@@ -47,7 +47,7 @@ app.post('/api/token', async (c) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         config: {
-          responseModalities: ['AUDIO'],
+          responseModalities: ['AUDIO', 'TEXT'],
           enableAffectiveDialog: true,
           speechConfig: {
             languageCode: 'bg-BG',
@@ -104,7 +104,7 @@ app.get('/ws/voice', async (c) => {
     setup: {
       model: 'models/gemini-3.1-flash-live-preview',
       generationConfig: {
-        responseModalities: ['AUDIO'],
+        responseModalities: ['AUDIO', 'TEXT'],
         speechConfig: {
           languageCode: 'bg-BG',
         },
@@ -236,21 +236,48 @@ async function tryParseAndSaveTask(
   db: D1Database,
   ws: WebSocket
 ): Promise<void> {
-  // Try to extract JSON from the text
-  const jsonMatch = text.match(/\{[\s\S]*"task"[\s\S]*\}/);
-  if (!jsonMatch) return;
+  if (!text.trim()) return;
+
+  let parsed: any = null;
 
   try {
-    const parsed = JSON.parse(jsonMatch[0]);
-    if (!parsed.task) return;
+    // Strategy 1: direct JSON parse
+    parsed = JSON.parse(text.trim());
+  } catch {
+    try {
+      // Strategy 2: extract JSON block from mixed text
+      const jsonMatch = text.match(/\{[\s\S]*?"task"\s*:\s*"[^"]+[\s\S]*?\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      }
+    } catch {
+      try {
+        // Strategy 3: handle markdown-wrapped JSON (```json ... ```)
+        const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlock) {
+          parsed = JSON.parse(codeBlock[1].trim());
+        }
+      } catch {
+        // All strategies failed — notify client for transparency
+        ws.send(JSON.stringify({
+          type: 'parseError',
+          message: 'Не успях да разпозная задачата. Моля, опитайте отново.',
+        }));
+        return;
+      }
+    }
+  }
 
+  if (!parsed || !parsed.task) return;
+
+  try {
     const task = await createTask(db, {
       user_id: userId,
       content: parsed.task,
       emotion: parsed.emotion || 'neutral',
-      priority: parsed.priority || 3,
+      priority: Math.min(5, Math.max(1, parseInt(parsed.priority) || 3)),
       due_date: parsed.due_date || null,
-      estimated_minutes: parsed.estimated_minutes || null,
+      estimated_minutes: parsed.estimated_minutes ? parseInt(parsed.estimated_minutes) : null,
     });
 
     ws.send(JSON.stringify({
@@ -258,7 +285,11 @@ async function tryParseAndSaveTask(
       task,
     }));
   } catch (e) {
-    // Not valid JSON yet, ignore
+    console.error('D1 save error:', e);
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Грешка при запис на задачата.',
+    }));
   }
 }
 

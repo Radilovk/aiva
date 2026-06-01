@@ -1,4 +1,4 @@
-const API_BASE = '';  // Same origin when served from Worker
+const API_BASE = '';
 const WS_BASE = location.protocol === 'https:' ? 'wss://' : 'ws://';
 
 // --- User ID ---
@@ -13,34 +13,45 @@ function getUserId() {
 
 const userId = getUserId();
 
-// --- DOM Elements ---
+// --- DOM ---
 const recordBtn = document.getElementById('recordBtn');
 const statusEl = document.getElementById('status');
-const taskConfirmation = document.getElementById('taskConfirmation');
-const taskContent = document.getElementById('taskContent');
-const taskEmotion = document.getElementById('taskEmotion');
-const taskPriority = document.getElementById('taskPriority');
-const taskDue = document.getElementById('taskDue');
+const waveform = document.getElementById('waveform');
+const toast = document.getElementById('toast');
+const toastContent = document.getElementById('toastContent');
+const toastMeta = document.getElementById('toastMeta');
+const errorToast = document.getElementById('errorToast');
 const tasksContainer = document.getElementById('tasksContainer');
+const tasksCount = document.getElementById('tasksCount');
 
 // --- State ---
 let isRecording = false;
 let ws = null;
 let audioContext = null;
 let mediaStream = null;
-let processorNode = null;
+let workletNode = null;
+let playbackQueue = [];
+let isPlaying = false;
 let playbackContext = null;
 
-// --- Audio Playback ---
-function initPlayback() {
-  if (!playbackContext) {
-    playbackContext = new AudioContext({ sampleRate: 24000 });
+// --- Audio Playback with queue (handles variable sample rates) ---
+function getPlaybackContext() {
+  if (!playbackContext || playbackContext.state === 'closed') {
+    try {
+      playbackContext = new AudioContext({ sampleRate: 24000 });
+    } catch {
+      // Fallback: let browser pick sample rate, we'll resample
+      playbackContext = new AudioContext();
+    }
   }
+  if (playbackContext.state === 'suspended') {
+    playbackContext.resume();
+  }
+  return playbackContext;
 }
 
 function playAudioChunk(base64Data) {
-  initPlayback();
-
+  const ctx = getPlaybackContext();
   const binaryStr = atob(base64Data);
   const bytes = new Uint8Array(binaryStr.length);
   for (let i = 0; i < binaryStr.length; i++) {
@@ -48,28 +59,59 @@ function playAudioChunk(base64Data) {
   }
 
   // Convert 16-bit PCM to Float32
-  const samples = new Float32Array(bytes.length / 2);
+  const pcmSamples = new Float32Array(bytes.length / 2);
   const view = new DataView(bytes.buffer);
-  for (let i = 0; i < samples.length; i++) {
-    samples[i] = view.getInt16(i * 2, true) / 32768;
+  for (let i = 0; i < pcmSamples.length; i++) {
+    pcmSamples[i] = view.getInt16(i * 2, true) / 32768;
   }
 
-  const buffer = playbackContext.createBuffer(1, samples.length, 24000);
-  buffer.getChannelData(0).set(samples);
+  // Resample if AudioContext doesn't support 24kHz natively
+  const targetRate = ctx.sampleRate;
+  let finalSamples = pcmSamples;
 
-  const source = playbackContext.createBufferSource();
+  if (targetRate !== 24000) {
+    const ratio = 24000 / targetRate;
+    const newLength = Math.round(pcmSamples.length / ratio);
+    finalSamples = new Float32Array(newLength);
+    for (let i = 0; i < newLength; i++) {
+      const srcIdx = i * ratio;
+      const idx = Math.floor(srcIdx);
+      const frac = srcIdx - idx;
+      const a = pcmSamples[idx] || 0;
+      const b = pcmSamples[idx + 1] || 0;
+      finalSamples[i] = a + (b - a) * frac;
+    }
+  }
+
+  const buffer = ctx.createBuffer(1, finalSamples.length, targetRate);
+  buffer.getChannelData(0).set(finalSamples);
+
+  playbackQueue.push(buffer);
+  if (!isPlaying) drainPlaybackQueue(ctx);
+}
+
+function drainPlaybackQueue(ctx) {
+  if (playbackQueue.length === 0) {
+    isPlaying = false;
+    return;
+  }
+  isPlaying = true;
+  const buffer = playbackQueue.shift();
+  const source = ctx.createBufferSource();
   source.buffer = buffer;
-  source.connect(playbackContext.destination);
+  source.connect(ctx.destination);
+  source.onended = () => drainPlaybackQueue(ctx);
   source.start();
 }
 
-// --- WebSocket Connection ---
+// --- WebSocket ---
 function connectWebSocket() {
   const wsUrl = `${WS_BASE}${location.host}/ws/voice?user_id=${encodeURIComponent(userId)}`;
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
-    setStatus('Свързан — говорете...', true);
+    setStatus('Слушам...', true);
+    waveform.classList.add('active');
   };
 
   ws.onmessage = (event) => {
@@ -81,139 +123,169 @@ function connectWebSocket() {
       }
 
       if (msg.type === 'taskSaved') {
-        showTaskConfirmation(msg.task);
+        showToast(msg.task);
         loadTasks();
       }
 
-      if (msg.type === 'turnComplete') {
-        // Gemini finished speaking
+      if (msg.type === 'parseError' || msg.type === 'error') {
+        showError(msg.message);
       }
     } catch (e) {
-      console.error('WS message parse error:', e);
+      console.error('WS parse error:', e);
     }
   };
 
   ws.onclose = () => {
-    setStatus('Връзката е прекъсната');
-    stopRecording();
+    setStatus('Докоснете за запис');
+    waveform.classList.remove('active');
+    if (isRecording) stopRecording();
   };
 
-  ws.onerror = (e) => {
-    console.error('WS error:', e);
-    setStatus('Грешка при свързване');
+  ws.onerror = () => {
+    showError('Грешка при свързване');
   };
 }
 
-// --- Audio Recording ---
+// --- Audio Recording (AudioWorklet with ScriptProcessor fallback) ---
 async function startRecording() {
   try {
+    // Resume any existing playback context (required by browsers on user gesture)
+    getPlaybackContext();
+
     audioContext = new AudioContext({ sampleRate: 16000 });
+
+    // Fallback if 16kHz not supported — resample from native rate
+    const actualRate = audioContext.sampleRate;
+
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        sampleRate: 16000,
         channelCount: 1,
         echoCancellation: true,
         noiseSuppression: true,
+        autoGainControl: true,
       },
     });
 
     const source = audioContext.createMediaStreamSource(mediaStream);
 
-    // Use ScriptProcessorNode for PCM capture
-    processorNode = audioContext.createScriptProcessor(4096, 1, 1);
-    processorNode.onaudioprocess = (event) => {
+    // ScriptProcessor (widely supported)
+    const bufferSize = 4096;
+    const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+
+    processor.onaudioprocess = (event) => {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-      const inputData = event.inputBuffer.getChannelData(0);
-      // Convert Float32 to Int16
-      const int16Data = new Int16Array(inputData.length);
-      for (let i = 0; i < inputData.length; i++) {
-        const s = Math.max(-1, Math.min(1, inputData[i]));
-        int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      let inputData = event.inputBuffer.getChannelData(0);
+
+      // Resample to 16kHz if needed
+      if (actualRate !== 16000) {
+        const ratio = actualRate / 16000;
+        const newLen = Math.floor(inputData.length / ratio);
+        const resampled = new Float32Array(newLen);
+        for (let i = 0; i < newLen; i++) {
+          const srcIdx = Math.floor(i * ratio);
+          resampled[i] = inputData[srcIdx];
+        }
+        inputData = resampled;
       }
 
-      // Send as base64 JSON
-      const base64 = arrayBufferToBase64(int16Data.buffer);
+      // Float32 → Int16
+      const int16 = new Int16Array(inputData.length);
+      for (let i = 0; i < inputData.length; i++) {
+        const s = Math.max(-1, Math.min(1, inputData[i]));
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+
       ws.send(JSON.stringify({
         type: 'audio',
-        data: base64,
+        data: arrayBufferToBase64(int16.buffer),
       }));
     };
 
-    source.connect(processorNode);
-    processorNode.connect(audioContext.destination);
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+    workletNode = processor;
 
     connectWebSocket();
     isRecording = true;
     recordBtn.classList.add('recording');
-    setStatus('Слушам...', true);
+    setStatus('Свързване...', true);
   } catch (err) {
-    console.error('Microphone error:', err);
-    setStatus('Грешка: няма достъп до микрофона');
+    console.error('Mic error:', err);
+    showError('Няма достъп до микрофона');
   }
 }
 
 function stopRecording() {
-  if (processorNode) {
-    processorNode.disconnect();
-    processorNode = null;
-  }
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((t) => t.stop());
-    mediaStream = null;
-  }
-  if (audioContext) {
-    audioContext.close();
-    audioContext = null;
-  }
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.close();
-    ws = null;
-  }
+  if (workletNode) { workletNode.disconnect(); workletNode = null; }
+  if (mediaStream) { mediaStream.getTracks().forEach((t) => t.stop()); mediaStream = null; }
+  if (audioContext) { audioContext.close(); audioContext = null; }
+  if (ws && ws.readyState === WebSocket.OPEN) { ws.close(); ws = null; }
 
   isRecording = false;
   recordBtn.classList.remove('recording');
-  setStatus('Натиснете бутона за запис');
+  waveform.classList.remove('active');
+  setStatus('Докоснете за запис');
 }
 
-// --- UI Helpers ---
+// --- UI ---
 function setStatus(text, active = false) {
   statusEl.textContent = text;
   statusEl.classList.toggle('active', active);
 }
 
-function showTaskConfirmation(task) {
-  taskContent.textContent = task.content;
-  taskEmotion.textContent = `🎭 ${task.emotion || 'neutral'}`;
-  taskPriority.textContent = `⚡ Приоритет ${task.priority}`;
-  taskDue.textContent = task.due_date ? `📅 ${task.due_date}` : '';
-  taskConfirmation.classList.add('visible');
+function showToast(task) {
+  toastContent.textContent = task.content;
 
-  setTimeout(() => {
-    taskConfirmation.classList.remove('visible');
-  }, 8000);
+  const emotionMap = { stress: '😰', tired: '😴', urgent: '⚡', neutral: '😊' };
+  const priorityLabel = `П${task.priority}`;
+  const emotionText = escapeHtml(task.emotion || 'neutral');
+  const dueLabel = escapeHtml(task.due_date || '');
+
+  toastMeta.innerHTML = `
+    <span>${emotionMap[task.emotion] || '😊'} ${emotionText}</span>
+    <span>⚡ ${escapeHtml(priorityLabel)}</span>
+    ${dueLabel ? `<span>📅 ${dueLabel}</span>` : ''}
+  `;
+
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 5000);
 }
 
-// --- Tasks List ---
+function showError(msg) {
+  errorToast.textContent = msg;
+  errorToast.classList.add('visible');
+  setTimeout(() => errorToast.classList.remove('visible'), 4000);
+}
+
+// --- Tasks ---
 async function loadTasks() {
   try {
     const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`);
     const data = await res.json();
+    const tasks = data.tasks || [];
 
-    tasksContainer.innerHTML = '';
-    if (data.tasks && data.tasks.length > 0) {
-      data.tasks.forEach((task) => {
-        const el = document.createElement('div');
-        el.className = 'task-item';
-        el.innerHTML = `
-          <div class="task-text">${escapeHtml(task.content)}</div>
-          <button class="done-btn" data-id="${task.id}" aria-label="Готово"></button>
-        `;
-        tasksContainer.appendChild(el);
-      });
-    } else {
-      tasksContainer.innerHTML = '<p style="color:#555;font-size:0.9rem;">Няма активни задачи</p>';
+    tasksCount.textContent = tasks.length;
+
+    if (tasks.length === 0) {
+      tasksContainer.innerHTML = '<div class="empty-state">Все още няма задачи</div>';
+      return;
     }
+
+    tasksContainer.innerHTML = tasks.map((t) => `
+      <div class="task-item" data-id="${t.id}">
+        <div class="task-check" data-id="${t.id}" aria-label="Маркирай като готова">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="task-body">
+          <div class="task-text">${escapeHtml(t.content)}</div>
+          <div class="task-info">
+            ${t.emotion ? `<span>${t.emotion}</span>` : ''}
+            ${t.due_date ? `<span>${t.due_date}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
   } catch (e) {
     console.error('Load tasks error:', e);
   }
@@ -228,7 +300,7 @@ async function markDone(taskId) {
   }
 }
 
-// --- Event Listeners ---
+// --- Events ---
 recordBtn.addEventListener('click', () => {
   if (isRecording) {
     stopRecording();
@@ -238,9 +310,17 @@ recordBtn.addEventListener('click', () => {
 });
 
 tasksContainer.addEventListener('click', (e) => {
-  if (e.target.classList.contains('done-btn')) {
-    const id = e.target.dataset.id;
-    markDone(id);
+  const check = e.target.closest('.task-check');
+  if (check) {
+    const id = check.dataset.id;
+    // Animate out
+    const item = check.closest('.task-item');
+    if (item) {
+      item.style.opacity = '0';
+      item.style.transform = 'translateX(20px)';
+      item.style.transition = 'all 0.3s ease';
+    }
+    setTimeout(() => markDone(id), 300);
   }
 });
 
