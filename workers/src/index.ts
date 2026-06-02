@@ -279,7 +279,8 @@ app.get('/ws/voice', async (c) => {
   });
 
   geminiWs.addEventListener('error', (e) => {
-    console.error('Gemini WS error:', e);
+    const ev = e as ErrorEvent;
+    console.error('Gemini WS error:', ev.message || ev.type, ev.error);
     if (inactivityTimer) clearTimeout(inactivityTimer);
     server.close(1011, 'Грешка в Gemini връзката');
   });
