@@ -2,6 +2,7 @@ import { getAllIncompleteTasks, Task } from './tasks';
 
 export interface CronEnv {
   DB: D1Database;
+  SESSIONS: KVNamespace;
   GEMINI_API_KEY: string;
 }
 
@@ -10,8 +11,18 @@ export async function handleCron(env: CronEnv): Promise<void> {
 
   if (tasks.length === 0) return;
 
+  // Cache check: skip Gemini call if task list hasn't changed
+  const taskHash = tasks.map((t: Task) => `${t.id}:${t.priority}`).join(',');
+  const cacheKey = 'cron:last_task_hash';
+  const lastHash = await env.SESSIONS.get(cacheKey);
+
+  if (lastHash === taskHash) {
+    console.log('Cron: задачите не са променени, пропускам Gemini заявка.');
+    return;
+  }
+
   const taskList = tasks
-    .map((t: Task) => `- [Приоритет ${t.priority}] ${t.content} (краен срок: ${t.due_date || 'няма'})`)
+    .map((t: Task) => `- [id:${t.id}, Приоритет ${t.priority}] ${t.content} (краен срок: ${t.due_date || 'няма'})`)
     .join('\n');
 
   const prompt = `Ето списък с незавършени задачи:\n${taskList}\n\nКои 3 задачи трябва да бъдат приоритет за утре? Отговори на български като JSON масив с полета: task_id, reason.`;
@@ -25,6 +36,7 @@ export async function handleCron(env: CronEnv): Promise<void> {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
+          maxOutputTokens: 512,
         },
       }),
     }
@@ -40,6 +52,8 @@ export async function handleCron(env: CronEnv): Promise<void> {
 
   if (resultText) {
     console.log('Evening priority review:', resultText);
+    // Cache current task hash to avoid duplicate calls
+    await env.SESSIONS.put(cacheKey, taskHash, { expirationTtl: 86400 });
     // Future: send push notifications to users via app_token
   }
 }

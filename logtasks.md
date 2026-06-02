@@ -1,0 +1,25 @@
+# AIVA — Лог на задачите
+
+## 2026-06-02: Подобрения от Gemini Live API примерите + Cost Protection
+
+### Фаза 1: Cost Protection
+- [x] Добавен `maxOutputTokens: 1024` в generationConfig на WebSocket setup — ограничава дължината на отговорите
+- [x] Добавен session timeout (автоматично затваряне след 3 мин неактивност) — спестява API секунди
+- [x] Добавен rate limit: макс. 20 сесии/ден per user чрез KV — предпазва от неочаквани разходи
+- [x] Кеширане на cron резултата в KV — ако задачите не са се променили, не прави нова Gemini заявка
+- [x] Добавен `maxOutputTokens: 512` в cron generationConfig
+
+### Фаза 2: Function Calling (от Google gemini-live-api-examples)
+- [x] Заменено JSON парсването с Gemini function declaration за `save_task` — надежден структуриран output
+- [x] Добавен `automaticActivityDetection` в setup message — по-добро разпознаване на края на речта
+
+### Фаза 3: Audio подобрения (от Google gemini-live-api-examples)
+- [x] Заменен ScriptProcessor с AudioWorklet (+ fallback) — по-ниска латентност, по-малко CPU
+- [x] Добавен input transcription — текстов fallback показван в UI
+
+### Технически детайли
+- Използван модел от Google примера: `automaticActivityDetection` с `silenceDurationMs: 2000`, `prefixPaddingMs: 500`
+- Function calling елиминира нестабилното JSON парсване от свободен текст
+- AudioWorklet процесор създаден в `frontend/pcm-processor.js`
+- Rate limiting използва KV с TTL 24ч (автоматично изтичане)
+- Cron кеш сравнява hash на task IDs — ново извикване само при промяна в задачите
