@@ -11,7 +11,6 @@ interface Env {
 
 // --- Cost protection constants ---
 const MAX_SESSIONS_PER_DAY = 50;
-const SESSION_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes inactivity
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -46,9 +45,19 @@ app.post('/api/users/register', async (c) => {
   return c.json({ success: true });
 });
 
-// --- Ephemeral token endpoint for frontend ---
+// --- Ephemeral token endpoint for frontend (includes rate limiting) ---
 
 app.post('/api/token', async (c) => {
+  const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as any));
+  const userId = body?.user_id || 'anonymous';
+
+  const rateLimitKey = `rate:${userId}:${new Date().toISOString().slice(0, 10)}`;
+  const currentCount = parseInt(await c.env.SESSIONS.get(rateLimitKey) || '0', 10);
+  if (currentCount >= MAX_SESSIONS_PER_DAY) {
+    return c.json({ error: 'Достигнат е дневният лимит от сесии. Опитайте утре.' }, 429);
+  }
+  await c.env.SESSIONS.put(rateLimitKey, String(currentCount + 1), { expirationTtl: 86400 });
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-live-preview:generateEphemeralToken?key=${c.env.GEMINI_API_KEY}`,
     {
@@ -78,325 +87,37 @@ app.post('/api/token', async (c) => {
   return c.json(data);
 });
 
-// --- WebSocket voice proxy ---
+// --- Save task endpoint (called directly by frontend after Gemini function call) ---
 
-app.get('/ws/voice', async (c) => {
-  const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader !== 'websocket') {
-    return c.text('Очаква се WebSocket връзка', 426);
+app.post('/api/tasks', async (c) => {
+  const body = await c.req.json<{
+    user_id: string;
+    task: string;
+    emotion?: string;
+    priority?: number;
+    due_date?: string;
+    estimated_minutes?: number;
+  }>();
+
+  if (!body.user_id || !body.task) {
+    return c.json({ error: 'user_id и task са задължителни' }, 400);
   }
 
-  const pair = new WebSocketPair();
-  const [client, server] = Object.values(pair);
-
-  server.accept();
-
-  const userId = c.req.query('user_id') || 'anonymous';
-
-  // --- Rate limiting: max 20 sessions/day per user ---
-  const rateLimitKey = `rate:${userId}:${new Date().toISOString().slice(0, 10)}`;
-  const currentCount = parseInt(await c.env.SESSIONS.get(rateLimitKey) || '0', 10);
-  if (currentCount >= MAX_SESSIONS_PER_DAY) {
-    server.send(JSON.stringify({
-      type: 'error',
-      message: 'Достигнат е дневният лимит от 20 сесии. Опитайте утре.',
-    }));
-    server.close(1008, 'Дневен лимит достигнат');
-    return new Response(null, { status: 101, webSocket: client });
-  }
-  await c.env.SESSIONS.put(rateLimitKey, String(currentCount + 1), { expirationTtl: 86400 });
-
-  let geminiWs: WebSocket | null = null;
-  let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
-
-  // --- Inactivity timeout helper ---
-  function resetInactivityTimer() {
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-    inactivityTimer = setTimeout(() => {
-      server.send(JSON.stringify({
-        type: 'error',
-        message: 'Сесията е затворена поради неактивност (3 мин).',
-      }));
-      server.close(1000, 'Timeout поради неактивност');
-      geminiWs?.close();
-    }, SESSION_TIMEOUT_MS);
-  }
-
-  resetInactivityTimer();
-
-  const GEMINI_WS_URL = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${c.env.GEMINI_API_KEY}`;
-
-  // Connect to Gemini Live API
-  let geminiResponse: Response;
   try {
-    geminiResponse = await fetch(GEMINI_WS_URL, {
-      headers: { Upgrade: 'websocket' },
+    const task = await createTask(c.env.DB, {
+      user_id: body.user_id,
+      content: body.task,
+      emotion: body.emotion || 'neutral',
+      priority: Math.min(5, Math.max(1, parseInt(String(body.priority)) || 3)),
+      due_date: body.due_date || null,
+      estimated_minutes: body.estimated_minutes ? parseInt(String(body.estimated_minutes)) : null,
     });
+    return c.json({ success: true, task });
   } catch (e) {
-    console.error('Gemini WS connection error:', e);
-    server.send(JSON.stringify({ type: 'error', message: 'Неуспешна връзка с Gemini.' }));
-    server.close(1011, 'Неуспешна връзка с Gemini');
-    return new Response(null, { status: 101, webSocket: client });
+    console.error('Task save error:', e);
+    return c.json({ error: 'Грешка при запис на задачата' }, 500);
   }
-
-  geminiWs = (geminiResponse as any).webSocket as WebSocket;
-  if (!geminiWs) {
-    server.send(JSON.stringify({ type: 'error', message: 'Неуспешна връзка с Gemini.' }));
-    server.close(1011, 'Неуспешна връзка с Gemini');
-    return new Response(null, { status: 101, webSocket: client });
-  }
-
-  geminiWs.accept();
-
-  // Send setup message to Gemini with function calling and activity detection
-  const setupMessage = {
-    setup: {
-      model: 'models/gemini-3.1-flash-live-preview',
-      generationConfig: {
-        maxOutputTokens: 1024,
-        responseModalities: ['AUDIO', 'TEXT'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
-          },
-        },
-      },
-      enableAffectiveDialog: true,
-      inputAudioTranscription: {},
-      realtimeInputConfig: {
-        automaticActivityDetection: { disabled: false },
-      },
-      tools: [
-        {
-          functionDeclarations: [
-            {
-              name: 'save_task',
-              description: 'Запазва задача след като потребителят я опише. Извикай тази функция когато разбереш какво е задачата.',
-              parameters: {
-                type: 'OBJECT',
-                properties: {
-                  task: {
-                    type: 'STRING',
-                    description: 'Кратка формулировка на задачата на български',
-                  },
-                  emotion: {
-                    type: 'STRING',
-                    description: 'Засечена емоция от тона на гласа',
-                    enum: ['stress', 'tired', 'urgent', 'neutral'],
-                  },
-                  priority: {
-                    type: 'INTEGER',
-                    description: 'Приоритет от 1 (най-висок) до 5 (най-нисък)',
-                  },
-                  due_date: {
-                    type: 'STRING',
-                    description: 'Краен срок във формат YYYY-MM-DD или празен ако няма',
-                  },
-                  estimated_minutes: {
-                    type: 'INTEGER',
-                    description: 'Прогнозно време за изпълнение в минути',
-                  },
-                },
-                required: ['task', 'emotion', 'priority'],
-              },
-            },
-          ],
-        },
-      ],
-      systemInstruction: {
-        parts: [
-          {
-            text: `Ти си личен асистент за задачи на български език.
-
-ПРАВИЛА:
-- Слушаш ТОНА на гласа, не само думите
-- Ако потребителят звучи стресирано → отговаряш спокойно и уверено
-- Ако звучи уморено → отговаряш много кратко
-- Ако звучи бързащо → веднага минаваш към същественото
-- Задаваш САМО ЕДИН въпрос
-- НИКОГА не задаваш повече от един въпрос
-- Говориш само на български
-- Когато разбереш задачата, ИЗВИКАЙ функцията save_task с правилните параметри`,
-          },
-        ],
-      },
-    },
-  };
-
-  geminiWs.send(JSON.stringify(setupMessage));
-
-  // Handle messages from Gemini
-  geminiWs.addEventListener('message', (event) => {
-    try {
-      const data = JSON.parse(event.data as string);
-
-      // Handle function call (save_task) from Gemini
-      if (data.toolCall) {
-        for (const call of data.toolCall.functionCalls || []) {
-          if (call.name === 'save_task') {
-            handleFunctionCallSaveTask(call, userId, c.env.DB, server, geminiWs!);
-          }
-        }
-        return;
-      }
-
-      // Forward audio back to client
-      if (data.serverContent?.modelTurn?.parts) {
-        for (const part of data.serverContent.modelTurn.parts) {
-          if (part.inlineData) {
-            server.send(JSON.stringify({
-              type: 'audio',
-              data: part.inlineData.data,
-              mimeType: part.inlineData.mimeType,
-            }));
-          }
-          if (part.text) {
-            server.send(JSON.stringify({ type: 'text', data: part.text }));
-          }
-        }
-      }
-
-      // Forward input transcription to client
-      if (data.serverContent?.inputTranscription) {
-        server.send(JSON.stringify({
-          type: 'transcription',
-          data: data.serverContent.inputTranscription.text || '',
-        }));
-      }
-
-      // Check if turn is complete
-      if (data.serverContent?.turnComplete) {
-        server.send(JSON.stringify({ type: 'turnComplete' }));
-      }
-    } catch (e) {
-      console.error('Error processing Gemini message:', e);
-    }
-  });
-
-  geminiWs.addEventListener('close', () => {
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-    server.close(1000, 'Gemini връзката е затворена');
-  });
-
-  geminiWs.addEventListener('error', (e) => {
-    const ev = e as ErrorEvent;
-    console.error('Gemini WS error:', ev.message || ev.type, ev.error);
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-    server.close(1011, 'Грешка в Gemini връзката');
-  });
-
-  // Handle messages from client
-  server.addEventListener('message', (event) => {
-    if (!geminiWs) return;
-    resetInactivityTimer();
-
-    try {
-      const msg = JSON.parse(event.data as string);
-
-      if (msg.type === 'audio') {
-        geminiWs.send(JSON.stringify({
-          realtimeInput: {
-            mediaChunks: [
-              {
-                mimeType: 'audio/pcm;rate=16000',
-                data: msg.data,
-              },
-            ],
-          },
-        }));
-      }
-    } catch (e) {
-      // Binary data - forward as PCM audio
-      if (event.data instanceof ArrayBuffer) {
-        const base64 = arrayBufferToBase64(event.data);
-        geminiWs.send(JSON.stringify({
-          realtimeInput: {
-            mediaChunks: [
-              {
-                mimeType: 'audio/pcm;rate=16000',
-                data: base64,
-              },
-            ],
-          },
-        }));
-      }
-    }
-  });
-
-  server.addEventListener('close', () => {
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-    geminiWs?.close();
-  });
-
-  return new Response(null, { status: 101, webSocket: client });
 });
-
-// --- Helper functions ---
-
-async function handleFunctionCallSaveTask(
-  call: { id: string; name: string; args: any },
-  userId: string,
-  db: D1Database,
-  ws: WebSocket,
-  geminiWs: WebSocket
-): Promise<void> {
-  const args = call.args || {};
-
-  if (!args.task) {
-    geminiWs.send(JSON.stringify({
-      toolResponse: {
-        functionResponses: [{
-          id: call.id,
-          response: { error: 'Липсва описание на задачата' },
-        }],
-      },
-    }));
-    return;
-  }
-
-  try {
-    const task = await createTask(db, {
-      user_id: userId,
-      content: args.task,
-      emotion: args.emotion || 'neutral',
-      priority: Math.min(5, Math.max(1, parseInt(args.priority) || 3)),
-      due_date: args.due_date || null,
-      estimated_minutes: args.estimated_minutes ? parseInt(args.estimated_minutes) : null,
-    });
-
-    ws.send(JSON.stringify({ type: 'taskSaved', task }));
-
-    // Respond to Gemini so it can confirm to the user
-    geminiWs.send(JSON.stringify({
-      toolResponse: {
-        functionResponses: [{
-          id: call.id,
-          response: { success: true, task_id: task.id, content: task.content },
-        }],
-      },
-    }));
-  } catch (e) {
-    console.error('D1 save error:', e);
-    ws.send(JSON.stringify({ type: 'error', message: 'Грешка при запис на задачата.' }));
-    geminiWs.send(JSON.stringify({
-      toolResponse: {
-        functionResponses: [{
-          id: call.id,
-          response: { error: 'Грешка при запис' },
-        }],
-      },
-    }));
-  }
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
 
 // --- Static file serving for frontend ---
 

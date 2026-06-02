@@ -73,19 +73,29 @@
 
 ---
 
-## 2026-06-02: Fix — "Network connection lost" / Gemini Live API setup message грешки
+## 2026-06-02: Fix — "Network connection lost" / Stateless Worker не може да проксира WebSocket
 
 ### Проблем
-- `Gemini WS error: Uncaught Error: Network connection lost.` — Gemini приема WebSocket handshake, но веднага затваря връзката
-- Voice функцията никога не е работила
+- `Gemini WS error: Uncaught Error: Network connection lost.` + `"outcome": "canceled"`
+- Гласовата функция никога не работи повече от секунди
 
-### Причина (потвърдена чрез реален работещ пример)
-1. `speechConfig: { languageCode: 'bg-BG' }` — несъществуващ формат за Gemini Live API. Правилният формат изисква `voiceConfig.prebuiltVoiceConfig.voiceName`.
-2. `automaticActivityDetection` съдържаше недокументирани полета `silenceDurationMs` и `prefixPaddingMs`.
+### Причина (потвърдена)
+- Cloudflare Workers в `"executionModel": "stateless"` **не може да поддържа дълготрайни изходящи WebSocket връзки**
+- Stateless worker се отменя от runtime-а, което разкъсва TCP връзката към Gemini → `"Network connection lost."`
+- Worker проксирането на WebSocket изисква Durable Objects (stateful execution)
 
 ### Решение
-- Заменено `speechConfig: { languageCode: 'bg-BG' }` с `speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } }` — в WS setup message и в `/api/token`
-- Премахнати `silenceDurationMs` и `prefixPaddingMs` от `automaticActivityDetection`
+- Премахнат `/ws/voice` WebSocket proxy endpoint и целия свързан код (handleFunctionCallSaveTask, arrayBufferToBase64, SESSION_TIMEOUT_MS)
+- `POST /api/token` сега приема `user_id` в body и извършва rate limiting преди да издаде токен
+- Добавен `POST /api/tasks` REST endpoint — фронтендът го вика директно след toolCall от Gemini
+- `frontend/app.js`: `connectWebSocket()` заменен с `connectGemini()` — браузърът се свързва **директно** с Gemini Live API WebSocket чрез ephemeral token
+- Аудио се изпраща директно в Gemini формат (`realtimeInput.mediaChunks`), без Worker-посредник
+- `handleSaveTask()` в JS прихваща `toolCall` от Gemini и вика `POST /api/tasks` на Worker-а
 
-### Бележка
-- Ако грешката продължи след деплоя — провери дали API ключът има активиран достъп до Gemini Live API в Google AI Studio.
+### Архитектура след поправката
+```
+Браузър ←→ Gemini Live API WebSocket (директно, с ephemeral token)
+Браузър → Worker POST /api/token (вземане на токен + rate limiting)
+Браузър → Worker POST /api/tasks (запис на задача след toolCall)
+```
+
