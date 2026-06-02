@@ -27,5 +27,11 @@
       "binding": "SESSIONS",
       "id": "d9d04ee275024e2a9cbfcea9da7a13d4"
     }
+  ],
+  "migrations": [
+    {
+      "tag": "v1",
+      "deleted_classes": ["VoiceWebSocket"]
+    }
   ]
 }
