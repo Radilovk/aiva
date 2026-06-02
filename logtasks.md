@@ -114,3 +114,6 @@
 
 ### Решение
 - Добавена `"migrations"` секция в `wrangler.jsonc` с `"deleted_classes": ["VoiceWebSocket"]` и tag `"v1"`
+- Добавен stub `VoiceWebSocket` клас в `index.ts` (Cloudflare изисква класът да е наличен при деплоя с миграцията)
+- Добавен `durable_objects.bindings` в `wrangler.jsonc` за да може wrangler да асоциира миграцията с binding-а
+- **След успешен деплой**: премахни stub класа и `durable_objects` секцията от конфига

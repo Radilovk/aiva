@@ -125,6 +125,14 @@ app.get('/', async (c) => {
   return c.redirect('/index.html');
 });
 
+// --- Stub for delete-class migration (remove after successful deploy) ---
+export class VoiceWebSocket {
+  constructor(private state: DurableObjectState, private env: Env) {}
+  async fetch(_request: Request) {
+    return new Response('This Durable Object is being deleted', { status: 410 });
+  }
+}
+
 // --- Export ---
 
 export default {
