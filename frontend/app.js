@@ -127,6 +127,10 @@ function connectWebSocket() {
         loadTasks();
       }
 
+      if (msg.type === 'transcription' && msg.data) {
+        setStatus(`"${msg.data}"`, true);
+      }
+
       if (msg.type === 'parseError' || msg.type === 'error') {
         showError(msg.message);
       }
@@ -168,43 +172,65 @@ async function startRecording() {
 
     const source = audioContext.createMediaStreamSource(mediaStream);
 
-    // ScriptProcessor (widely supported)
-    const bufferSize = 4096;
-    const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+    // Try AudioWorklet first, fallback to ScriptProcessor
+    let useWorklet = false;
+    try {
+      await audioContext.audioWorklet.addModule('pcm-processor.js');
+      useWorklet = true;
+    } catch (e) {
+      console.warn('AudioWorklet not supported, using ScriptProcessor fallback');
+    }
 
-    processor.onaudioprocess = (event) => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (useWorklet) {
+      const worklet = new AudioWorkletNode(audioContext, 'pcm-processor');
+      worklet.port.onmessage = (event) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({
+          type: 'audio',
+          data: arrayBufferToBase64(event.data.pcm),
+        }));
+      };
+      source.connect(worklet);
+      worklet.connect(audioContext.destination);
+      workletNode = worklet;
+    } else {
+      // ScriptProcessor fallback
+      const bufferSize = 4096;
+      const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
 
-      let inputData = event.inputBuffer.getChannelData(0);
+      processor.onaudioprocess = (event) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-      // Resample to 16kHz if needed
-      if (actualRate !== 16000) {
-        const ratio = actualRate / 16000;
-        const newLen = Math.floor(inputData.length / ratio);
-        const resampled = new Float32Array(newLen);
-        for (let i = 0; i < newLen; i++) {
-          const srcIdx = Math.floor(i * ratio);
-          resampled[i] = inputData[srcIdx];
+        let inputData = event.inputBuffer.getChannelData(0);
+
+        // Resample to 16kHz if needed
+        if (actualRate !== 16000) {
+          const ratio = actualRate / 16000;
+          const newLen = Math.floor(inputData.length / ratio);
+          const resampled = new Float32Array(newLen);
+          for (let i = 0; i < newLen; i++) {
+            resampled[i] = inputData[Math.floor(i * ratio)];
+          }
+          inputData = resampled;
         }
-        inputData = resampled;
-      }
 
-      // Float32 → Int16
-      const int16 = new Int16Array(inputData.length);
-      for (let i = 0; i < inputData.length; i++) {
-        const s = Math.max(-1, Math.min(1, inputData[i]));
-        int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-      }
+        // Float32 → Int16
+        const int16 = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          const s = Math.max(-1, Math.min(1, inputData[i]));
+          int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
 
-      ws.send(JSON.stringify({
-        type: 'audio',
-        data: arrayBufferToBase64(int16.buffer),
-      }));
-    };
+        ws.send(JSON.stringify({
+          type: 'audio',
+          data: arrayBufferToBase64(int16.buffer),
+        }));
+      };
 
-    source.connect(processor);
-    processor.connect(audioContext.destination);
-    workletNode = processor;
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+      workletNode = processor;
+    }
 
     connectWebSocket();
     isRecording = true;

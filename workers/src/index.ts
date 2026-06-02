@@ -9,6 +9,10 @@ interface Env {
   GEMINI_API_KEY: string;
 }
 
+// --- Cost protection constants ---
+const MAX_SESSIONS_PER_DAY = 20;
+const SESSION_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes inactivity
+
 const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', cors());
@@ -81,8 +85,37 @@ app.get('/ws/voice', async (c) => {
   server.accept();
 
   const userId = c.req.query('user_id') || 'anonymous';
+
+  // --- Rate limiting: max 20 sessions/day per user ---
+  const rateLimitKey = `rate:${userId}:${new Date().toISOString().slice(0, 10)}`;
+  const currentCount = parseInt(await c.env.SESSIONS.get(rateLimitKey) || '0', 10);
+  if (currentCount >= MAX_SESSIONS_PER_DAY) {
+    server.send(JSON.stringify({
+      type: 'error',
+      message: 'Достигнат е дневният лимит от 20 сесии. Опитайте утре.',
+    }));
+    server.close(1008, 'Дневен лимит достигнат');
+    return new Response(null, { status: 101, webSocket: client });
+  }
+  await c.env.SESSIONS.put(rateLimitKey, String(currentCount + 1), { expirationTtl: 86400 });
+
   let geminiWs: WebSocket | null = null;
-  let accumulatedText = '';
+  let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // --- Inactivity timeout helper ---
+  function resetInactivityTimer() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      server.send(JSON.stringify({
+        type: 'error',
+        message: 'Сесията е затворена поради неактивност (3 мин).',
+      }));
+      server.close(1000, 'Timeout поради неактивност');
+      geminiWs?.close();
+    }, SESSION_TIMEOUT_MS);
+  }
+
+  resetInactivityTimer();
 
   const GEMINI_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${c.env.GEMINI_API_KEY}`;
 
@@ -99,39 +132,77 @@ app.get('/ws/voice', async (c) => {
 
   geminiWs.accept();
 
-  // Send setup message to Gemini
+  // Send setup message to Gemini with function calling and activity detection
   const setupMessage = {
     setup: {
       model: 'models/gemini-3.1-flash-live-preview',
       generationConfig: {
+        maxOutputTokens: 1024,
         responseModalities: ['AUDIO', 'TEXT'],
         speechConfig: {
           languageCode: 'bg-BG',
         },
       },
       enableAffectiveDialog: true,
+      inputAudioTranscription: {},
+      realtimeInputConfig: {
+        automaticActivityDetection: {
+          disabled: false,
+          silenceDurationMs: 2000,
+          prefixPaddingMs: 500,
+        },
+      },
+      tools: [
+        {
+          functionDeclarations: [
+            {
+              name: 'save_task',
+              description: 'Запазва задача след като потребителят я опише. Извикай тази функция когато разбереш какво е задачата.',
+              parameters: {
+                type: 'OBJECT',
+                properties: {
+                  task: {
+                    type: 'STRING',
+                    description: 'Кратка формулировка на задачата на български',
+                  },
+                  emotion: {
+                    type: 'STRING',
+                    description: 'Засечена емоция от тона на гласа',
+                    enum: ['stress', 'tired', 'urgent', 'neutral'],
+                  },
+                  priority: {
+                    type: 'INTEGER',
+                    description: 'Приоритет от 1 (най-висок) до 5 (най-нисък)',
+                  },
+                  due_date: {
+                    type: 'STRING',
+                    description: 'Краен срок във формат YYYY-MM-DD или празен ако няма',
+                  },
+                  estimated_minutes: {
+                    type: 'INTEGER',
+                    description: 'Прогнозно време за изпълнение в минути',
+                  },
+                },
+                required: ['task', 'emotion', 'priority'],
+              },
+            },
+          ],
+        },
+      ],
       systemInstruction: {
         parts: [
           {
             text: `Ти си личен асистент за задачи на български език.
-  
-  ПРАВИЛА:
-  - Слушаш ТОНА на гласа, не само думите
-  - Ако потребителят звучи стресирано → отговаряш спокойно и уверено
-  - Ако звучи уморено → отговаряш много кратко
-  - Ако звучи бързащо → веднага минаваш към същественото
-  - Задаваш САМО ЕДИН въпрос
-  - НИКОГА не задаваш повече от един въпрос
-  - Говориш само на български
-  
-  СЛЕД като разбереш задачата, върни JSON:
-  {
-    "task": "кратка формулировка",
-    "emotion": "stress|tired|urgent|neutral",
-    "priority": 1,
-    "due_date": "YYYY-MM-DD или null",
-    "estimated_minutes": 30
-  }`,
+
+ПРАВИЛА:
+- Слушаш ТОНА на гласа, не само думите
+- Ако потребителят звучи стресирано → отговаряш спокойно и уверено
+- Ако звучи уморено → отговаряш много кратко
+- Ако звучи бързащо → веднага минаваш към същественото
+- Задаваш САМО ЕДИН въпрос
+- НИКОГА не задаваш повече от един въпрос
+- Говориш само на български
+- Когато разбереш задачата, ИЗВИКАЙ функцията save_task с правилните параметри`,
           },
         ],
       },
@@ -145,6 +216,16 @@ app.get('/ws/voice', async (c) => {
     try {
       const data = JSON.parse(event.data as string);
 
+      // Handle function call (save_task) from Gemini
+      if (data.toolCall) {
+        for (const call of data.toolCall.functionCalls || []) {
+          if (call.name === 'save_task') {
+            handleFunctionCallSaveTask(call, userId, c.env.DB, server, geminiWs!);
+          }
+        }
+        return;
+      }
+
       // Forward audio back to client
       if (data.serverContent?.modelTurn?.parts) {
         for (const part of data.serverContent.modelTurn.parts) {
@@ -156,18 +237,22 @@ app.get('/ws/voice', async (c) => {
             }));
           }
           if (part.text) {
-            accumulatedText += part.text;
+            server.send(JSON.stringify({ type: 'text', data: part.text }));
           }
         }
+      }
+
+      // Forward input transcription to client
+      if (data.serverContent?.inputTranscription) {
+        server.send(JSON.stringify({
+          type: 'transcription',
+          data: data.serverContent.inputTranscription.text || '',
+        }));
       }
 
       // Check if turn is complete
       if (data.serverContent?.turnComplete) {
         server.send(JSON.stringify({ type: 'turnComplete' }));
-
-        // Try to parse task JSON from accumulated text
-        tryParseAndSaveTask(accumulatedText, userId, c.env.DB, server);
-        accumulatedText = '';
       }
     } catch (e) {
       console.error('Error processing Gemini message:', e);
@@ -175,23 +260,25 @@ app.get('/ws/voice', async (c) => {
   });
 
   geminiWs.addEventListener('close', () => {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
     server.close(1000, 'Gemini връзката е затворена');
   });
 
   geminiWs.addEventListener('error', (e) => {
     console.error('Gemini WS error:', e);
+    if (inactivityTimer) clearTimeout(inactivityTimer);
     server.close(1011, 'Грешка в Gemini връзката');
   });
 
   // Handle messages from client
   server.addEventListener('message', (event) => {
     if (!geminiWs) return;
+    resetInactivityTimer();
 
     try {
       const msg = JSON.parse(event.data as string);
 
       if (msg.type === 'audio') {
-        // Forward audio to Gemini
         geminiWs.send(JSON.stringify({
           realtimeInput: {
             mediaChunks: [
@@ -222,6 +309,7 @@ app.get('/ws/voice', async (c) => {
   });
 
   server.addEventListener('close', () => {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
     geminiWs?.close();
   });
 
@@ -230,65 +318,58 @@ app.get('/ws/voice', async (c) => {
 
 // --- Helper functions ---
 
-async function tryParseAndSaveTask(
-  text: string,
+async function handleFunctionCallSaveTask(
+  call: { id: string; name: string; args: any },
   userId: string,
   db: D1Database,
-  ws: WebSocket
+  ws: WebSocket,
+  geminiWs: WebSocket
 ): Promise<void> {
-  if (!text.trim()) return;
+  const args = call.args || {};
 
-  let parsed: any = null;
-
-  try {
-    // Strategy 1: direct JSON parse
-    parsed = JSON.parse(text.trim());
-  } catch {
-    try {
-      // Strategy 2: extract JSON block from mixed text
-      const jsonMatch = text.match(/\{[\s\S]*?"task"\s*:\s*"[^"]+[\s\S]*?\}/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      }
-    } catch {
-      try {
-        // Strategy 3: handle markdown-wrapped JSON (```json ... ```)
-        const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (codeBlock) {
-          parsed = JSON.parse(codeBlock[1].trim());
-        }
-      } catch {
-        // All strategies failed — notify client for transparency
-        ws.send(JSON.stringify({
-          type: 'parseError',
-          message: 'Не успях да разпозная задачата. Моля, опитайте отново.',
-        }));
-        return;
-      }
-    }
+  if (!args.task) {
+    geminiWs.send(JSON.stringify({
+      toolResponse: {
+        functionResponses: [{
+          id: call.id,
+          response: { error: 'Липсва описание на задачата' },
+        }],
+      },
+    }));
+    return;
   }
-
-  if (!parsed || !parsed.task) return;
 
   try {
     const task = await createTask(db, {
       user_id: userId,
-      content: parsed.task,
-      emotion: parsed.emotion || 'neutral',
-      priority: Math.min(5, Math.max(1, parseInt(parsed.priority) || 3)),
-      due_date: parsed.due_date || null,
-      estimated_minutes: parsed.estimated_minutes ? parseInt(parsed.estimated_minutes) : null,
+      content: args.task,
+      emotion: args.emotion || 'neutral',
+      priority: Math.min(5, Math.max(1, parseInt(args.priority) || 3)),
+      due_date: args.due_date || null,
+      estimated_minutes: args.estimated_minutes ? parseInt(args.estimated_minutes) : null,
     });
 
-    ws.send(JSON.stringify({
-      type: 'taskSaved',
-      task,
+    ws.send(JSON.stringify({ type: 'taskSaved', task }));
+
+    // Respond to Gemini so it can confirm to the user
+    geminiWs.send(JSON.stringify({
+      toolResponse: {
+        functionResponses: [{
+          id: call.id,
+          response: { success: true, task_id: task.id, content: task.content },
+        }],
+      },
     }));
   } catch (e) {
     console.error('D1 save error:', e);
-    ws.send(JSON.stringify({
-      type: 'error',
-      message: 'Грешка при запис на задачата.',
+    ws.send(JSON.stringify({ type: 'error', message: 'Грешка при запис на задачата.' }));
+    geminiWs.send(JSON.stringify({
+      toolResponse: {
+        functionResponses: [{
+          id: call.id,
+          response: { error: 'Грешка при запис' },
+        }],
+      },
     }));
   }
 }
