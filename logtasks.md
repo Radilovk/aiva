@@ -70,3 +70,22 @@
 
 ### Решение
 - Заменено с `console.error('Gemini WS error:', ev.message || ev.type, ev.error)` — извлича конкретното съобщение
+
+---
+
+## 2026-06-02: Fix — "Network connection lost" / Gemini Live API setup message грешки
+
+### Проблем
+- `Gemini WS error: Uncaught Error: Network connection lost.` — Gemini приема WebSocket handshake, но веднага затваря връзката
+- Voice функцията никога не е работила
+
+### Причина (потвърдена чрез реален работещ пример)
+1. `speechConfig: { languageCode: 'bg-BG' }` — несъществуващ формат за Gemini Live API. Правилният формат изисква `voiceConfig.prebuiltVoiceConfig.voiceName`.
+2. `automaticActivityDetection` съдържаше недокументирани полета `silenceDurationMs` и `prefixPaddingMs`.
+
+### Решение
+- Заменено `speechConfig: { languageCode: 'bg-BG' }` с `speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } }` — в WS setup message и в `/api/token`
+- Премахнати `silenceDurationMs` и `prefixPaddingMs` от `automaticActivityDetection`
+
+### Бележка
+- Ако грешката продължи след деплоя — провери дали API ключът има активиран достъп до Gemini Live API в Google AI Studio.
