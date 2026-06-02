@@ -56,3 +56,17 @@
 - AudioWorklet процесор създаден в `frontend/pcm-processor.js`
 - Rate limiting използва KV с TTL 24ч (автоматично изтичане)
 - Cron кеш сравнява hash на task IDs — ново извикване само при промяна в задачите
+
+---
+
+## 2026-06-02: Fix — "Gemini WS error: [object ErrorEvent]"
+
+### Проблем
+- Логовете показват `Gemini WS error: [object ErrorEvent]` — без полезна информация за реалната грешка
+
+### Причина
+- `console.error('Gemini WS error:', e)` предава `ErrorEvent` обекта директно → `.toString()` го превръща в `[object ErrorEvent]`
+- Реалното съобщение за грешка е в `e.message` и `e.error`, но не се извличат
+
+### Решение
+- Заменено с `console.error('Gemini WS error:', ev.message || ev.type, ev.error)` — извлича конкретното съобщение
