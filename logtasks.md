@@ -15,6 +15,24 @@
 - Добавени в `wrangler.jsonc`: `main: "workers/src/index.ts"`, D1 binding, KV binding, cron trigger
 - Взети от `workers/wrangler.toml` (database_id, kv id остават същите)
 
+## 2026-06-02: Fix — 500 на /ws/voice и HTML отговор от /api/tasks
+
+### Проблем
+- `GET /ws/voice` → HTTP 500, `wallTimeMs: 30178` (30 сек timeout)
+- `app.js:316 Load tasks error: SyntaxError: Unexpected token '<'` — HTML вместо JSON
+
+### Причина
+- `GEMINI_WS_URL` използваше `wss://` схема, но Cloudflare Workers `fetch()` изисква `https://` за изходящи WebSocket връзки — `fetch('wss://...')` виси 30 сек и хвърля изключение
+- Нямаше try-catch около `fetch(GEMINI_WS_URL)` → неуловено изключение → Hono връща 500
+- `/api/tasks/:user_id` нямаше try-catch → при DB грешка Cloudflare сервира HTML error page вместо JSON
+
+### Решение
+- `wss://` → `https://` в `GEMINI_WS_URL`
+- Добавен try-catch около `fetch(GEMINI_WS_URL)` — при грешка праща `type: 'error'` на WebSocket клиента и затваря с 1011
+- Добавен try-catch в `/api/tasks/:user_id` — връща `{ tasks: [] }` с 500 вместо HTML
+
+---
+
 ## 2026-06-02: Подобрения от Gemini Live API примерите + Cost Protection
 
 ### Фаза 1: Cost Protection
