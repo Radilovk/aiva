@@ -99,3 +99,18 @@
 Браузър → Worker POST /api/tasks (запис на задача след toolCall)
 ```
 
+---
+
+## 2026-06-02: Fix — Cloudflare деплой грешка: "does not export class 'VoiceWebSocket'" (code: 10064)
+
+### Проблем
+- `New version of script does not export class 'VoiceWebSocket' which is depended on by existing Durable Objects` [code: 10064]
+- Деплойът се проваля — Cloudflare пази запис за `VoiceWebSocket` като Durable Object клас от предишна версия
+
+### Причина (потвърдена)
+- `VoiceWebSocket` Durable Object класът е бил регистриран в Cloudflare в по-ранна версия
+- При прехода към директна Gemini WebSocket връзка, класът е премахнат без `delete-class` migration
+- Cloudflare изисква изрична миграция при премахване на Durable Object клас
+
+### Решение
+- Добавена `"migrations"` секция в `wrangler.jsonc` с `"deleted_classes": ["VoiceWebSocket"]` и tag `"v1"`
