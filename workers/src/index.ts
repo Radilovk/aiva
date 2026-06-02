@@ -21,8 +21,13 @@ app.use('*', cors());
 
 app.get('/api/tasks/:user_id', async (c) => {
   const userId = c.req.param('user_id');
-  const tasks = await getIncompleteTasks(c.env.DB, userId);
-  return c.json({ tasks });
+  try {
+    const tasks = await getIncompleteTasks(c.env.DB, userId);
+    return c.json({ tasks });
+  } catch (e) {
+    console.error('Get tasks error:', e);
+    return c.json({ tasks: [] }, 500);
+  }
 });
 
 app.patch('/api/tasks/:id/done', async (c) => {
@@ -117,15 +122,24 @@ app.get('/ws/voice', async (c) => {
 
   resetInactivityTimer();
 
-  const GEMINI_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${c.env.GEMINI_API_KEY}`;
+  const GEMINI_WS_URL = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${c.env.GEMINI_API_KEY}`;
 
   // Connect to Gemini Live API
-  const geminiResponse = await fetch(GEMINI_WS_URL, {
-    headers: { Upgrade: 'websocket' },
-  });
+  let geminiResponse: Response;
+  try {
+    geminiResponse = await fetch(GEMINI_WS_URL, {
+      headers: { Upgrade: 'websocket' },
+    });
+  } catch (e) {
+    console.error('Gemini WS connection error:', e);
+    server.send(JSON.stringify({ type: 'error', message: 'Неуспешна връзка с Gemini.' }));
+    server.close(1011, 'Неуспешна връзка с Gemini');
+    return new Response(null, { status: 101, webSocket: client });
+  }
 
   geminiWs = (geminiResponse as any).webSocket as WebSocket;
   if (!geminiWs) {
+    server.send(JSON.stringify({ type: 'error', message: 'Неуспешна връзка с Gemini.' }));
     server.close(1011, 'Неуспешна връзка с Gemini');
     return new Response(null, { status: 101, webSocket: client });
   }
