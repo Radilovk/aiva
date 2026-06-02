@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { createTask, getIncompleteTasks, markTaskDone, registerUser } from './tasks';
 import { handleCron } from './cron';
+import { ensureSchema } from './db';
 
 interface Env {
   DB: D1Database;
@@ -16,6 +17,10 @@ const SESSION_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes inactivity
 const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', cors());
+app.use('*', async (c, next) => {
+  await ensureSchema(c.env.DB);
+  await next();
+});
 
 // --- REST API ---
 
@@ -394,6 +399,9 @@ app.get('/', async (c) => {
 export default {
   fetch: app.fetch,
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(handleCron(env));
+    ctx.waitUntil((async () => {
+      await ensureSchema(env.DB);
+      await handleCron(env);
+    })());
   },
 };

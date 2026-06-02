@@ -23,3 +23,9 @@
 - AudioWorklet процесор създаден в `frontend/pcm-processor.js`
 - Rate limiting използва KV с TTL 24ч (автоматично изтичане)
 - Cron кеш сравнява hash на task IDs — ново извикване само при промяна в задачите
+
+## 2026-06-02: Автоматично създаване на backend schema
+
+- [x] Добавен bootstrap в worker backend, който създава D1 таблиците `tasks` и `users` с `IF NOT EXISTS`
+- [x] Bootstrap-ът се изпълнява преди request handlers и cron, за да няма ръчни migrations
+- [x] Обновен README да показва, че migration стъпката вече не е нужна
