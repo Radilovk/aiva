@@ -10,7 +10,7 @@ interface Env {
 }
 
 // --- Cost protection constants ---
-const MAX_SESSIONS_PER_DAY = 20;
+const MAX_SESSIONS_PER_DAY = 50;
 const SESSION_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes inactivity
 
 const app = new Hono<{ Bindings: Env }>();
