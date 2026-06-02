@@ -1,4 +1,5 @@
 import { getAllIncompleteTasks, Task } from './tasks';
+import { ensureSchema } from './db';
 
 export interface CronEnv {
   DB: D1Database;
@@ -7,6 +8,7 @@ export interface CronEnv {
 }
 
 export async function handleCron(env: CronEnv): Promise<void> {
+  await ensureSchema(env.DB);
   const tasks = await getAllIncompleteTasks(env.DB);
 
   if (tasks.length === 0) return;

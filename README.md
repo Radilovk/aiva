@@ -50,20 +50,13 @@ wrangler d1 create aiva-db
 
 Update `wrangler.toml` with the generated database ID.
 
-### 3. Run migrations
-
-```bash
-cd workers
-npm run db:migrate
-```
-
-### 4. Set secrets
+### 3. Set secrets
 
 ```bash
 wrangler secret put GEMINI_API_KEY
 ```
 
-### 5. Create KV namespace
+### 4. Create KV namespace
 
 ```bash
 wrangler kv namespace create SESSIONS
@@ -71,14 +64,16 @@ wrangler kv namespace create SESSIONS
 
 Update `wrangler.toml` with the generated KV namespace ID.
 
-### 6. Deploy
+### 5. Deploy
 
 ```bash
 cd workers
 npm run deploy
 ```
 
-### 7. Serve frontend
+> The worker now creates the D1 tables automatically on first request or cron run, so no manual migration step is needed.
+
+### 6. Serve frontend
 
 The frontend files in `frontend/` can be served via Cloudflare Pages or as static assets from the Worker.
 
