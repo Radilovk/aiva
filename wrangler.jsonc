@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "aiva",
+  "main": "workers/src/index.ts",
   "compatibility_date": "2026-06-02",
   "observability": {
     "enabled": true
@@ -10,5 +11,21 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "triggers": {
+    "crons": ["0 19 * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "aiva-db",
+      "database_id": "3e660ebf-11b1-47c3-b2c8-752d039dd7dc"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "d9d04ee275024e2a9cbfcea9da7a13d4"
+    }
   ]
 }

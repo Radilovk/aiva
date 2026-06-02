@@ -1,5 +1,20 @@
 # AIVA — Лог на задачите
 
+## 2026-06-02: Fix — bindings изчезват след деплой + грешка при зареждане на задачи
+
+### Проблем
+- `app.js:316 Load tasks error: SyntaxError: Unexpected token '<'` — фронтендът получавал HTML вместо JSON от `/api/tasks/...`
+- Bindings (D1, KV) изчезвали след всеки деплой
+
+### Причина
+- Root `wrangler.jsonc` нямал `main` поле → при деплой се качват само статичните assets без Worker код
+- Без Worker — `/api/*` пренасочва към `index.html` (HTML), което счупва `res.json()`
+- При всеки деплой без декларирани bindings в `wrangler.jsonc` — Cloudflare ги трие от dashboard-а
+
+### Решение
+- Добавени в `wrangler.jsonc`: `main: "workers/src/index.ts"`, D1 binding, KV binding, cron trigger
+- Взети от `workers/wrangler.toml` (database_id, kv id остават същите)
+
 ## 2026-06-02: Подобрения от Gemini Live API примерите + Cost Protection
 
 ### Фаза 1: Cost Protection
