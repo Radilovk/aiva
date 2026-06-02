@@ -117,3 +117,18 @@
 - Добавен stub `VoiceWebSocket` клас в `index.ts` (Cloudflare изисква класът да е наличен при деплоя с миграцията)
 - Добавен `durable_objects.bindings` в `wrangler.jsonc` за да може wrangler да асоциира миграцията с binding-а
 - **След успешен деплой**: премахни stub класа и `durable_objects` секцията от конфига
+
+## 2026-06-02: Fix — "Token generation failed: " (празно error тяло)
+
+### Проблем
+- `POST /api/token` връща 500 с лог `Token generation failed: ` (празно съобщение)
+- Gemini API отговаря с non-OK статус и празно тяло
+
+### Причина
+- Невалидно име на модел `gemini-3.1-flash-live-preview` — такъв модел не съществува в Google Gemini API
+- Правилното име за Live API е `gemini-2.0-flash-live-001`
+
+### Решение
+- `workers/src/index.ts`: сменен модел от `gemini-3.1-flash-live-preview` на `gemini-2.0-flash-live-001` в URL за `generateEphemeralToken`
+- `frontend/app.js`: сменен модел в setup съобщението към Gemini WebSocket
+- Обновен `README.md` с коректното име на модела
