@@ -59,7 +59,9 @@ app.post('/api/token', async (c) => {
           responseModalities: ['AUDIO', 'TEXT'],
           enableAffectiveDialog: true,
           speechConfig: {
-            languageCode: 'bg-BG',
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
+            },
           },
         },
       }),
@@ -154,17 +156,15 @@ app.get('/ws/voice', async (c) => {
         maxOutputTokens: 1024,
         responseModalities: ['AUDIO', 'TEXT'],
         speechConfig: {
-          languageCode: 'bg-BG',
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
         },
       },
       enableAffectiveDialog: true,
       inputAudioTranscription: {},
       realtimeInputConfig: {
-        automaticActivityDetection: {
-          disabled: false,
-          silenceDurationMs: 2000,
-          prefixPaddingMs: 500,
-        },
+        automaticActivityDetection: { disabled: false },
       },
       tools: [
         {
