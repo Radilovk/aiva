@@ -517,6 +517,12 @@
         <span class="tasks-title">Задачи</span>
         <span class="tasks-count" id="tasksCount">0</span>
       </div>
+      
+      <div class="input-group" style="display: flex; gap: 8px; margin-bottom: 16px; width: 100%;">
+        <input type="text" id="task-input" placeholder="Опиши нова задача тук..." style="flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; color: var(--text); font-family: inherit; font-size: 0.9rem; outline: none; transition: border-color 0.2s;" />
+        <button id="addTaskBtn" style="background: var(--accent); border: none; border-radius: var(--radius-sm); padding: 0 16px; color: white; font-weight: 500; font-size: 0.9rem; cursor: pointer; transition: transform 0.1s;">Добави</button>
+      </div>
+
       <div id="tasksContainer">
         <div class="empty-state">Все още няма задачи</div>
       </div>

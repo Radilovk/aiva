@@ -28,18 +28,7 @@
       "id": "d9d04ee275024e2a9cbfcea9da7a13d4"
     }
   ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "VOICE_WEBSOCKET",
-        "class_name": "VoiceWebSocket"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "deleted_classes": ["VoiceWebSocket"]
-    }
-  ]
+  "ai": {
+    "binding": "AI"
+  }
 }

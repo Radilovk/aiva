@@ -7,6 +7,7 @@ interface Env {
   DB: D1Database;
   SESSIONS: KVNamespace;
   GEMINI_API_KEY: string;
+  AI: any;
 }
 
 // --- Cost protection constants ---
@@ -117,19 +118,45 @@ app.post('/api/tasks', async (c) => {
   }
 });
 
+// --- Transcription API with Whisper ---
+
+app.post('/api/transcribe', async (c) => {
+  const formData = await c.req.formData();
+  const audioFile = formData.get('audio') as any as File;
+  
+  if (!audioFile) {
+    return c.json({ error: 'No audio file provided' }, 400);
+  }
+
+  const audioBuffer = await audioFile.arrayBuffer();
+  const uint8 = new Uint8Array(audioBuffer);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < uint8.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, uint8.subarray(i, i + chunkSize) as any);
+  }
+  const base64Audio = btoa(binary);
+
+  try {
+    const result = await c.env.AI.run(
+      '@cf/openai/whisper-large-v3-turbo',
+      {
+        audio: base64Audio,
+        language: 'bg',
+      }
+    );
+    return c.json({ text: result.text });
+  } catch (e) {
+    console.error('Transcription error:', e);
+    return c.json({ error: 'Transcription failed' }, 500);
+  }
+});
+
 // --- Static file serving for frontend ---
 
 app.get('/', async (c) => {
   return c.redirect('/index.html');
 });
-
-// --- Stub for delete-class migration (remove after successful deploy) ---
-export class VoiceWebSocket {
-  constructor(private state: DurableObjectState, private env: Env) {}
-  async fetch(_request: Request) {
-    return new Response('This Durable Object is being deleted', { status: 410 });
-  }
-}
 
 // --- Export ---
 
