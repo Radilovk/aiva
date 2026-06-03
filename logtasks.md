@@ -1,5 +1,16 @@
 # AIVA — Лог на задачите
 
+## 2026-06-03: Замяна на VoiceWebSocket с Whisper транскрипция и добавяне на Whisper endpoint
+
+### Проблем
+Транскрибирането и управлението на задачи чрез директна WebSocket връзка към Gemini Live API беше заменено с по-стабилен подход, използващ Whisper за гласова диктовка директно във фронтенда, и беше добавена опция за ръчно въвеждане на задачи.
+
+### Решение
+1. **Wrangler**: Добавен е `AI` binding (`@cf/openai/whisper-large-v3-turbo`) в `wrangler.jsonc` и са премахнати `durable_objects` и `migrations` секциите, които бяха останали за стария `VoiceWebSocket`.
+2. **Worker**: Добавен е Hono POST route на `/api/transcribe` за транскрипция с модела Whisper. Премахнат е напълно stub класът `VoiceWebSocket`.
+3. **Фронтенд HTML**: В `index.html` и `frontend/index.html` е добавено текстово поле с `id="task-input"` и бутон `id="addTaskBtn"` за преглед на транскрибирания текст и ръчно добавяне/редактиране на задачи.
+4. **Фронтенд JS**: В `app.js` и `frontend/app.js` е изцяло изтрит остарелият сложен код за Gemini WebSocket връзка и аудио възпроизвеждане/resampling, като е заменен с `MediaRecorder` и повикване на новия `/api/transcribe` endpoint, който вмъква текста в текстовото поле. Добавена е логика за ръчно запазване на задачата при натискане на бутона "Добави" или Enter.
+
 ## 2026-06-03: Fix — AudioWorklet грешка при инициализация + SyntaxError при зареждане на задачи
 
 ### Проблем
