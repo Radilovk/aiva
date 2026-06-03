@@ -122,7 +122,7 @@ app.post('/api/tasks', async (c) => {
 
 app.post('/api/transcribe', async (c) => {
   const formData = await c.req.formData();
-  const audioFile = formData.get('audio') as File;
+  const audioFile = formData.get('audio') as any as File;
   
   if (!audioFile) {
     return c.json({ error: 'No audio file provided' }, 400);
