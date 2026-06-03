@@ -297,15 +297,6 @@ async function startRecording() {
 
     const source = audioContext.createMediaStreamSource(mediaStream);
 
-    // Try AudioWorklet first, fallback to ScriptProcessor
-    let useWorklet = false;
-    try {
-      await audioContext.audioWorklet.addModule('pcm-processor.js');
-      useWorklet = true;
-    } catch (e) {
-      console.warn('AudioWorklet not supported, using ScriptProcessor fallback');
-    }
-
     // Connect to Gemini before setting up audio pipeline
     const geminiWs = await connectGemini();
     if (!geminiWs) {
@@ -314,7 +305,10 @@ async function startRecording() {
       return;
     }
 
-    if (useWorklet) {
+    // Try AudioWorklet first, fallback to ScriptProcessor
+    let workletSuccess = false;
+    try {
+      await audioContext.audioWorklet.addModule('pcm-processor.js');
       const worklet = new AudioWorkletNode(audioContext, 'pcm-processor');
       worklet.port.onmessage = (event) => {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -327,7 +321,12 @@ async function startRecording() {
       source.connect(worklet);
       worklet.connect(audioContext.destination);
       workletNode = worklet;
-    } else {
+      workletSuccess = true;
+    } catch (e) {
+      console.warn('AudioWorklet not supported, using ScriptProcessor fallback:', e);
+    }
+
+    if (!workletSuccess) {
       // ScriptProcessor fallback
       const bufferSize = 4096;
       const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
@@ -422,6 +421,15 @@ function showError(msg) {
 async function loadTasks() {
   try {
     const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`);
+    if (!res.ok) {
+      console.warn('Failed to load tasks:', res.status);
+      return;
+    }
+    const contentType = res.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.warn('Tasks endpoint returned non-JSON response');
+      return;
+    }
     const data = await res.json();
     const tasks = data.tasks || [];
 
