@@ -58,21 +58,19 @@ app.post('/api/token', async (c) => {
   }
   await c.env.SESSIONS.put(rateLimitKey, String(currentCount + 1), { expirationTtl: 86400 });
 
+  const now = new Date();
+  const expireTime = new Date(now.getTime() + 30 * 60 * 1000); // 30 min
+  const newSessionExpireTime = new Date(now.getTime() + 2 * 60 * 1000); // 2 min
+
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateEphemeralToken?key=${c.env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=${c.env.GEMINI_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        config: {
-          responseModalities: ['AUDIO', 'TEXT'],
-          enableAffectiveDialog: true,
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
-          },
-        },
+        uses: 1,
+        expireTime: expireTime.toISOString(),
+        newSessionExpireTime: newSessionExpireTime.toISOString(),
       }),
     }
   );
@@ -84,7 +82,7 @@ app.post('/api/token', async (c) => {
   }
 
   const data = await response.json() as any;
-  return c.json(data);
+  return c.json({ token: data.name, expires_at: expireTime.toISOString() });
 });
 
 // --- Save task endpoint (called directly by frontend after Gemini function call) ---
