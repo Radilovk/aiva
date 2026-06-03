@@ -132,3 +132,21 @@
 - `workers/src/index.ts`: сменен модел от `gemini-3.1-flash-live-preview` на `gemini-2.0-flash-live-001` в URL за `generateEphemeralToken`
 - `frontend/app.js`: сменен модел в setup съобщението към Gemini WebSocket
 - Обновен `README.md` с коректното име на модела
+
+---
+
+## 2026-06-03: Fix — "Неуспешно генериране на токен" (модел gemini-2.0-flash-live-001 спрян)
+
+### Проблем
+- При натискане на бутона за гласово въвеждане се показва "Неуспешно генериране на токен"
+- `POST /api/token` връща 500
+
+### Причина (потвърдена)
+- Моделът `gemini-2.0-flash-live-001` е **officially deprecated и спрян на 1 юни 2026** от Google
+- Потребителят е в Европа с предплатен ключ — моделът вече не съществува в API-то
+- `generateEphemeralToken` endpoint-ът връща грешка за несъществуващ модел
+
+### Решение
+- `workers/src/index.ts`: сменен модел от `gemini-2.0-flash-live-001` на `gemini-2.5-flash` в URL за `generateEphemeralToken`
+- `frontend/app.js`: сменен модел в setup съобщението от `models/gemini-2.0-flash-live-001` на `models/gemini-2.5-flash`
+- `gemini-2.5-flash` е наличен в списъка с модели на потребителя и поддържа Live API

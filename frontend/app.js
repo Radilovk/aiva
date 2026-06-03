@@ -136,7 +136,7 @@ async function connectGemini() {
     // Send setup message directly to Gemini
     ws.send(JSON.stringify({
       setup: {
-        model: 'models/gemini-2.0-flash-live-001',
+        model: 'models/gemini-2.5-flash',
         generationConfig: {
           maxOutputTokens: 1024,
           responseModalities: ['AUDIO', 'TEXT'],
