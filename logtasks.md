@@ -1,5 +1,19 @@
 # AIVA — Лог на задачите
 
+## 2026-06-03: Fix — AudioWorklet грешка при инициализация + SyntaxError при зареждане на задачи
+
+### Проблем
+1. **Workers (https://aiva.radilov-k.workers.dev/)**: `app.js:374 Mic error: InvalidStateError: Failed to construct 'AudioWorkletNode': AudioWorkletNode cannot be created: AudioWorklet does not have a valid AudioWorkletGlobalScope. Load a script via audioWorklet.addModule() first.`
+2. **GitHub/локален файл**: `app.js:450 Load tasks error: SyntaxError: Unexpected token '<'`
+
+### Причина
+1. **AudioWorklet грешка**: Кодът се опитваше да създаде `AudioWorkletNode` преди да провери дали `addModule()` е наистина успял. При грешка в зареждането на модула, `useWorklet` оставаше `false` от try-catch блока, но поради неправилна логика (проверката `if (useWorklet)` беше СЛЕД `connectGemini`, но се създаваше преди try-catch да завърши), се опитваше да създаде worklet node дори когато модулът не е зареден.
+2. **SyntaxError**: При отваряне на `index.html` директно (не през Worker), `API_BASE` е празен, `fetch('/api/tasks/...')` връща HTML (404 страница от GitHub или локален сървър), а кодът се опитва да парсва HTML като JSON → `SyntaxError: Unexpected token '<'`.
+
+### Решение
+1. **AudioWorklet**: Преместен цялата логика за създаване на `AudioWorkletNode` в `try-catch` блока, като и двете операции (`addModule` и `new AudioWorkletNode`) се изпълняват заедно. Флагът `workletSuccess` се сетва само ако И ДВЕТЕ операции успеят. При грешка се използва ScriptProcessor fallback.
+2. **loadTasks**: Добавена проверка на HTTP статус и Content-Type преди опит за парсване като JSON. Ако отговорът не е успешен (non-200) или не е JSON, функцията връща ранно без да се опитва да парсва.
+
 ## 2026-06-02: Fix — bindings изчезват след деплой + грешка при зареждане на задачи
 
 ### Проблем
