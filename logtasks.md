@@ -150,3 +150,32 @@
 - `workers/src/index.ts`: сменен модел от `gemini-2.0-flash-live-001` на `gemini-2.5-flash` в URL за `generateEphemeralToken`
 - `frontend/app.js`: сменен модел в setup съобщението от `models/gemini-2.0-flash-live-001` на `models/gemini-2.5-flash`
 - `gemini-2.5-flash` е наличен в списъка с модели на потребителя и поддържа Live API
+
+---
+
+## 2026-06-03: Fix — "Token generation failed: " (празно error тяло, endpoint не съществува)
+
+### Проблем
+- `POST /api/token` продължава да връща 500 с `Token generation failed: ` (празно error тяло)
+- Gemini API отговаря с non-OK статус и празно тяло
+
+### Причина (потвърдена чрез изходния код на googleapis/python-genai SDK и google-gemini/gemini-live-api-examples)
+- **Endpoint-ът `models/{model}:generateEphemeralToken` НЕ СЪЩЕСТВУВА** в Google Generative Language API
+- Предишният "fix" само сменяше модела, но самият REST метод `:generateEphemeralToken` никога не е бил валиден
+- Правилният endpoint за издаване на auth token е `POST /v1alpha/auth_tokens` (не `/v1beta/models/...`)
+- SDK-то (`googleapis/python-genai`) вътрешно вика `POST auth_tokens` с `api_version: v1alpha`
+- WebSocket endpoint-ът за auth tokens е `BidiGenerateContentConstrained` (v1alpha), не `BidiGenerateContent` (v1beta)
+- Правилното име на модела за Live API с аудио е `gemini-2.5-flash-preview-native-audio-dialog`
+
+### Решение
+- `workers/src/index.ts`:
+  - Сменен endpoint от `/v1beta/models/gemini-2.5-flash:generateEphemeralToken` на `/v1alpha/auth_tokens`
+  - Request body: `{ uses: 1, expireTime, newSessionExpireTime }` (вместо невалидния `config` обект)
+  - Response: връща `{ token: data.name, expires_at }` (auth token name)
+- `frontend/app.js`:
+  - WebSocket URL: `v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`
+  - Модел: `models/gemini-2.5-flash-preview-native-audio-dialog`
+
+### Източници
+- `googleapis/python-genai` → `google/genai/tokens.py` (path = 'auth_tokens', api_version = 'v1alpha')
+- `google-gemini/gemini-live-api-examples` → `gemini-live-ephemeral-tokens-websocket/frontend/geminilive.js`

@@ -129,14 +129,14 @@ async function connectGemini() {
     return null;
   }
 
-  const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${token}`;
+  const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`;
   ws = new WebSocket(geminiUrl);
 
   ws.onopen = () => {
     // Send setup message directly to Gemini
     ws.send(JSON.stringify({
       setup: {
-        model: 'models/gemini-2.5-flash',
+        model: 'models/gemini-2.5-flash-preview-native-audio-dialog',
         generationConfig: {
           maxOutputTokens: 1024,
           responseModalities: ['AUDIO', 'TEXT'],
