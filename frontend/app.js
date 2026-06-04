@@ -229,6 +229,7 @@ async function connectGemini() {
     setStatus('Докоснете за запис');
     waveform.classList.remove('active');
     if (isRecording) stopRecording();
+    ws = null;
   };
 
   ws.onerror = (ev) => {
@@ -476,9 +477,7 @@ recordBtn.addEventListener('click', () => {
   if (isRecording) {
     stopRecording();
   } else {
-    startRecording().catch(err => {
-      console.error('startRecording failed:', err);
-    });
+    startRecording();
   }
 });
 
