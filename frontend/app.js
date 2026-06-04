@@ -226,6 +226,7 @@ async function connectGemini() {
 
   ws.onclose = (ev) => {
     console.log(`WebSocket closed: ${ev.code} ${ev.reason}`);
+    ws = null;
     setStatus('Докоснете за запис');
     waveform.classList.remove('active');
     if (isRecording) stopRecording();
@@ -476,9 +477,7 @@ recordBtn.addEventListener('click', () => {
   if (isRecording) {
     stopRecording();
   } else {
-    startRecording().catch(err => {
-      console.error('startRecording failed:', err);
-    });
+    startRecording();
   }
 });
 
