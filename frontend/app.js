@@ -136,7 +136,7 @@ async function connectGemini() {
     // Send setup message directly to Gemini
     ws.send(JSON.stringify({
       setup: {
-        model: 'models/gemini-2.5-flash-preview-native-audio-dialog',
+        model: 'models/gemini-2.0-flash-live-001',
         generationConfig: {
           maxOutputTokens: 1024,
           responseModalities: ['AUDIO', 'TEXT'],
@@ -224,13 +224,15 @@ async function connectGemini() {
     }
   };
 
-  ws.onclose = () => {
+  ws.onclose = (ev) => {
+    console.log(`WebSocket closed: ${ev.code} ${ev.reason}`);
     setStatus('Докоснете за запис');
     waveform.classList.remove('active');
     if (isRecording) stopRecording();
   };
 
-  ws.onerror = () => {
+  ws.onerror = (ev) => {
+    console.error('Gemini WS error:', ev);
     showError('Грешка при свързване с Gemini');
   };
 
@@ -470,10 +472,13 @@ async function markDone(taskId) {
 
 // --- Events ---
 recordBtn.addEventListener('click', () => {
+  console.log('Record button clicked');
   if (isRecording) {
     stopRecording();
   } else {
-    startRecording();
+    startRecording().catch(err => {
+      console.error('startRecording failed:', err);
+    });
   }
 });
 

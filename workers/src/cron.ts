@@ -28,7 +28,7 @@ export async function handleCron(env: CronEnv): Promise<void> {
   const prompt = `Ето списък с незавършени задачи:\n${taskList}\n\nКои 3 задачи трябва да бъдат приоритет за утре? Отговори на български като JSON масив с полета: task_id, reason.`;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
