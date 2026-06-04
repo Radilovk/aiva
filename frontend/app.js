@@ -1,4 +1,6 @@
-const API_BASE = '';
+const API_BASE = location.hostname === 'radilovk.github.io'
+  ? 'https://aiva.radilov-k.workers.dev'
+  : '';
 
 // --- User ID ---
 function getUserId() {
