@@ -1,4 +1,6 @@
-const API_BASE = '';
+const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? ''
+  : 'https://aiva.radilov-k.workers.dev';
 
 // --- User ID ---
 function getUserId() {
@@ -133,10 +135,12 @@ async function connectGemini() {
   ws = new WebSocket(geminiUrl);
 
   ws.onopen = () => {
+    console.log('Gemini WebSocket connected');
+    console.log('Using model:', 'models/gemini-1.5-flash');
     // Send setup message directly to Gemini
     ws.send(JSON.stringify({
       setup: {
-        model: 'models/gemini-2.0-flash-live-001',
+        model: 'models/gemini-1.5-flash',
         generationConfig: {
           maxOutputTokens: 1024,
           responseModalities: ['AUDIO', 'TEXT'],
@@ -184,18 +188,25 @@ async function connectGemini() {
   };
 
   ws.onmessage = async (event) => {
+    console.log('Gemini WS message received:', event.data);
     let data;
     try {
       data = JSON.parse(event.data);
     } catch (e) {
+      console.error('Failed to parse WS message:', e);
       return;
     }
 
     // Setup complete — connection ready
     if (data.setupComplete) {
+      console.log('Gemini setup complete');
       setStatus('Слушам...', true);
       waveform.classList.add('active');
       return;
+    }
+
+    if (data.error) {
+      console.error('Gemini error message:', data.error);
     }
 
     // Tool call — save task via Worker REST API
@@ -516,4 +527,6 @@ function escapeHtml(text) {
 }
 
 // --- Init ---
+console.log('AIVA initialized');
+console.log('API_BASE:', API_BASE || '(relative)');
 loadTasks();
