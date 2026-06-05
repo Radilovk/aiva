@@ -14,7 +14,14 @@ const MAX_SESSIONS_PER_DAY = 50;
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use('*', cors());
+app.use(
+  '*',
+  cors({
+    origin: (origin) => origin || '*',
+    allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    allowHeaders: ['Content-Type'],
+  })
+);
 
 // --- REST API ---
 

@@ -28,7 +28,7 @@ AI-powered voice task manager that listens in Bulgarian, detects emotion from vo
 
 ## Tech Stack
 
-- **AI**: Gemini Live API (`gemini-2.5-flash-native-audio-preview-12-2025`)
+- **AI**: Gemini Live API (`gemini-3.1-flash-live-preview`, per [Google's ephemeral-token example](https://github.com/google-gemini/gemini-live-api-examples/tree/main/gemini-live-ephemeral-tokens-websocket))
 - **Backend**: Cloudflare Workers + Hono
 - **Database**: Cloudflare D1
 - **Frontend**: Vanilla JS with Web Audio API
@@ -78,9 +78,13 @@ cd workers
 npm run deploy
 ```
 
-### 7. Serve frontend
+### 7. Frontend (single source of truth)
 
-The frontend files in `frontend/` can be served via Cloudflare Pages or as static assets from the Worker.
+All UI lives in **`frontend/`** only (served as Worker static assets via `wrangler.jsonc`).  
+Do not use duplicate HTML/JS at the repo root — they were removed to avoid drift.
+
+- Production: `https://aiva.radilov-k.workers.dev`
+- GitHub Pages (`*.github.io`) uses the same UI but calls the Worker API for `/api/*` (see `frontend/config.js`).
 
 ## API Endpoints
 
