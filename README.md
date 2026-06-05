@@ -28,7 +28,7 @@ AI-powered voice task manager that listens in Bulgarian, detects emotion from vo
 
 ## Tech Stack
 
-- **AI**: Gemini Live API (`gemini-2.0-flash-live-001`)
+- **AI**: Gemini Live API (`gemini-2.5-flash-native-audio-preview-12-2025`)
 - **Backend**: Cloudflare Workers + Hono
 - **Database**: Cloudflare D1
 - **Frontend**: Vanilla JS with Web Audio API
