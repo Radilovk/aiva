@@ -90,7 +90,6 @@ Do not use duplicate HTML/JS at the repo root — they were removed to avoid dri
 
 | Method | Path | Description |
 |--------|------|-------------|
-| WebSocket | `/ws/voice?user_id=X` | Voice proxy to Gemini Live API |
 | GET | `/api/tasks/:user_id` | Get incomplete tasks |
 | PATCH | `/api/tasks/:id/done` | Mark task complete |
 | POST | `/api/users/register` | Register push token |
