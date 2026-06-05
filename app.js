@@ -1,4 +1,9 @@
-const API_BASE = '';
+const API_BASE =
+  location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+    ? ''
+    : location.origin;
+
+const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025';
 
 // --- User ID ---
 function getUserId() {
@@ -25,6 +30,8 @@ const tasksCount = document.getElementById('tasksCount');
 
 // --- State ---
 let isRecording = false;
+let isConnecting = false;
+let geminiReady = false;
 let ws = null;
 let audioContext = null;
 let mediaStream = null;
@@ -32,14 +39,20 @@ let workletNode = null;
 let playbackQueue = [];
 let isPlaying = false;
 let playbackContext = null;
+let connectAbort = null;
 
-// --- Audio Playback with queue (handles variable sample rates) ---
+const PCM_PROCESSOR_URL = (() => {
+  const script = document.querySelector('script[src*="app.js"]');
+  if (script?.src) return new URL('pcm-processor.js', script.src).href;
+  return '/pcm-processor.js';
+})();
+
+// --- Audio Playback ---
 function getPlaybackContext() {
   if (!playbackContext || playbackContext.state === 'closed') {
     try {
       playbackContext = new AudioContext({ sampleRate: 24000 });
     } catch {
-      // Fallback: let browser pick sample rate, we'll resample
       playbackContext = new AudioContext();
     }
   }
@@ -57,14 +70,12 @@ function playAudioChunk(base64Data) {
     bytes[i] = binaryStr.charCodeAt(i);
   }
 
-  // Convert 16-bit PCM to Float32
   const pcmSamples = new Float32Array(bytes.length / 2);
   const view = new DataView(bytes.buffer);
   for (let i = 0; i < pcmSamples.length; i++) {
     pcmSamples[i] = view.getInt16(i * 2, true) / 32768;
   }
 
-  // Resample if AudioContext doesn't support 24kHz natively
   const targetRate = ctx.sampleRate;
   let finalSamples = pcmSamples;
 
@@ -103,9 +114,21 @@ function drainPlaybackQueue(ctx) {
   source.start();
 }
 
-// --- Direct Gemini WebSocket connection ---
+function sendAudioPcm(base64Pcm) {
+  if (!geminiReady || !ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(
+    JSON.stringify({
+      realtimeInput: {
+        audio: { mimeType: 'audio/pcm', data: base64Pcm },
+      },
+    })
+  );
+}
+
+// --- Gemini Live WebSocket ---
 async function connectGemini() {
-  // Get ephemeral token with rate limiting
+  geminiReady = false;
+
   let tokenData;
   try {
     const res = await fetch(`${API_BASE}/api/token`, {
@@ -116,128 +139,201 @@ async function connectGemini() {
     tokenData = await res.json();
     if (!res.ok) {
       showError(tokenData.error || 'Грешка при получаване на токен');
-      return null;
+      return false;
     }
-  } catch (e) {
-    showError('Грешка при свързване');
-    return null;
+  } catch {
+    showError('Грешка при свързване със сървъра');
+    return false;
   }
 
   const token = tokenData.token;
   if (!token) {
     showError('Невалиден токен от сървъра');
-    return null;
+    return false;
   }
 
-  const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`;
-  ws = new WebSocket(geminiUrl);
+  const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`;
 
-  ws.onopen = () => {
-    // Send setup message directly to Gemini
-    ws.send(JSON.stringify({
-      setup: {
-        model: 'models/gemini-2.5-flash-preview-native-audio-dialog',
-        generationConfig: {
-          maxOutputTokens: 1024,
-          responseModalities: ['AUDIO', 'TEXT'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
-          },
-        },
-        enableAffectiveDialog: true,
-        inputAudioTranscription: {},
-        realtimeInputConfig: {
-          automaticActivityDetection: { disabled: false },
-        },
-        tools: [
-          {
-            functionDeclarations: [
-              {
-                name: 'save_task',
-                description: 'Запазва задача след като потребителят я опише. Извикай тази функция когато разбереш какво е задачата.',
-                parameters: {
-                  type: 'OBJECT',
-                  properties: {
-                    task: { type: 'STRING', description: 'Кратка формулировка на задачата на български' },
-                    emotion: { type: 'STRING', description: 'Засечена емоция от тона на гласа', enum: ['stress', 'tired', 'urgent', 'neutral'] },
-                    priority: { type: 'INTEGER', description: 'Приоритет от 1 (най-висок) до 5 (най-нисък)' },
-                    due_date: { type: 'STRING', description: 'Краен срок във формат YYYY-MM-DD или празен ако няма' },
-                    estimated_minutes: { type: 'INTEGER', description: 'Прогнозно време за изпълнение в минути' },
-                  },
-                  required: ['task', 'emotion', 'priority'],
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok, message) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      if (!ok) {
+        if (ws) {
+          try {
+            ws.close();
+          } catch {
+            /* ignore */
+          }
+          ws = null;
+        }
+        if (message) showError(message);
+      }
+      resolve(ok);
+    };
+
+    connectAbort = () => finish(false);
+
+    const timeoutId = setTimeout(() => {
+      finish(false, 'Времето за свързване изтече');
+    }, 20000);
+
+    ws = new WebSocket(geminiUrl);
+
+    ws.onopen = () => {
+      ws.send(
+        JSON.stringify({
+          setup: {
+            model: `models/${LIVE_MODEL}`,
+            generationConfig: {
+              maxOutputTokens: 1024,
+              responseModalities: ['AUDIO', 'TEXT'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: 'Kore' },
                 },
               },
-            ],
-          },
-        ],
-        systemInstruction: {
-          parts: [
-            {
-              text: `Ти си личен асистент за задачи на български език.\n\nПРАВИЛА:\n- Слушаш ТОНА на гласа, не само думите\n- Ако потребителят звучи стресирано → отговаряш спокойно и уверено\n- Ако звучи уморено → отговаряш много кратко\n- Ако звучи бързащо → веднага минаваш към същественото\n- Задаваш САМО ЕДИН въпрос\n- НИКОГА не задаваш повече от един въпрос\n- Говориш само на български\n- Когато разбереш задачата, ИЗВИКАЙ функцията save_task с правилните параметри`,
             },
-          ],
-        },
-      },
-    }));
-  };
+            enableAffectiveDialog: true,
+            inputAudioTranscription: {},
+            realtimeInputConfig: {
+              automaticActivityDetection: {
+                disabled: false,
+                silenceDurationMs: 2000,
+                prefixPaddingMs: 500,
+              },
+            },
+            tools: [
+              {
+                functionDeclarations: [
+                  {
+                    name: 'save_task',
+                    description:
+                      'Запазва задача след като потребителят я опише. Извикай тази функция когато разбереш какво е задачата.',
+                    parameters: {
+                      type: 'OBJECT',
+                      properties: {
+                        task: {
+                          type: 'STRING',
+                          description: 'Кратка формулировка на задачата на български',
+                        },
+                        emotion: {
+                          type: 'STRING',
+                          description: 'Засечена емоция от тона на гласа',
+                          enum: ['stress', 'tired', 'urgent', 'neutral'],
+                        },
+                        priority: {
+                          type: 'INTEGER',
+                          description: 'Приоритет от 1 (най-висок) до 5 (най-нисък)',
+                        },
+                        due_date: {
+                          type: 'STRING',
+                          description: 'Краен срок във формат YYYY-MM-DD или празен ако няма',
+                        },
+                        estimated_minutes: {
+                          type: 'INTEGER',
+                          description: 'Прогнозно време за изпълнение в минути',
+                        },
+                      },
+                      required: ['task', 'emotion', 'priority'],
+                    },
+                  },
+                ],
+              },
+            ],
+            systemInstruction: {
+              parts: [
+                {
+                  text: `Ти си личен асистент за задачи на български език.
 
-  ws.onmessage = async (event) => {
-    let data;
-    try {
-      data = JSON.parse(event.data);
-    } catch (e) {
-      return;
-    }
+ПРАВИЛА:
+- Слушаш ТОНА на гласа, не само думите
+- Ако потребителят звучи стресирано → отговаряш спокойно и уверено
+- Ако звучи уморено → отговаряш много кратко
+- Ако звучи бързащо → веднага минаваш към същественото
+- Задаваш САМО ЕДИН въпрос
+- НИКОГА не задаваш повече от един въпрос
+- Говориш само на български
+- Когато разбереш задачата, ИЗВИКАЙ функцията save_task с правилните параметри`,
+                },
+              ],
+            },
+          },
+        })
+      );
+    };
 
-    // Setup complete — connection ready
-    if (data.setupComplete) {
-      setStatus('Слушам...', true);
-      waveform.classList.add('active');
-      return;
-    }
+    ws.onmessage = async (event) => {
+      let data;
+      try {
+        const raw =
+          event.data instanceof Blob
+            ? await event.data.text()
+            : event.data instanceof ArrayBuffer
+              ? new TextDecoder().decode(event.data)
+              : event.data;
+        data = JSON.parse(raw);
+      } catch {
+        return;
+      }
 
-    // Tool call — save task via Worker REST API
-    if (data.toolCall) {
-      for (const call of data.toolCall.functionCalls || []) {
-        if (call.name === 'save_task') {
-          await handleSaveTask(call);
+      if (data.setupComplete) {
+        geminiReady = true;
+        setStatus('Слушам...', true);
+        waveform.classList.add('active');
+        finish(true);
+        return;
+      }
+
+      if (data.error) {
+        console.error('Gemini error:', data.error);
+        const msg = data.error?.message || 'Грешка от Gemini';
+        finish(false, msg);
+        return;
+      }
+
+      if (data.toolCall) {
+        for (const call of data.toolCall.functionCalls || []) {
+          if (call.name === 'save_task') {
+            await handleSaveTask(call);
+          }
+        }
+        return;
+      }
+
+      if (data.serverContent?.modelTurn?.parts) {
+        for (const part of data.serverContent.modelTurn.parts) {
+          if (part.inlineData?.data) {
+            playAudioChunk(part.inlineData.data);
+          }
         }
       }
-      return;
-    }
 
-    // Audio / text from Gemini
-    if (data.serverContent?.modelTurn?.parts) {
-      for (const part of data.serverContent.modelTurn.parts) {
-        if (part.inlineData) {
-          playAudioChunk(part.inlineData.data);
-        }
+      if (data.serverContent?.inputTranscription?.text) {
+        setStatus(`„${data.serverContent.inputTranscription.text}"`, true);
       }
-    }
+    };
 
-    // Input transcription
-    if (data.serverContent?.inputTranscription) {
-      const text = data.serverContent.inputTranscription.text || '';
-      if (text) setStatus(`"${text}"`, true);
-    }
-  };
+    ws.onclose = (ev) => {
+      geminiReady = false;
+      waveform.classList.remove('active');
+      if (!settled) {
+        const reason = ev.reason ? `: ${ev.reason}` : '';
+        finish(false, `Връзката прекъсна (${ev.code}${reason})`);
+      } else if (isRecording) {
+        setStatus('Докоснете за запис');
+        stopRecording();
+      }
+    };
 
-  ws.onclose = () => {
-    setStatus('Докоснете за запис');
-    waveform.classList.remove('active');
-    if (isRecording) stopRecording();
-  };
-
-  ws.onerror = () => {
-    showError('Грешка при свързване с Gemini');
-  };
-
-  return ws;
+    ws.onerror = () => {
+      if (!settled) finish(false, 'Грешка при свързване с Gemini');
+    };
+  });
 }
 
-// --- Handle save_task function call from Gemini ---
 async function handleSaveTask(call) {
   const args = call.args || {};
   let response;
@@ -262,28 +358,38 @@ async function handleSaveTask(call) {
     } else {
       response = { error: data.error || 'Грешка при запис' };
     }
-  } catch (e) {
+  } catch {
     response = { error: 'Грешка при запис' };
   }
-  // Send function response back to Gemini so it can confirm to the user
+
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      toolResponse: {
-        functionResponses: [{ id: call.id, response }],
-      },
-    }));
+    ws.send(
+      JSON.stringify({
+        toolResponse: {
+          functionResponses: [{ id: call.id, response }],
+        },
+      })
+    );
   }
 }
 
-// --- Audio Recording (AudioWorklet with ScriptProcessor fallback) ---
+// --- Microphone capture ---
 async function startRecording() {
+  if (isConnecting || isRecording) return;
+
+  isConnecting = true;
+  recordBtn.disabled = true;
+  setStatus('Свързване...', true);
+
   try {
-    // Resume any existing playback context (required by browsers on user gesture)
     getPlaybackContext();
 
-    audioContext = new AudioContext({ sampleRate: 16000 });
+    if (!navigator.mediaDevices?.getUserMedia) {
+      showError('Микрофонът не се поддържа в този браузър');
+      return;
+    }
 
-    // Fallback if 16kHz not supported — resample from native rate
+    audioContext = new AudioContext({ sampleRate: 16000 });
     const actualRate = audioContext.sampleRate;
 
     mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -295,48 +401,35 @@ async function startRecording() {
       },
     });
 
-    const source = audioContext.createMediaStreamSource(mediaStream);
-
-    // Connect to Gemini before setting up audio pipeline
-    const geminiWs = await connectGemini();
-    if (!geminiWs) {
-      if (mediaStream) { mediaStream.getTracks().forEach((t) => t.stop()); mediaStream = null; }
-      if (audioContext) { audioContext.close(); audioContext = null; }
+    const connected = await connectGemini();
+    if (!connected) {
+      cleanupAudio();
       return;
     }
 
-    // Try AudioWorklet first, fallback to ScriptProcessor
+    const source = audioContext.createMediaStreamSource(mediaStream);
     let workletSuccess = false;
+
     try {
-      await audioContext.audioWorklet.addModule('pcm-processor.js');
+      await audioContext.audioWorklet.addModule(PCM_PROCESSOR_URL);
       const worklet = new AudioWorkletNode(audioContext, 'pcm-processor');
       worklet.port.onmessage = (event) => {
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        ws.send(JSON.stringify({
-          realtimeInput: {
-            mediaChunks: [{ mimeType: 'audio/pcm;rate=16000', data: arrayBufferToBase64(event.data.pcm) }],
-          },
-        }));
+        sendAudioPcm(arrayBufferToBase64(event.data.pcm));
       };
       source.connect(worklet);
       worklet.connect(audioContext.destination);
       workletNode = worklet;
       workletSuccess = true;
     } catch (e) {
-      console.warn('AudioWorklet not supported, using ScriptProcessor fallback:', e);
+      console.warn('AudioWorklet fallback to ScriptProcessor:', e);
     }
 
     if (!workletSuccess) {
-      // ScriptProcessor fallback
       const bufferSize = 4096;
       const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
-
       processor.onaudioprocess = (event) => {
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
         let inputData = event.inputBuffer.getChannelData(0);
 
-        // Resample to 16kHz if needed
         if (actualRate !== 16000) {
           const ratio = actualRate / 16000;
           const newLen = Math.floor(inputData.length / ratio);
@@ -347,18 +440,13 @@ async function startRecording() {
           inputData = resampled;
         }
 
-        // Float32 → Int16
         const int16 = new Int16Array(inputData.length);
         for (let i = 0; i < inputData.length; i++) {
           const s = Math.max(-1, Math.min(1, inputData[i]));
-          int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
         }
 
-        ws.send(JSON.stringify({
-          realtimeInput: {
-            mediaChunks: [{ mimeType: 'audio/pcm;rate=16000', data: arrayBufferToBase64(int16.buffer) }],
-          },
-        }));
+        sendAudioPcm(arrayBufferToBase64(int16.buffer));
       };
 
       source.connect(processor);
@@ -368,21 +456,56 @@ async function startRecording() {
 
     isRecording = true;
     recordBtn.classList.add('recording');
-    setStatus('Свързване...', true);
+    recordBtn.setAttribute('aria-label', 'Спри записа');
   } catch (err) {
     console.error('Mic error:', err);
-    showError('Няма достъп до микрофона');
+    if (err?.name === 'NotAllowedError') {
+      showError('Разрешете достъп до микрофона');
+    } else {
+      showError('Няма достъп до микрофона');
+    }
+    cleanupAudio();
+  } finally {
+    isConnecting = false;
+    recordBtn.disabled = false;
+    connectAbort = null;
+  }
+}
+
+function cleanupAudio() {
+  geminiReady = false;
+  if (workletNode) {
+    workletNode.disconnect();
+    workletNode = null;
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((t) => t.stop());
+    mediaStream = null;
+  }
+  if (audioContext) {
+    audioContext.close();
+    audioContext = null;
+  }
+  if (ws) {
+    try {
+      ws.close();
+    } catch {
+      /* ignore */
+    }
+    ws = null;
   }
 }
 
 function stopRecording() {
-  if (workletNode) { workletNode.disconnect(); workletNode = null; }
-  if (mediaStream) { mediaStream.getTracks().forEach((t) => t.stop()); mediaStream = null; }
-  if (audioContext) { audioContext.close(); audioContext = null; }
-  if (ws && ws.readyState === WebSocket.OPEN) { ws.close(); ws = null; }
+  if (connectAbort) connectAbort();
+
+  cleanupAudio();
 
   isRecording = false;
+  isConnecting = false;
   recordBtn.classList.remove('recording');
+  recordBtn.disabled = false;
+  recordBtn.setAttribute('aria-label', 'Запис');
   waveform.classList.remove('active');
   setStatus('Докоснете за запис');
 }
@@ -414,22 +537,18 @@ function showToast(task) {
 function showError(msg) {
   errorToast.textContent = msg;
   errorToast.classList.add('visible');
-  setTimeout(() => errorToast.classList.remove('visible'), 4000);
+  setTimeout(() => errorToast.classList.remove('visible'), 4500);
 }
 
 // --- Tasks ---
 async function loadTasks() {
   try {
     const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`);
-    if (!res.ok) {
-      console.warn('Failed to load tasks:', res.status);
-      return;
-    }
+    if (!res.ok) return;
+
     const contentType = res.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      console.warn('Tasks endpoint returned non-JSON response');
-      return;
-    }
+    if (!contentType?.includes('application/json')) return;
+
     const data = await res.json();
     const tasks = data.tasks || [];
 
@@ -440,7 +559,9 @@ async function loadTasks() {
       return;
     }
 
-    tasksContainer.innerHTML = tasks.map((t) => `
+    tasksContainer.innerHTML = tasks
+      .map(
+        (t) => `
       <div class="task-item" data-id="${t.id}">
         <div class="task-check" data-id="${t.id}" aria-label="Маркирай като готова">
           <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
@@ -448,12 +569,14 @@ async function loadTasks() {
         <div class="task-body">
           <div class="task-text">${escapeHtml(t.content)}</div>
           <div class="task-info">
-            ${t.emotion ? `<span>${t.emotion}</span>` : ''}
-            ${t.due_date ? `<span>${t.due_date}</span>` : ''}
+            ${t.emotion ? `<span>${escapeHtml(t.emotion)}</span>` : ''}
+            ${t.due_date ? `<span>${escapeHtml(t.due_date)}</span>` : ''}
           </div>
         </div>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
   } catch (e) {
     console.error('Load tasks error:', e);
   }
@@ -481,7 +604,6 @@ tasksContainer.addEventListener('click', (e) => {
   const check = e.target.closest('.task-check');
   if (check) {
     const id = check.dataset.id;
-    // Animate out
     const item = check.closest('.task-item');
     if (item) {
       item.style.opacity = '0';
@@ -510,5 +632,4 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// --- Init ---
 loadTasks();

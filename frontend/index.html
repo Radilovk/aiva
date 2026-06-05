@@ -141,8 +141,14 @@
       transform: scale(1.06);
     }
 
-    .record-btn:active {
+    .record-btn:active:not(:disabled) {
       transform: scale(0.94);
+    }
+
+    .record-btn:disabled {
+      opacity: 0.55;
+      cursor: wait;
+      transform: none;
     }
 
     .record-btn svg {
@@ -509,7 +515,7 @@
         <span></span><span></span><span></span><span></span><span></span>
       </div>
 
-      <div class="status" id="status">Докоснете за запис</div>
+      <div class="status" id="status" role="status" aria-live="polite">Докоснете за запис</div>
     </section>
 
     <section class="tasks-panel" id="tasksPanel">
