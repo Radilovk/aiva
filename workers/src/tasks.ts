@@ -22,7 +22,7 @@ export interface Task {
 export interface TaskInput {
   user_id: string;
   content: string;
-  emotion?: string;
+  emotion?: string | null;
   priority?: number;
   due_date?: string | null;
   due_time?: string | null;
