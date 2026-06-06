@@ -70,7 +70,7 @@
       position: relative;
       z-index: 1;
       width: 100%;
-      max-width: 420px;
+      max-width: 920px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -81,6 +81,16 @@
     .header {
       text-align: center;
       padding: 2rem 0 1rem;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      flex: 1;
+      text-align: left;
     }
 
     .logo {
@@ -99,14 +109,45 @@
       letter-spacing: 0.5px;
     }
 
+    .admin-link,
+    .ghost-btn,
+    .icon-btn,
+    .view-tab {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 9px 13px;
+      font: inherit;
+      font-size: 0.78rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+
+    .admin-link:hover,
+    .ghost-btn:hover,
+    .icon-btn:hover,
+    .view-tab:hover,
+    .view-tab.active {
+      background: var(--surface-hover);
+      border-color: rgba(255, 255, 255, 0.16);
+      transform: translateY(-1px);
+    }
+
+    .view-tab.active {
+      color: white;
+      box-shadow: inset 0 0 0 1px rgba(255, 59, 92, 0.35);
+    }
+
     /* Record Button */
     .voice-section {
-      flex: 1;
+      flex: 0 0 auto;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 3rem 0;
+      padding: 2rem 0 1.5rem;
       width: 100%;
     }
 
@@ -339,7 +380,23 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 14px;
       margin-bottom: 12px;
+    }
+
+    .tasks-heading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .tasks-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .tasks-title {
@@ -359,6 +416,50 @@
       border-radius: 10px;
     }
 
+    .calendar-toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .range-control,
+    .view-tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .range-control {
+      justify-content: space-between;
+      padding: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+
+    .range-label {
+      flex: 1;
+      text-align: center;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      text-transform: capitalize;
+    }
+
+    .icon-btn {
+      min-width: 40px;
+      min-height: 36px;
+      padding: 8px 12px;
+    }
+
+    .ghost-btn.primary-action {
+      background: var(--accent);
+      border-color: transparent;
+      color: white;
+      font-weight: 600;
+    }
+
     .task-item {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -369,6 +470,7 @@
       align-items: center;
       gap: 12px;
       transition: background 0.2s, transform 0.2s;
+      cursor: pointer;
     }
 
     .task-item:active {
@@ -392,6 +494,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 0;
+      background: transparent;
     }
 
     .task-check:hover {
@@ -428,12 +532,41 @@
       text-overflow: ellipsis;
     }
 
+    .task-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .priority-pill {
+      flex: 0 0 auto;
+      font-size: 0.62rem;
+      color: white;
+      background: rgba(255, 59, 92, 0.22);
+      border: 1px solid rgba(255, 59, 92, 0.28);
+      border-radius: 999px;
+      padding: 2px 7px;
+    }
+
     .task-info {
       font-size: 0.68rem;
       color: var(--text-secondary);
       margin-top: 3px;
       display: flex;
       gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .task-note {
+      margin-top: 7px;
+      color: rgba(255, 255, 255, 0.62);
+      font-size: 0.72rem;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .empty-state {
@@ -442,6 +575,270 @@
       color: var(--text-secondary);
       font-size: 0.82rem;
       font-weight: 300;
+    }
+
+    .empty-state.small {
+      padding: 1rem 0;
+      font-size: 0.76rem;
+    }
+
+    .agenda-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      touch-action: pan-y;
+    }
+
+    .agenda-grid.view-three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .agenda-grid.view-week {
+      grid-template-columns: repeat(7, minmax(120px, 1fr));
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .calendar-day,
+    .unscheduled-block,
+    .month-agenda {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      min-width: 0;
+    }
+
+    .calendar-day.is-today,
+    .month-cell.is-today {
+      border-color: rgba(255, 59, 92, 0.4);
+      box-shadow: 0 0 0 1px rgba(255, 59, 92, 0.14);
+    }
+
+    .day-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      color: var(--text);
+      text-transform: capitalize;
+    }
+
+    .day-name {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 2px;
+    }
+
+    .day-count,
+    .month-count {
+      font-size: 0.68rem;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 7px;
+    }
+
+    .day-stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .unscheduled-block {
+      margin-top: 12px;
+    }
+
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 7px;
+      touch-action: pan-y;
+    }
+
+    .month-weekday {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.68rem;
+      padding: 0 0 4px;
+    }
+
+    .month-cell {
+      min-height: 72px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .month-cell.muted {
+      opacity: 0.38;
+    }
+
+    .month-date {
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .month-dots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.9;
+    }
+
+    .priority-1 { background: #ff3b5c; }
+    .priority-2 { background: #ff8f3b; }
+    .priority-3 { background: #f5d66b; }
+    .priority-4 { background: #62d9b7; }
+    .priority-5 { background: #78a8ff; }
+
+    .month-agenda {
+      margin-top: 12px;
+    }
+
+    .task-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.56);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .task-modal.visible {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(720px, 100%);
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      background: rgba(18, 18, 26, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 28px;
+      padding: 20px;
+      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-header,
+    .modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 1.1rem;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .form-grid label,
+    .full-field {
+      display: grid;
+      gap: 6px;
+      color: var(--text-secondary);
+      font-size: 0.72rem;
+      font-weight: 500;
+    }
+
+    .full-field {
+      grid-column: 1 / -1;
+    }
+
+    .form-grid input,
+    .form-grid select,
+    .form-grid textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      font: inherit;
+      padding: 11px 12px;
+      outline: none;
+    }
+
+    .form-grid select option {
+      background: #15151d;
+      color: var(--text);
+    }
+
+    .form-grid textarea {
+      min-height: 90px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    .duplicate-panel {
+      grid-column: 1 / -1;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .duplicate-panel p {
+      color: var(--text-secondary);
+      font-size: 0.72rem;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+
+    .danger-btn {
+      color: #ff8aa0;
+      border-color: rgba(255, 59, 92, 0.25);
+    }
+
+    .save-btn {
+      background: var(--accent);
+      border-color: transparent;
+      color: white;
+      font-weight: 700;
+    }
+
+    body.compact-calendar .calendar-day,
+    body.compact-calendar .task-item {
+      padding: 10px;
     }
 
     /* Error toast */
@@ -476,6 +873,60 @@
       .record-wrapper { width: 140px; height: 140px; }
     }
 
+    @media (max-width: 720px) {
+      .app {
+        max-width: 420px;
+      }
+
+      .header {
+        align-items: flex-start;
+      }
+
+      .agenda-grid.view-three,
+      .agenda-grid.view-week {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        padding-bottom: 4px;
+      }
+
+      .agenda-grid.view-three .calendar-day,
+      .agenda-grid.view-week .calendar-day {
+        min-width: 82%;
+        scroll-snap-align: start;
+      }
+
+      .tasks-header {
+        align-items: flex-start;
+      }
+
+      .view-tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .view-tab {
+        padding-inline: 8px;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .modal-actions {
+        flex-wrap: wrap;
+      }
+
+      .modal-actions button {
+        flex: 1;
+      }
+
+      .month-cell {
+        min-height: 56px;
+        padding: 6px;
+      }
+    }
+
     @media (min-height: 800px) {
       .voice-section { padding: 4rem 0; }
     }
@@ -494,8 +945,11 @@
 <body>
   <div class="app">
     <header class="header">
-      <div class="logo">AIVA</div>
-      <div class="tagline">гласов асистент за задачи</div>
+      <div class="brand">
+        <div class="logo">AIVA</div>
+        <div class="tagline">гласов асистент за задачи</div>
+      </div>
+      <a class="admin-link" href="./admin.html">Admin</a>
     </header>
 
     <section class="voice-section">
@@ -520,13 +974,116 @@
 
     <section class="tasks-panel" id="tasksPanel">
       <div class="tasks-header">
-        <span class="tasks-title">Задачи</span>
-        <span class="tasks-count" id="tasksCount">0</span>
+        <div class="tasks-heading">
+          <span class="tasks-title">Календар</span>
+          <span class="tasks-count" id="tasksCount">0</span>
+        </div>
+        <div class="tasks-actions">
+          <button class="ghost-btn primary-action" id="addTaskBtn" type="button">+ Задача</button>
+        </div>
       </div>
+
+      <div class="calendar-toolbar">
+        <div class="range-control">
+          <button class="icon-btn" id="prevRange" type="button" aria-label="Предишен период">‹</button>
+          <div class="range-label" id="rangeLabel">Днес</div>
+          <button class="icon-btn" id="nextRange" type="button" aria-label="Следващ период">›</button>
+        </div>
+        <div class="view-tabs" role="tablist" aria-label="Календарни изгледи">
+          <button class="view-tab active" data-view="day" type="button" aria-pressed="true">Ден</button>
+          <button class="view-tab" data-view="three" type="button" aria-pressed="false">3 дни</button>
+          <button class="view-tab" data-view="week" type="button" aria-pressed="false">Календар</button>
+          <button class="view-tab" data-view="month" type="button" aria-pressed="false">Месец</button>
+          <button class="view-tab" id="todayBtn" type="button">Днес</button>
+        </div>
+      </div>
+
       <div id="tasksContainer">
         <div class="empty-state">Все още няма задачи</div>
       </div>
     </section>
+  </div>
+
+  <!-- Task details modal -->
+  <div class="task-modal" id="taskModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">Детайли за задачата</div>
+        <button class="modal-close" id="closeTaskModal" type="button" aria-label="Затвори">×</button>
+      </div>
+
+      <form id="taskForm">
+        <input id="taskId" name="id" type="hidden">
+        <div class="form-grid">
+          <label class="full-field">
+            Задача / ангажимент
+            <input name="content" required placeholder="Напр. Обади се на клиента">
+          </label>
+
+          <label>
+            Дата
+            <input name="due_date" type="date">
+          </label>
+          <label>
+            Час
+            <input name="due_time" type="time">
+          </label>
+          <label>
+            Приоритет
+            <select name="priority">
+              <option value="1">П1 - висок</option>
+              <option value="2">П2</option>
+              <option value="3">П3</option>
+              <option value="4">П4</option>
+              <option value="5">П5 - нисък</option>
+            </select>
+          </label>
+          <label>
+            Емоция / контекст
+            <select name="emotion">
+              <option value="neutral">neutral</option>
+              <option value="urgent">urgent</option>
+              <option value="stress">stress</option>
+              <option value="tired">tired</option>
+            </select>
+          </label>
+          <label>
+            Продължителност (мин)
+            <input name="estimated_minutes" type="number" min="0" max="1440">
+          </label>
+          <label>
+            Локация
+            <input name="location" placeholder="Офис, онлайн, адрес...">
+          </label>
+          <label>
+            Тагове
+            <input name="tags" placeholder="работа, лично, важни">
+          </label>
+          <label>
+            Повторяемост
+            <input name="repeat_rule" placeholder="всеки понеделник, месечно...">
+          </label>
+          <label class="full-field">
+            Допълнителна информация
+            <textarea name="notes" placeholder="Контекст, линкове, подзадачи, инструкции..."></textarea>
+          </label>
+
+          <div class="duplicate-panel">
+            <p><strong>Мултиплициране:</strong> въведи по един ред във формат <code>YYYY-MM-DD HH:MM</code>, например <code>2026-06-08 09:30</code>.</p>
+            <label class="full-field">
+              Дни и часове за копия
+              <textarea id="duplicateRows" placeholder="2026-06-08 09:30&#10;2026-06-10 14:00"></textarea>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="ghost-btn danger-btn" id="deleteTaskBtn" type="button">Изтрий</button>
+          <button class="ghost-btn" id="duplicateTaskBtn" type="button">Мултиплицирай</button>
+          <button class="ghost-btn save-btn" type="submit">Запази</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- Task saved toast -->
@@ -543,6 +1100,7 @@
   <div class="error-toast" id="errorToast"></div>
 
   <script src="config.js"></script>
+  <script src="settings.js"></script>
   <script src="lib/geminilive.js"></script>
   <script src="lib/mediaUtils.js"></script>
   <script src="app.js"></script>
