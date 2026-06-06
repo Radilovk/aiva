@@ -1,6 +1,14 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { createTask, getIncompleteTasks, markTaskDone, registerUser } from './tasks';
+import {
+  createTask,
+  deleteTask,
+  duplicateTask,
+  getIncompleteTasks,
+  markTaskDone,
+  registerUser,
+  updateTask,
+} from './tasks';
 import { handleCron } from './cron';
 
 interface Env {
@@ -18,7 +26,7 @@ app.use(
   '*',
   cors({
     origin: (origin) => origin || '*',
-    allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type'],
   })
 );
@@ -41,6 +49,105 @@ app.patch('/api/tasks/:id/done', async (c) => {
   const success = await markTaskDone(c.env.DB, id);
   if (!success) return c.json({ error: 'Задачата не е намерена' }, 404);
   return c.json({ success: true });
+});
+
+app.patch('/api/tasks/:id', async (c) => {
+  const id = parseInt(c.req.param('id'), 10);
+  const body = await c.req.json<{
+    user_id?: string;
+    content?: string;
+    task?: string;
+    emotion?: string | null;
+    priority?: number;
+    due_date?: string | null;
+    due_time?: string | null;
+    estimated_minutes?: number | null;
+    notes?: string | null;
+    location?: string | null;
+    repeat_rule?: string | null;
+    tags?: string | null;
+    done?: number;
+  }>();
+
+  if (!Number.isFinite(id)) {
+    return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
+  }
+
+  try {
+    const task = await updateTask(
+      c.env.DB,
+      id,
+      {
+        content: body.content ?? body.task,
+        emotion: body.emotion,
+        priority: body.priority,
+        due_date: body.due_date,
+        due_time: body.due_time,
+        estimated_minutes: body.estimated_minutes,
+        notes: body.notes,
+        location: body.location,
+        repeat_rule: body.repeat_rule,
+        tags: body.tags,
+        done: body.done,
+      },
+      body.user_id
+    );
+    if (!task) return c.json({ error: 'Задачата не е намерена' }, 404);
+    return c.json({ success: true, task });
+  } catch (e) {
+    console.error('Task update error:', e);
+    return c.json({ error: 'Грешка при редакция на задачата' }, 500);
+  }
+});
+
+app.delete('/api/tasks/:id', async (c) => {
+  const id = parseInt(c.req.param('id'), 10);
+  const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as { user_id?: string }));
+
+  if (!Number.isFinite(id)) {
+    return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
+  }
+
+  try {
+    const success = await deleteTask(c.env.DB, id, body.user_id);
+    if (!success) return c.json({ error: 'Задачата не е намерена' }, 404);
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Task delete error:', e);
+    return c.json({ error: 'Грешка при изтриване на задачата' }, 500);
+  }
+});
+
+app.post('/api/tasks/:id/duplicate', async (c) => {
+  const id = parseInt(c.req.param('id'), 10);
+  const body = await c.req.json<{
+    user_id: string;
+    due_date?: string | null;
+    due_time?: string | null;
+    repeat_rule?: string | null;
+    notes?: string | null;
+  }>();
+
+  if (!Number.isFinite(id)) {
+    return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
+  }
+  if (!body.user_id) {
+    return c.json({ error: 'user_id е задължителен' }, 400);
+  }
+
+  try {
+    const task = await duplicateTask(c.env.DB, id, body.user_id, {
+      due_date: body.due_date,
+      due_time: body.due_time,
+      repeat_rule: body.repeat_rule,
+      notes: body.notes,
+    });
+    if (!task) return c.json({ error: 'Задачата не е намерена' }, 404);
+    return c.json({ success: true, task });
+  } catch (e) {
+    console.error('Task duplicate error:', e);
+    return c.json({ error: 'Грешка при мултиплициране на задачата' }, 500);
+  }
 });
 
 app.post('/api/users/register', async (c) => {
@@ -98,24 +205,35 @@ app.post('/api/tasks', async (c) => {
   const body = await c.req.json<{
     user_id: string;
     task: string;
+    content?: string;
     emotion?: string;
     priority?: number;
     due_date?: string;
+    due_time?: string;
     estimated_minutes?: number;
+    notes?: string;
+    location?: string;
+    repeat_rule?: string;
+    tags?: string;
   }>();
 
-  if (!body.user_id || !body.task) {
+  if (!body.user_id || !(body.task || body.content)) {
     return c.json({ error: 'user_id и task са задължителни' }, 400);
   }
 
   try {
     const task = await createTask(c.env.DB, {
       user_id: body.user_id,
-      content: body.task,
+      content: body.task || body.content || '',
       emotion: body.emotion || 'neutral',
       priority: Math.min(5, Math.max(1, parseInt(String(body.priority)) || 3)),
       due_date: body.due_date || null,
+      due_time: body.due_time || null,
       estimated_minutes: body.estimated_minutes ? parseInt(String(body.estimated_minutes)) : null,
+      notes: body.notes || null,
+      location: body.location || null,
+      repeat_rule: body.repeat_rule || null,
+      tags: body.tags || null,
     });
     return c.json({ success: true, task });
   } catch (e) {

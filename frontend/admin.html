@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#050508">
+  <title>AIVA Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050508;
+      --surface: rgba(255, 255, 255, 0.045);
+      --surface-strong: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f4f4f6;
+      --muted: rgba(255, 255, 255, 0.58);
+      --accent: #ff3b5c;
+      --success: #2dd4a8;
+      --radius: 22px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 15% 0%, rgba(255, 59, 92, 0.14), transparent 34%),
+                  radial-gradient(circle at 85% 15%, rgba(100, 60, 255, 0.12), transparent 32%),
+                  var(--bg);
+      color: var(--text);
+      padding: calc(var(--safe-top) + 24px) 18px calc(var(--safe-bottom) + 28px);
+    }
+
+    .shell {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 6vw, 4.8rem);
+      letter-spacing: -0.06em;
+      line-height: 0.95;
+      margin-top: 8px;
+    }
+
+    .lead {
+      max-width: 680px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-top: 14px;
+    }
+
+    .nav-link,
+    button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 11px 16px;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    }
+
+    .nav-link:hover,
+    button:hover {
+      background: var(--surface-strong);
+      border-color: rgba(255, 255, 255, 0.16);
+      transform: translateY(-1px);
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: transparent;
+      color: white;
+      font-weight: 700;
+      box-shadow: 0 16px 42px rgba(255, 59, 92, 0.22);
+    }
+
+    form {
+      display: grid;
+      gap: 18px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+
+    .card {
+      grid-column: span 12;
+      background: rgba(17, 17, 24, 0.68);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 20px 80px rgba(0, 0, 0, 0.18);
+    }
+
+    .card.half {
+      grid-column: span 6;
+    }
+
+    .card.third {
+      grid-column: span 4;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .section-note {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-bottom: 14px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.055);
+      color: var(--text);
+      font: inherit;
+      padding: 12px 13px;
+      outline: none;
+    }
+
+    select option {
+      background: #15151d;
+      color: var(--text);
+    }
+
+    textarea {
+      min-height: 280px;
+      resize: vertical;
+      line-height: 1.55;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      accent-color: var(--accent);
+    }
+
+    input[type="color"] {
+      min-height: 44px;
+      padding: 4px;
+    }
+
+    .row {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 12px;
+      padding: 13px 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.035);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    .toggle span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.4;
+      display: block;
+      margin-top: 3px;
+    }
+
+    .toggle input {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      position: sticky;
+      bottom: calc(var(--safe-bottom) + 12px);
+      padding: 14px;
+      background: rgba(5, 5, 8, 0.78);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 4;
+    }
+
+    .save-state {
+      margin-right: auto;
+      color: var(--success);
+      font-size: 0.86rem;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .save-state.visible {
+      opacity: 1;
+    }
+
+    pre {
+      overflow: auto;
+      max-height: 360px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(0, 0, 0, 0.28);
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 0.78rem;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 860px) {
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .grid,
+      .row {
+        grid-template-columns: 1fr;
+      }
+
+      .card,
+      .card.half,
+      .card.third {
+        grid-column: span 1;
+      }
+
+      .actions {
+        justify-content: stretch;
+      }
+
+      .actions button,
+      .actions .nav-link {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">AIVA Admin</div>
+        <h1>Контролен панел</h1>
+        <p class="lead">
+          Редактирай системния prompt, модела, гласа, параметрите на Live API сесията,
+          настройките на календара и препоръчителните UX защити. Промените се пазят локално
+          и се прилагат при следващото стартиране на асистента.
+        </p>
+      </div>
+      <a class="nav-link" href="./index.html">Към приложението</a>
+    </header>
+
+    <form id="adminForm">
+      <section class="grid">
+        <article class="card">
+          <div class="section-title">1. Настоящ prompt към AI модела</div>
+          <p class="section-note">Това е системната инструкция, която AIVA изпраща към Gemini Live API.</p>
+          <label>
+            System instructions
+            <textarea id="systemInstructions" spellcheck="false"></textarea>
+          </label>
+        </article>
+
+        <article class="card half">
+          <div class="section-title">2. Модел, глас и генеративни параметри</div>
+          <p class="section-note">Основни настройки на асистента и начина, по който говори.</p>
+          <label>
+            Gemini Live модел
+            <input id="model" list="modelOptions" autocomplete="off">
+            <datalist id="modelOptions">
+              <option value="gemini-3.1-flash-live-preview"></option>
+              <option value="gemini-2.5-flash-live-preview"></option>
+              <option value="gemini-live-2.5-flash-preview"></option>
+            </datalist>
+          </label>
+          <div class="row">
+            <label>
+              Глас
+              <select id="voiceName">
+                <option value="Kore">Kore</option>
+                <option value="Puck">Puck</option>
+                <option value="Charon">Charon</option>
+                <option value="Fenrir">Fenrir</option>
+                <option value="Aoede">Aoede</option>
+                <option value="Leda">Leda</option>
+                <option value="Orus">Orus</option>
+                <option value="Zephyr">Zephyr</option>
+              </select>
+            </label>
+            <label>
+              Temperature: <strong id="temperatureValue">1.0</strong>
+              <input id="temperature" type="range" min="0" max="2" step="0.1">
+            </label>
+          </div>
+          <label class="toggle">
+            <div>Аудио отговор <span>Асистентът говори с избрания глас.</span></div>
+            <input id="responseAudio" type="checkbox">
+          </label>
+          <label class="toggle">
+            <div>Текстов отговор <span>Полезно за debug и бъдещ chat изглед.</span></div>
+            <input id="responseText" type="checkbox">
+          </label>
+        </article>
+
+        <article class="card half">
+          <div class="section-title">3. Voice session и VAD настройки</div>
+          <p class="section-note">Контрол върху транскрипция, Google grounding и засичане на говор.</p>
+          <label class="toggle">
+            <div>Input transcription <span>Показва чутия от потребителя текст в UI.</span></div>
+            <input id="inputAudioTranscription" type="checkbox">
+          </label>
+          <label class="toggle">
+            <div>Output transcription <span>Записва текстова версия на отговора на асистента.</span></div>
+            <input id="outputAudioTranscription" type="checkbox">
+          </label>
+          <label class="toggle">
+            <div>Google grounding <span>Използвай само ако няма custom tools в сесията.</span></div>
+            <input id="googleGrounding" type="checkbox">
+          </label>
+          <label class="toggle">
+            <div>Изключи automatic activity detection <span>За ръчен контрол на turn-овете.</span></div>
+            <input id="vadDisabled" type="checkbox">
+          </label>
+          <div class="row">
+            <label>
+              Silence duration (ms)
+              <input id="silenceDuration" type="number" min="100" max="10000" step="100">
+            </label>
+            <label>
+              Prefix padding (ms)
+              <input id="prefixPadding" type="number" min="0" max="5000" step="50">
+            </label>
+          </div>
+          <div class="row">
+            <label>
+              Start sensitivity
+              <select id="startSensitivity">
+                <option value="START_SENSITIVITY_UNSPECIFIED">Unspecified</option>
+                <option value="START_SENSITIVITY_HIGH">High</option>
+                <option value="START_SENSITIVITY_LOW">Low</option>
+              </select>
+            </label>
+            <label>
+              End sensitivity
+              <select id="endSensitivity">
+                <option value="END_SENSITIVITY_UNSPECIFIED">Unspecified</option>
+                <option value="END_SENSITIVITY_HIGH">High</option>
+                <option value="END_SENSITIVITY_LOW">Low</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Activity handling
+            <select id="activityHandling">
+              <option value="ACTIVITY_HANDLING_UNSPECIFIED">Unspecified</option>
+              <option value="START_OF_ACTIVITY_INTERRUPTS">Start of activity interrupts</option>
+              <option value="NO_INTERRUPTION">No interruption</option>
+            </select>
+          </label>
+        </article>
+
+        <article class="card third">
+          <div class="section-title">Календар и UX</div>
+          <p class="section-note">Подходящи настройки за новите дневен, 3-дневен, седмичен и месечен изглед.</p>
+          <label>
+            Начален изглед
+            <select id="defaultView">
+              <option value="day">Текущ ден</option>
+              <option value="three">Следващи 3 дни</option>
+              <option value="week">Седмица</option>
+              <option value="month">Месец</option>
+            </select>
+          </label>
+          <label>
+            Първи ден от седмицата
+            <select id="weekStartsOn">
+              <option value="1">Понеделник</option>
+              <option value="0">Неделя</option>
+            </select>
+          </label>
+          <div class="row">
+            <label>
+              Работен ден от
+              <input id="workingDayStart" type="time">
+            </label>
+            <label>
+              до
+              <input id="workingDayEnd" type="time">
+            </label>
+          </div>
+          <label class="toggle">
+            <div>Показвай задачи без дата <span>Отделна зона в календара.</span></div>
+            <input id="showUnscheduled" type="checkbox">
+          </label>
+        </article>
+
+        <article class="card third">
+          <div class="section-title">Defaults и защити</div>
+          <p class="section-note">Препоръчителни стойности за нови/редактирани задачи.</p>
+          <label>
+            Приоритет по подразбиране
+            <input id="defaultPriority" type="number" min="1" max="5">
+          </label>
+          <label>
+            Продължителност по подразбиране (мин)
+            <input id="defaultEstimatedMinutes" type="number" min="0" max="1440">
+          </label>
+          <label>
+            Час по подразбиране
+            <input id="defaultDueTime" type="time">
+          </label>
+          <label class="toggle">
+            <div>Потвърждение преди изтриване <span>Намалява риска от случайни действия.</span></div>
+            <input id="askBeforeDelete" type="checkbox">
+          </label>
+          <label class="toggle">
+            <div>Показвай завършени задачи <span>Запазено за бъдещ completed изглед.</span></div>
+            <input id="showCompletedTasks" type="checkbox">
+          </label>
+          <label>
+            Максимум дни за мултиплициране
+            <input id="maxDuplicateDays" type="number" min="1" max="365">
+          </label>
+        </article>
+
+        <article class="card third">
+          <div class="section-title">Външен вид и инструменти</div>
+          <p class="section-note">Бърз export/import и preview на setup payload-а към модела.</p>
+          <label>
+            Accent цвят
+            <input id="accentColor" type="color">
+          </label>
+          <label class="toggle">
+            <div>Компактен календар <span>По-плътен изглед за малки екрани.</span></div>
+            <input id="compactCalendar" type="checkbox">
+          </label>
+          <label>
+            Export / Import JSON
+            <textarea id="exportOutput" placeholder="Натисни Export или постави JSON за Import"></textarea>
+          </label>
+          <div class="row">
+            <button type="button" id="exportSettings">Export</button>
+            <button type="button" id="importSettings">Import</button>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="section-title">Live API setup preview</div>
+          <p class="section-note">Проверка как основните параметри ще изглеждат при следваща voice сесия.</p>
+          <pre id="setupPreview"></pre>
+        </article>
+      </section>
+
+      <div class="actions">
+        <span class="save-state" id="saveState"></span>
+        <a class="nav-link" href="./index.html">Назад</a>
+        <button type="button" id="resetSettings">Reset</button>
+        <button class="primary" type="submit">Запази настройки</button>
+      </div>
+    </form>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="settings.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
