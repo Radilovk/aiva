@@ -39,6 +39,7 @@ const modalTitle = document.getElementById('modalTitle');
 const closeTaskModalBtn = document.getElementById('closeTaskModal');
 const deleteTaskBtn = document.getElementById('deleteTaskBtn');
 const duplicateTaskBtn = document.getElementById('duplicateTaskBtn');
+const addToCalendarBtn = document.getElementById('addToCalendarBtn');
 const duplicateRowsField = document.getElementById('duplicateRows');
 const taskIdField = document.getElementById('taskId');
 
@@ -1059,6 +1060,31 @@ duplicateTaskBtn.addEventListener('click', async () => {
     await duplicateTaskToRows(id);
   } catch (error) {
     showError(error.message || 'Грешка при мултиплициране');
+  }
+});
+
+addToCalendarBtn.addEventListener('click', async () => {
+  const task = {
+    id: taskIdField.value || `new-${Date.now()}`,
+    content: taskForm.elements.content.value,
+    due_date: taskForm.elements.due_date.value || null,
+    due_time: taskForm.elements.due_time.value || null,
+    estimated_minutes: taskForm.elements.estimated_minutes.value || null,
+    location: taskForm.elements.location.value || null,
+    tags: taskForm.elements.tags.value || null,
+    notes: taskForm.elements.notes.value || null,
+  };
+  if (!task.content) {
+    showError('Въведи задача преди да я добавиш в календара');
+    return;
+  }
+  try {
+    const result = await window.AIVA_CALENDAR.addToDevice(task);
+    if (result !== 'aborted') {
+      showToast({ content: 'Добавено в календара на устройството', emotion: 'neutral', priority: 3 });
+    }
+  } catch (error) {
+    showError(error.message || 'Грешка при добавяне в календара');
   }
 });
 
