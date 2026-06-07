@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#050508">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <title>AIVA — Настройки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050508;
+      --surface: rgba(255, 255, 255, 0.03);
+      --surface-hover: rgba(255, 255, 255, 0.06);
+      --border: rgba(255, 255, 255, 0.06);
+      --text: #f0f0f2;
+      --text-secondary: rgba(255, 255, 255, 0.45);
+      --accent: #ff3b5c;
+      --accent-glow: rgba(255, 59, 92, 0.35);
+      --success: #2dd4a8;
+      --radius: 20px;
+      --radius-sm: 14px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: calc(var(--safe-top) + 20px) 20px calc(var(--safe-bottom) + 20px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+      background: radial-gradient(ellipse at 50% 20%, rgba(255, 59, 92, 0.04) 0%, transparent 50%),
+                  radial-gradient(ellipse at 80% 80%, rgba(100, 60, 255, 0.03) 0%, transparent 40%);
+      pointer-events: none; z-index: 0;
+    }
+
+    .settings-app {
+      position: relative; z-index: 1;
+      max-width: 640px; margin: 0 auto;
+      padding-bottom: 40px;
+    }
+
+    .settings-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 0 2rem; gap: 12px;
+    }
+
+    .settings-header h1 { font-size: 1.4rem; font-weight: 700; }
+
+    .back-link {
+      color: var(--text-secondary); text-decoration: none;
+      font-size: 0.82rem; border: 1px solid var(--border);
+      background: var(--surface); border-radius: 999px;
+      padding: 8px 14px; transition: background 0.2s;
+    }
+    .back-link:hover { background: var(--surface-hover); }
+
+    .section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 0.72rem; font-weight: 600; color: var(--accent);
+      text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 16px;
+    }
+
+    .field { margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+
+    .field-label {
+      display: block; font-size: 0.78rem; font-weight: 500;
+      color: var(--text-secondary); margin-bottom: 6px;
+    }
+
+    .field-hint {
+      font-size: 0.68rem; color: var(--text-secondary);
+      margin-top: 4px; opacity: 0.7;
+    }
+
+    input[type="text"], input[type="number"], input[type="time"],
+    input[type="color"], select, textarea {
+      width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.06); color: var(--text);
+      font: inherit; padding: 11px 12px; outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    select option { background: #15151d; color: var(--text); }
+    textarea { min-height: 100px; resize: vertical; line-height: 1.45; font-size: 0.82rem; }
+    input[type="color"] { height: 42px; padding: 4px; cursor: pointer; }
+
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; gap: 12px;
+    }
+
+    .toggle-label { font-size: 0.85rem; font-weight: 400; }
+
+    .toggle {
+      position: relative; width: 48px; height: 26px;
+      background: rgba(255, 255, 255, 0.1); border-radius: 13px;
+      cursor: pointer; transition: background 0.3s; flex-shrink: 0;
+    }
+    .toggle::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: white; transition: transform 0.3s;
+    }
+    .toggle.active { background: var(--accent); }
+    .toggle.active::after { transform: translateX(22px); }
+
+    .row-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+
+    .btn-group {
+      display: flex; gap: 10px; margin-top: 24px;
+    }
+
+    .btn {
+      flex: 1; border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); border-radius: 999px; padding: 12px 16px;
+      font: inherit; font-size: 0.85rem; font-weight: 500;
+      cursor: pointer; transition: background 0.2s, transform 0.2s;
+      text-align: center;
+    }
+    .btn:hover { background: var(--surface-hover); transform: translateY(-1px); }
+    .btn.primary { background: var(--accent); border-color: transparent; color: white; font-weight: 700; }
+    .btn.danger { color: #ff8aa0; border-color: rgba(255, 59, 92, 0.25); }
+
+    .ics-url {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ics-url input { flex: 1; font-size: 0.78rem; }
+    .ics-url .btn { flex: 0 0 auto; padding: 10px 14px; }
+
+    .saved-toast {
+      position: fixed; bottom: calc(var(--safe-bottom) + 20px);
+      left: 50%; transform: translateX(-50%) translateY(60px);
+      background: rgba(45, 212, 168, 0.15); backdrop-filter: blur(16px);
+      border: 1px solid rgba(45, 212, 168, 0.2); border-radius: 12px;
+      padding: 12px 24px; font-size: 0.85rem; color: var(--success);
+      z-index: 100; opacity: 0; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .saved-toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    @media (max-width: 480px) {
+      .row-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="settings-app">
+    <div class="settings-header">
+      <h1>⚙ Настройки</h1>
+      <a class="back-link" href="./index.html">← Начало</a>
+    </div>
+
+    <!-- Notifications -->
+    <div class="section">
+      <div class="section-title">🔔 Нотификации</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Напомняния за задачи</span>
+        <div class="toggle" id="toggleNotifications"></div>
+      </div>
+      <div class="field">
+        <span class="field-label">Напомняне преди (минути)</span>
+        <select id="reminderMinutes">
+          <option value="5">5 минути</option>
+          <option value="10">10 минути</option>
+          <option value="15">15 минути</option>
+          <option value="30">30 минути</option>
+          <option value="60">1 час</option>
+        </select>
+      </div>
+      <div class="row-grid">
+        <div class="field">
+          <span class="field-label">Тихи часове — от</span>
+          <input type="time" id="quietStart">
+        </div>
+        <div class="field">
+          <span class="field-label">Тихи часове — до</span>
+          <input type="time" id="quietEnd">
+        </div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Звук при нотификация</span>
+        <div class="toggle" id="toggleSound"></div>
+      </div>
+    </div>
+
+    <!-- Calendar Sync -->
+    <div class="section">
+      <div class="section-title">📅 Синхронизация с календар</div>
+      <div class="field">
+        <span class="field-label">Доставчик</span>
+        <select id="calendarProvider">
+          <option value="none">Без синхронизация</option>
+          <option value="ics">ICS feed (webcal://)</option>
+          <option value="google">Google Calendar (скоро)</option>
+        </select>
+        <div class="field-hint">ICS feed позволява абониране от всеки календар (Google, Apple, Outlook).</div>
+      </div>
+      <div class="field" id="icsUrlSection" style="display:none">
+        <span class="field-label">ICS URL за абониране</span>
+        <div class="ics-url">
+          <input type="text" id="icsUrl" readonly>
+          <button class="btn" type="button" id="copyIcsBtn">Копирай</button>
+        </div>
+        <div class="field-hint">Отвори този URL в Google Calendar / Apple Calendar за автоматична синхронизация.</div>
+      </div>
+      <div class="field">
+        <span class="field-label">Честота на синхронизация</span>
+        <select id="syncFrequency">
+          <option value="manual">Ръчна</option>
+          <option value="15">На всеки 15 мин</option>
+          <option value="change">При всяка промяна</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Voice Assistant -->
+    <div class="section">
+      <div class="section-title">🎙 Гласов асистент</div>
+      <div class="field">
+        <span class="field-label">Модел</span>
+        <select id="model">
+          <option value="gemini-3.1-flash-live-preview">Gemini 3.1 Flash (Live)</option>
+        </select>
+      </div>
+      <div class="field">
+        <span class="field-label">Глас</span>
+        <select id="voiceName">
+          <option value="Kore">Kore</option>
+          <option value="Puck">Puck</option>
+          <option value="Charon">Charon</option>
+          <option value="Fenrir">Fenrir</option>
+          <option value="Aoede">Aoede</option>
+        </select>
+      </div>
+      <div class="field">
+        <span class="field-label">Температура (креативност)</span>
+        <input type="number" id="temperature" min="0" max="2" step="0.1">
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Google Grounding (интернет достъп)</span>
+        <div class="toggle" id="toggleGrounding"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Транскрипция на входа</span>
+        <div class="toggle" id="toggleInputTranscription"></div>
+      </div>
+      <div class="field">
+        <span class="field-label">Системни инструкции</span>
+        <textarea id="systemInstructions"></textarea>
+      </div>
+    </div>
+
+    <!-- Calendar View -->
+    <div class="section">
+      <div class="section-title">📆 Календар</div>
+      <div class="row-grid">
+        <div class="field">
+          <span class="field-label">Изглед по подразбиране</span>
+          <select id="defaultView">
+            <option value="day">Ден</option>
+            <option value="three">3 дни</option>
+            <option value="week">Седмица</option>
+            <option value="month">Месец</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="field-label">Седмицата започва от</span>
+          <select id="weekStartsOn">
+            <option value="1">Понеделник</option>
+            <option value="0">Неделя</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="field-label">Работен ден — от</span>
+          <input type="time" id="workingDayStart">
+        </div>
+        <div class="field">
+          <span class="field-label">Работен ден — до</span>
+          <input type="time" id="workingDayEnd">
+        </div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Показвай задачи без дата</span>
+        <div class="toggle" id="toggleShowUnscheduled"></div>
+      </div>
+    </div>
+
+    <!-- Defaults -->
+    <div class="section">
+      <div class="section-title">📋 Стойности по подразбиране</div>
+      <div class="row-grid">
+        <div class="field">
+          <span class="field-label">Приоритет</span>
+          <select id="defaultPriority">
+            <option value="1">П1 — висок</option>
+            <option value="2">П2</option>
+            <option value="3">П3</option>
+            <option value="4">П4</option>
+            <option value="5">П5 — нисък</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="field-label">Продължителност (мин)</span>
+          <input type="number" id="defaultMinutes" min="0" max="480">
+        </div>
+        <div class="field">
+          <span class="field-label">Час по подразбиране</span>
+          <input type="time" id="defaultDueTime">
+        </div>
+        <div class="field">
+          <span class="field-label">Емоция</span>
+          <select id="defaultEmotion">
+            <option value="neutral">neutral</option>
+            <option value="urgent">urgent</option>
+            <option value="stress">stress</option>
+            <option value="tired">tired</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Safety -->
+    <div class="section">
+      <div class="section-title">🛡 Безопасност</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Питай преди изтриване</span>
+        <div class="toggle" id="toggleAskDelete"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Показвай завършени задачи</span>
+        <div class="toggle" id="toggleShowCompleted"></div>
+      </div>
+      <div class="field">
+        <span class="field-label">Максимални дати за мултиплициране</span>
+        <input type="number" id="maxDuplicateDays" min="1" max="365">
+      </div>
+    </div>
+
+    <!-- Appearance -->
+    <div class="section">
+      <div class="section-title">🎨 Външен вид</div>
+      <div class="field">
+        <span class="field-label">Акцентен цвят</span>
+        <input type="color" id="accentColor">
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Компактен календар</span>
+        <div class="toggle" id="toggleCompactCalendar"></div>
+      </div>
+    </div>
+
+    <!-- Data -->
+    <div class="section">
+      <div class="section-title">💾 Данни</div>
+      <div class="btn-group">
+        <button class="btn" id="exportBtn" type="button">Експорт (JSON)</button>
+        <button class="btn" id="importBtn" type="button">Импорт</button>
+      </div>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+    </div>
+
+    <!-- Actions -->
+    <div class="btn-group">
+      <button class="btn danger" id="resetBtn" type="button">Нулирай всичко</button>
+      <button class="btn primary" id="saveBtn" type="button">Запази</button>
+    </div>
+  </div>
+
+  <div class="saved-toast" id="savedToast">✓ Настройките са запазени</div>
+
+  <script src="config.js"></script>
+  <script src="settings.js"></script>
+  <script>
+    const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.AIVA_SETTINGS;
+    const { API_BASE } = window.AIVA_CONFIG;
+    let settings = loadAssistantSettings();
+
+    // --- Populate UI from settings ---
+    function populateUI() {
+      // Notifications
+      setToggle('toggleNotifications', settings.notifications?.enabled);
+      document.getElementById('reminderMinutes').value = settings.notifications?.reminderMinutes || 15;
+      document.getElementById('quietStart').value = settings.notifications?.quietHoursStart || '22:00';
+      document.getElementById('quietEnd').value = settings.notifications?.quietHoursEnd || '07:00';
+      setToggle('toggleSound', settings.notifications?.sound !== false);
+
+      // Calendar sync
+      document.getElementById('calendarProvider').value = settings.calendarSync?.provider || 'none';
+      document.getElementById('syncFrequency').value = settings.calendarSync?.syncFrequency || 'manual';
+      updateIcsUrl();
+
+      // Voice
+      document.getElementById('model').value = settings.model;
+      document.getElementById('voiceName').value = settings.voiceName;
+      document.getElementById('temperature').value = settings.temperature;
+      setToggle('toggleGrounding', settings.googleGrounding);
+      setToggle('toggleInputTranscription', settings.inputAudioTranscription);
+      document.getElementById('systemInstructions').value = settings.systemInstructions;
+
+      // Calendar
+      document.getElementById('defaultView').value = settings.calendar.defaultView;
+      document.getElementById('weekStartsOn').value = settings.calendar.weekStartsOn;
+      document.getElementById('workingDayStart').value = settings.calendar.workingDayStart;
+      document.getElementById('workingDayEnd').value = settings.calendar.workingDayEnd;
+      setToggle('toggleShowUnscheduled', settings.calendar.showUnscheduled);
+
+      // Defaults
+      document.getElementById('defaultPriority').value = settings.defaults.priority;
+      document.getElementById('defaultMinutes').value = settings.defaults.estimatedMinutes;
+      document.getElementById('defaultDueTime').value = settings.defaults.dueTime;
+      document.getElementById('defaultEmotion').value = settings.defaults.emotion;
+
+      // Safety
+      setToggle('toggleAskDelete', settings.safety.askBeforeDelete);
+      setToggle('toggleShowCompleted', settings.safety.showCompletedTasks);
+      document.getElementById('maxDuplicateDays').value = settings.safety.maxDuplicateDays;
+
+      // Appearance
+      document.getElementById('accentColor').value = settings.appearance.accentColor;
+      setToggle('toggleCompactCalendar', settings.appearance.compactCalendar);
+    }
+
+    function setToggle(id, value) {
+      document.getElementById(id).classList.toggle('active', !!value);
+    }
+
+    function getToggle(id) {
+      return document.getElementById(id).classList.contains('active');
+    }
+
+    function updateIcsUrl() {
+      const provider = document.getElementById('calendarProvider').value;
+      const section = document.getElementById('icsUrlSection');
+      if (provider === 'ics') {
+        const userId = localStorage.getItem('aiva_user_id') || 'unknown';
+        const base = API_BASE || location.origin;
+        document.getElementById('icsUrl').value = `${base}/api/calendar.ics?user_id=${encodeURIComponent(userId)}`;
+        section.style.display = '';
+      } else {
+        section.style.display = 'none';
+      }
+    }
+
+    // --- Collect settings from UI ---
+    function collectSettings() {
+      return {
+        ...settings,
+        model: document.getElementById('model').value,
+        voiceName: document.getElementById('voiceName').value,
+        temperature: parseFloat(document.getElementById('temperature').value) || 1.0,
+        googleGrounding: getToggle('toggleGrounding'),
+        inputAudioTranscription: getToggle('toggleInputTranscription'),
+        systemInstructions: document.getElementById('systemInstructions').value,
+        calendar: {
+          defaultView: document.getElementById('defaultView').value,
+          weekStartsOn: parseInt(document.getElementById('weekStartsOn').value, 10),
+          workingDayStart: document.getElementById('workingDayStart').value,
+          workingDayEnd: document.getElementById('workingDayEnd').value,
+          showUnscheduled: getToggle('toggleShowUnscheduled'),
+        },
+        defaults: {
+          priority: parseInt(document.getElementById('defaultPriority').value, 10),
+          estimatedMinutes: parseInt(document.getElementById('defaultMinutes').value, 10) || 30,
+          dueTime: document.getElementById('defaultDueTime').value,
+          emotion: document.getElementById('defaultEmotion').value,
+        },
+        safety: {
+          askBeforeDelete: getToggle('toggleAskDelete'),
+          showCompletedTasks: getToggle('toggleShowCompleted'),
+          maxDuplicateDays: parseInt(document.getElementById('maxDuplicateDays').value, 10) || 30,
+        },
+        appearance: {
+          accentColor: document.getElementById('accentColor').value,
+          compactCalendar: getToggle('toggleCompactCalendar'),
+        },
+        notifications: {
+          enabled: getToggle('toggleNotifications'),
+          reminderMinutes: parseInt(document.getElementById('reminderMinutes').value, 10) || 15,
+          quietHoursStart: document.getElementById('quietStart').value,
+          quietHoursEnd: document.getElementById('quietEnd').value,
+          sound: getToggle('toggleSound'),
+        },
+        calendarSync: {
+          provider: document.getElementById('calendarProvider').value,
+          syncFrequency: document.getElementById('syncFrequency').value,
+        },
+      };
+    }
+
+    function showSavedToast() {
+      const el = document.getElementById('savedToast');
+      el.classList.add('visible');
+      setTimeout(() => el.classList.remove('visible'), 2500);
+    }
+
+    // --- Push notification registration ---
+    async function enablePushNotifications() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: null,
+        });
+        const userId = localStorage.getItem('aiva_user_id');
+        if (userId && subscription) {
+          await fetch(`${API_BASE}/api/push/subscribe`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, subscription }),
+          }).catch(() => {});
+        }
+      } catch (e) {
+        console.warn('Push subscription failed:', e);
+      }
+    }
+
+    // --- Events ---
+    document.querySelectorAll('.toggle').forEach((el) => {
+      el.addEventListener('click', () => el.classList.toggle('active'));
+    });
+
+    document.getElementById('calendarProvider').addEventListener('change', updateIcsUrl);
+
+    document.getElementById('copyIcsBtn').addEventListener('click', () => {
+      const input = document.getElementById('icsUrl');
+      navigator.clipboard.writeText(input.value).then(() => {
+        document.getElementById('copyIcsBtn').textContent = '✓';
+        setTimeout(() => { document.getElementById('copyIcsBtn').textContent = 'Копирай'; }, 1500);
+      });
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      settings = saveAssistantSettings(collectSettings());
+      if (getToggle('toggleNotifications')) enablePushNotifications();
+      showSavedToast();
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      if (!confirm('Сигурни ли сте, че искате да нулирате всички настройки?')) return;
+      settings = resetAssistantSettings();
+      populateUI();
+      showSavedToast();
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', async () => {
+      const userId = localStorage.getItem('aiva_user_id');
+      try {
+        const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`);
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify({ settings, tasks: data.tasks || [] }, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `aiva-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (e) {
+        alert('Грешка при експорт: ' + e.message);
+      }
+    });
+
+    document.getElementById('importBtn').addEventListener('click', () => {
+      document.getElementById('importFile').click();
+    });
+
+    document.getElementById('importFile').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (data.settings) {
+          settings = saveAssistantSettings(data.settings);
+          populateUI();
+        }
+        if (data.tasks?.length) {
+          const userId = localStorage.getItem('aiva_user_id');
+          for (const task of data.tasks) {
+            await fetch(`${API_BASE}/api/tasks`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ user_id: userId, task: task.content, ...task }),
+            });
+          }
+        }
+        showSavedToast();
+      } catch (err) {
+        alert('Грешка при импорт: ' + err.message);
+      }
+      e.target.value = '';
+    });
+
+    populateUI();
+  </script>
+</body>
+</html>
