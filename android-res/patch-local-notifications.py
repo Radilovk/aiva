@@ -17,7 +17,13 @@ with open(MANIFEST, 'r') as f:
     content = f.read()
 
 # Add permissions before <application>
+# RECORD_AUDIO + MODIFY_AUDIO_SETTINGS are required so that Capacitor's
+# BridgeWebChromeClient.onPermissionRequest can grant getUserMedia in the WebView.
+# Without them the audio capture request is denied instantly and voice
+# recording/listening fails in the APK while it works on the web.
 PERMISSIONS = """
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -28,7 +34,19 @@ PERMISSIONS = """
 
 if 'POST_NOTIFICATIONS' not in content:
     content = content.replace('<application', PERMISSIONS + '\n    <application', 1)
-    print('✅ Added notification permissions')
+    print('✅ Added notification + microphone permissions')
+
+# Ensure RECORD_AUDIO is present even if the notification permissions were
+# already patched in by a previous run.
+if 'RECORD_AUDIO' not in content:
+    content = content.replace(
+        '<application',
+        '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n'
+        '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n'
+        '    <application',
+        1,
+    )
+    print('✅ Added microphone permissions')
 
 # Add BroadcastReceiver before </application>
 RECEIVER = """

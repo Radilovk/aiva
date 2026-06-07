@@ -1,5 +1,21 @@
 # AIVA — Лог на задачите
 
+## 2026-06-07: Fix — APK не записва/слуша + синхронизация с календара на устройството
+
+### Проблем
+1. APK не успява да включи запис/слушане, докато web версията работи.
+2. Синхронизацията трябва да ползва календара на самото устройство.
+
+### Причина (потвърдена)
+- Capacitor `BridgeWebChromeClient.onPermissionRequest` автоматично иска `RECORD_AUDIO` + `MODIFY_AUDIO_SETTINGS` при `getUserMedia`, но Android ги отказва веднага, ако не са декларирани в `AndroidManifest.xml`. Скриптът `android-res/patch-local-notifications.py` добавяше само нотификационни пермисии → `getUserMedia` се отказва в WebView → запис/слушане не работи в APK (на web няма този слой). Потвърдено в изходния код на Capacitor: `request.deny()` при липсваща пермисия.
+
+### Решение
+1. **Микрофон**: добавени `RECORD_AUDIO` и `MODIFY_AUDIO_SETTINGS` в `patch-local-notifications.py` (вкл. idempotent клон за вече патчнати манифести).
+2. **Календар на устройството** (без нови native плъгини):
+   - `frontend/lib/deviceCalendar.js` — изгражда single-event ICS и го подава на календарното приложение на устройството чрез Web Share API (files); fallback към сваляне/отваряне на `.ics`.
+   - Бутон „📅 Календар" в модала за задача (`index.html` + `app.js`).
+   - Нова опция „Календар на устройството" в настройките (`settings.html`).
+
 ## 2026-06-03: Fix — AudioWorklet грешка при инициализация + SyntaxError при зареждане на задачи
 
 ### Проблем
