@@ -277,3 +277,61 @@ export async function registerUser(db: D1Database, userId: string, appToken: str
     .bind(userId, appToken)
     .run();
 }
+
+export async function searchTasks(db: D1Database, userId: string, query: string): Promise<Task[]> {
+  await ensureTaskSchema(db);
+
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM tasks
+       WHERE user_id = ? AND done = 0 AND content LIKE ?
+       ORDER BY priority ASC, COALESCE(due_date, '9999-12-31') ASC
+       LIMIT 10`
+    )
+    .bind(userId, `%${query}%`)
+    .all<Task>();
+
+  return results;
+}
+
+export async function getTasksForDate(db: D1Database, userId: string, date: string): Promise<Task[]> {
+  await ensureTaskSchema(db);
+
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM tasks
+       WHERE user_id = ? AND done = 0 AND due_date = ?
+       ORDER BY COALESCE(due_time, '99:99') ASC, priority ASC`
+    )
+    .bind(userId, date)
+    .all<Task>();
+
+  return results;
+}
+
+export async function getUpcomingTasks(db: D1Database, withinMinutes: number = 30): Promise<(Task & { app_token?: string })[]> {
+  await ensureTaskSchema(db);
+
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const targetMinutes = nowMinutes + withinMinutes;
+  const targetTime = `${String(Math.floor(targetMinutes / 60)).padStart(2, '0')}:${String(targetMinutes % 60).padStart(2, '0')}`;
+
+  const { results } = await db
+    .prepare(
+      `SELECT t.*, u.app_token FROM tasks t
+       LEFT JOIN users u ON t.user_id = u.id
+       WHERE t.done = 0 AND t.due_date = ? AND t.due_time IS NOT NULL
+         AND t.due_time >= ? AND t.due_time <= ?
+       ORDER BY t.due_time ASC`
+    )
+    .bind(
+      todayStr,
+      `${String(Math.floor(nowMinutes / 60)).padStart(2, '0')}:${String(nowMinutes % 60).padStart(2, '0')}`,
+      targetTime
+    )
+    .all<Task & { app_token?: string }>();
+
+  return results;
+}
