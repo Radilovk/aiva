@@ -193,3 +193,66 @@
 ### Източници
 - `googleapis/python-genai` → `google/genai/tokens.py` (path = 'auth_tokens', api_version = 'v1alpha')
 - `google-gemini/gemini-live-api-examples` → `gemini-live-ephemeral-tokens-websocket/frontend/geminilive.js`
+
+---
+
+## 2026-06-07: Имплементация на план за нови функции
+
+### Задача
+Пълна имплементация на 6-точковия план за нови функции на AIVA:
+1. Синхронизация с календар + настройки
+2. Гласово управление на задачи (четене/редакция/изтриване)
+3. Обсъждане на задачи + интернет достъп
+4. Нотификации
+5. APK + PWA пакетиране
+6. Допълнителни оптимизации
+
+### Какво е направено
+
+#### PWA (Progressive Web App)
+- [x] `frontend/manifest.json` — PWA манифест с име, икони, тема, standalone режим
+- [x] `frontend/sw.js` — Service Worker за офлайн кеширане + push нотификации
+- [x] `frontend/icons/icon-192.png`, `icon-512.png` — PWA икони
+- [x] Регистрация на SW в `index.html`
+- [x] Мета тагове за PWA (manifest link, apple-touch-icon)
+
+#### Гласови команди (Gemini function declarations)
+- [x] `read_tasks` — чете задачи за ден/утре/седмица/всички
+- [x] `edit_task` — редактира задача по ID или текстово търсене
+- [x] `delete_task` — изтрива задача с потвърждение
+- [x] `mark_task_done` — маркира задача като завършена
+- [x] `discuss_task` — обсъжда задача с интернет достъп (Google Grounding)
+- [x] Обновени `systemInstructions` с инструкции за всички нови команди
+- [x] Confirmation flow за изтриване/редактиране
+
+#### Google Grounding
+- [x] Активиран `googleGrounding: true` по подразбиране
+- [x] Интегриран в `discuss_task` за реални интернет съвети
+
+#### Настройки (settings.html)
+- [x] Пълна страница с UI за конфигуриране
+- [x] Секции: Нотификации, Синхронизация с календар, Гласов асистент, Календар, Стойности по подразбиране, Безопасност, Външен вид, Данни
+- [x] Toggle компоненти за бързо включване/изключване
+- [x] Експорт/Импорт на данни (JSON backup)
+- [x] ICS URL за абониране с календар
+- [x] Линк от главната страница
+
+#### Нотификации
+- [x] `frontend/local-scheduler.js` — notification scheduler (Capacitor + PWA fallback)
+- [x] SW push notification handler с action бутони (Отвори / Готово ✓)
+- [x] Настройки за нотификации (мин преди, тихи часове, звук)
+- [x] Автоматично планиране при зареждане на задачи
+
+#### Backend
+- [x] `GET /api/tasks/:user_id/search?q=...` — търсене на задачи за voice commands
+- [x] `GET /api/calendar.ics?user_id=...` — ICS calendar feed за webcal:// абониране
+- [x] `POST /api/push/subscribe` — запис на push subscription
+- [x] `searchTasks()`, `getTasksForDate()`, `getUpcomingTasks()` функции в tasks.ts
+
+#### Capacitor APK
+- [x] `capacitor.config.json` — конфигурация за `com.aiva.assistant`
+- [x] `.github/workflows/build-apk.yml` — CI/CD pipeline за автоматичен APK build
+- [x] `android-res/patch-local-notifications.py` — патч за AndroidManifest (пермисии + receiver)
+- [x] `android-res/java/.../AivaNotificationReceiver.java` — BroadcastReceiver за action бутони
+- [x] `android-res/proguard-rules.pro` — ProGuard конфигурация
+- [x] `.gitignore` обновен за android/ и capacitor-shell/
