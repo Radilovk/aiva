@@ -4,3 +4,8 @@
 !.dev.vars.example
 .env*
 !.env.example
+
+# Capacitor generated
+android/
+capacitor-shell/
+node_modules/

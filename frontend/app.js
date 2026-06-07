@@ -616,6 +616,10 @@ async function loadTasks() {
     const data = await res.json();
     tasks = data.tasks || [];
     renderCalendar();
+    // Re-schedule notifications when tasks are refreshed
+    if (window.AIVA_NOTIFIER && assistantSettings.notifications?.enabled) {
+      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
+    }
   } catch (e) {
     console.error('loadTasks:', e);
   }
@@ -1074,3 +1078,12 @@ window.addEventListener('aiva:settings-updated', () => {
 applyPreferences();
 renderCalendar();
 loadTasks();
+
+// Initialize notification scheduler
+if (window.AIVA_NOTIFIER) {
+  window.AIVA_NOTIFIER.init().then(() => {
+    if (assistantSettings.notifications?.enabled) {
+      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
+    }
+  });
+}

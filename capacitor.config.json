@@ -1,0 +1,20 @@
+{
+  "appId": "com.aiva.assistant",
+  "appName": "AIVA",
+  "webDir": "capacitor-shell",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_aiva",
+      "iconColor": "#ff3b5c"
+    }
+  },
+  "android": {
+    "minWebViewVersion": 60,
+    "allowMixedContent": false,
+    "backgroundColor": "#050508"
+  }
+}
