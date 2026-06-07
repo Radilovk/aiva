@@ -1,0 +1,671 @@
+# AIVA: Как да превратим vanilla repo в нативен APK с максимален системен достъп
+
+## ПРЕГЛЕД
+
+Този документ описва пълния процес на това как NutriPlan (обикновен vanilla web repo) се превраща в нативен Android APK (com.biocode.nutriplan) с пълен достъп до системата. Процесът включва Capacitor (JavaScript→Native bridge), локални нотификации, синхронизация с календар и часовник, критични пермисии и CI/CD автоматизация.
+
+---
+
+## 1. АРХИТЕКТУРА: От Vanilla Web към Capacitor APK
+
+### 1.1 Структура на проекта
+
+```
+vanilla-repo/
+├── index.html, plan.html, profile.html, ...  ← Обикновени HTML/CSS/JS файлове
+├── app.js, plan.js, worker.js                ← Web скриптове
+├── package.json                              ← npm зависимости
+├── capacitor.config.json                     ← Capacitor конфигурация ← КРИТИЧНО
+├── .github/workflows/build-apk.yml          ← CI/CD пайплайн ← КРИТИЧНО
+└── android-res/                              ← Пач-файлове за Capacitor
+    ├── patch-local-notifications.py         ← За нотификации
+    ├── patch-app-exit.py                    ← За приключване
+    ├── proguard-rules.pro                   ← Обфускация
+    ├── build-overrides.gradle               ← Gradle преконфигурация
+    └── java/                                ← Нативен Java код
+```
+
+### 1.2 Как Capacitor работи
+
+1. **Capacitor CLI** генерира `android/` папка с Gradle проект
+2. **Web shell** (в `capacitor-shell/`) се копира в `android/app/src/main/assets/`
+3. **WebView** (Android) зарежда `capacitor://` URL
+4. **JavaScript** в браузъра вика `window.Capacitor.registerPlugin('LocalNotifications')` 
+5. **Native Java код** (Capacitor) приема изизванията и ги изпълнява в Android
+6. **Резултатите** се връщат назад в JavaScript чрез Capacitor bridge
+
+**Критично:** Capacitor е просто bridge. Нищо не работи без правилна конфигурация.
+
+---
+
+## 2. НОТИФИКАЦИИ: Трислойна архитектура
+
+### 2.1 Трите слоя (в ред на предпочитание)
+
+```
+GameNotifier → Слой 1: Capacitor LocalNotifications (APK) ✅ Надежден, instant
+             → Слой 2: Calendar feed (webcal://) fallback ✅ За Huawei/без Google
+             → Слой 3: Service Worker (PWA) ⚠️ Работи само докато браузърът е жив
+```
+
+### 2.2 Слой 1: Capacitor LocalNotifications (APK)
+
+**Файл:** `/local-scheduler.js` (GameNotifier обект)
+
+**Как работи:**
+
+1. **Инициализация:**
+   ```javascript
+   const { LocalNotifications } = window.Capacitor.registerPlugin('LocalNotifications');
+   await LocalNotifications.requestPermissions(); // POST_NOTIFICATIONS пермисия
+   await LocalNotifications.createChannel({ ... }); // Создаване на канал
+   ```
+
+2. **Планиране нотификация:**
+   ```javascript
+   await LocalNotifications.schedule({
+       notifications: [
+           {
+               id: 1000,
+               title: 'AI Асистент',
+               body: 'Спахте ли добре?',
+               schedule: { at: new Date(...) },
+               actionTypeId: 'nutriplan_morning_check',
+               actions: [
+                   { id: 'sleep_yes', title: 'Да' },
+                   { id: 'sleep_no', title: 'Не' }
+               ]
+           }
+       ]
+   });
+   ```
+
+3. **Action бутони:**
+   - Когато потребител натиска бутон на нотификация, Android вика `GameNotificationActionReceiver` (BroadcastReceiver)
+   - Receiver-ът запазва отговора в `localStorage` (или IndexedDB) БЕЗ да пуска WebView
+   - При отваряне на приложението, `plan.html` чита потребителския отговор и го синхронизира с backend
+
+4. **Пермисии в AndroidManifest.xml:**
+   ```xml
+   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+   <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+   <uses-permission android:name="android.permission.WAKE_LOCK" />
+   ```
+
+### 2.3 Слой 2: Calendar feed fallback (webcal://)
+
+**URL:** `https://aidiet.radilov-k.workers.dev/api/calendar.ics`
+
+**Как работи:**
+
+1. **Server** (Cloudflare Worker) генерира `.ics` файл с нотификациите като календарни събития
+2. **Потребител** вставя `webcal://` адреса в календар (Google Calendar, Outlook, Huawei Calendar)
+3. **Календар** синхронизира ~дневно и показва събитията с напомняния
+4. **Предимства:** Работи без Google Services, видимо в системния календар
+
+**Важно:** Това НЕ е истинска нотификация, а напомняне от календар. За пълна функционалност трябва Слой 1 (Capacitor).
+
+### 2.4 Слой 3: Service Worker (PWA fallback)
+
+**Файл:** `sw.js`
+
+**Как работи:**
+
+1. JavaScript пуска перфектна нотификация чрез Service Worker
+2. SW показва native browser notification
+3. **Проблем:** Когато браузърът се затвори, SW спира — нотификациите не пристигат
+
+**Когда го използваме:** PWA режим на обикновен браузър (Chrome, Firefox, Edge)
+
+---
+
+## 3. СИНХРОНИЗАЦИЯ: Локално + часовник + календар
+
+### 3.1 Локална синхронизация (Capacitor Preferences)
+
+**Файл:** `native-backup.js` (NativeBackup обект)
+
+**Как работи:**
+
+1. **При всяка промяна в localStorage:** 
+   ```javascript
+   localStorage.setItem('dietPlan', JSON.stringify(plan));
+   // NativeBackup.init() хука localStorage.setItem()
+   // ↓ автоматично копира в Capacitor Preferences (Android SharedPreferences)
+   ```
+
+2. **SharedPreferences пътя:**
+   ```
+   /data/data/com.biocode.nutriplan/shared_prefs/NativeBackup.xml
+   ```
+
+3. **Защо е критично:**
+   - Ако потребител дезинсталира и преинсталира приложението, данните НЕ се загубват
+   - Когато APK се обновява, данните остават
+
+4. **Какво се запазва:**
+   ```javascript
+   const PLAN_KEYS = [
+       'dietPlan', 'userId', 'userData', 'pendingClientId', 'planJobId',
+       'questionnaireAnswers', 'gameData', 'gameNotifierConfig',
+       'theme', 'colorScheme', 'gameEnabled'
+   ];
+   ```
+
+5. **Пермисия: НИКОГА не трябва!** (SharedPreferences е конфиденциално на приложението)
+
+### 3.2 Drive Backup (Google Drive синхронизация)
+
+**Файл:** `drive-backup.js` (DriveBackup обект)
+
+**Как работи:**
+
+1. **Логин:**
+   ```javascript
+   const { GoogleAuth } = window.Capacitor.registerPlugin('GoogleAuth');
+   await GoogleAuth.signIn();
+   ```
+
+2. **Backup:**
+   ```javascript
+   // Получа Google Access Token
+   const token = await GoogleAuth.getCurrentUser().getIdToken();
+   
+   // Пращи план в Google Drive /appdata
+   fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder', {
+       method: 'POST',
+       headers: { 'Authorization': `****** },
+       body: JSON.stringify({ name: 'dietPlan.json', ... })
+   });
+   ```
+
+3. **Пермисии в capacitor.config.json:**
+   ```json
+   "GoogleAuth": {
+       "scopes": [
+           "profile",
+           "email",
+           "https://www.googleapis.com/auth/drive.appdata"
+       ],
+       "serverClientId": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+   }
+   ```
+
+4. **AndroidManifest.xml:**
+   ```xml
+   <uses-permission android:name="android.permission.INTERNET" />
+   ```
+
+### 3.3 Синхронизация с часовник и календар
+
+**Механизми:**
+
+1. **Часовник:** AndroidTask Scheduler → Capacitor Alarms → пробуждане на APK в точен час
+2. **Календар:** ICS feed → система синхронизира дневно → нотификации в системния календар
+3. **Watch sync:** Ако приложението支持 Wear OS, трябва отделен manifest за Wear
+
+**Практикуване в NutriPlan:**
+- Часовник: Capacitor LocalNotifications с `schedule: { at: new Date(...) }`
+- Календар: `getCalendarSubscribeUrl()` връща `webcal://...` за ръчна регистрация
+- Watch: Не е реализирано в текущата версия
+
+---
+
+## 4. КАК СЕ СГЛОБЯВА APK: CI/CD процес
+
+### 4.1 GitHub Actions пайплайн (`.github/workflows/build-apk.yml`)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Стъпка 1: Checkout + Setup                                 │
+│  - Node.js 22, JDK 21, Android SDK                         │
+│  - npm ci (install dependencies)                           │
+└──────────────────┬──────────────────────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Стъпка 2: Build Capacitor web shell                        │
+│  - rm -rf capacitor-shell/                                 │
+│  - rsync ./ capacitor-shell/ (копира всички HTML/JS/CSS)   │
+│  - ИЗКЛЮЧЕНИ: *.md, worker.js, node_modules, android/      │
+└──────────────────┬──────────────────────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Стъпка 3: Capacitor icon processing                        │
+│  - icon-512x512.png → резайз в mipmap-*/ic_launcher.png    │
+│  - Adaptive icon (108dp canvas, 66% safe zone)             │
+│  - ic_stat_nutriplan.png (за нотификации, монохромно)      │
+│  - Splash screen logo (256×256)                            │
+└──────────────────┬──────────────────────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Стъпка 4: Android Gradle preparation                       │
+│  - npx cap add android (генерира android/ от config)       │
+│  - npx cap sync android (копира web shell в assets/)       │
+│  - Патча AndroidManifest.xml (пермисии + receivers)        │
+│  - Патча styles.xml, colors.xml, strings.xml              │
+└──────────────────┬──────────────────────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Стъпка 5: Custom patches (КРИТИЧНО!)                       │
+│  - patch-local-notifications.py:                           │
+│    • Installs GameNotificationActionReceiver               │
+│    • Routes action buttons to BroadcastReceiver (no Activity)
+│    • Sets notification priority to HEADS_UP                │
+│  - patch-app-exit.py:                                      │
+│    • Изтрива App.exitApp() стартирането на recents        │
+│  - build-overrides.gradle:                                 │
+│    • Signing configuration (keystore, passwords)           │
+└──────────────────┬──────────────────────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Стъпка 6: Gradle build                                     │
+│  - ./gradlew assembleRelease (при production keystore)      │
+│  - ./gradlew assembleDebug (при липса на keystore)         │
+│  - Output: app-release.apk или app-debug.apk              │
+└──────────────────┬──────────────────────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Стъпка 7: Release + publish                                │
+│  - gh release create v-YYYYMMDDHHMM-HASH                  │
+│  - Upload artifact: NutriPlan.apk, NutriPlan-vX.X.X.apk   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 Версионирање
+
+```json
+// capacitor.config.json
+{
+  "appId": "com.biocode.nutriplan",
+  "appName": "NutriPlan",
+  "webDir": "capacitor-shell",
+  "android": {
+    "minWebViewVersion": 60
+  }
+}
+```
+
+**Версия управление:**
+- `versionCode`: build number (автоматично инкрементираща се от GitHub CI)
+- `versionName`: "1.0.{versionCode}"
+- **Източник:** `twa-manifest.json` (deprecated) или hardcoded в build-apk.yml
+
+---
+
+## 5. КРИТИЧНИ КОМПОНЕНТИ: Пермисии, ресурси, конфигурация
+
+### 5.1 Пермисии в AndroidManifest.xml
+
+```xml
+<!-- Нотификации + събуждане -->
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+<uses-permission android:name="android.permission.WAKE_LOCK" />
+<uses-permission android:name="android.permission.VIBRATE" />
+
+<!-- Камера (за храни снимки) -->
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+<!-- Google Drive backup -->
+<uses-permission android:name="android.permission.INTERNET" />
+```
+
+### 5.2 Capacitor конфигурация
+
+```json
+{
+  "appId": "com.biocode.nutriplan",
+  "appName": "NutriPlan",
+  "webDir": "capacitor-shell",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_nutriplan",
+      "iconColor": "#009A9E"
+    },
+    "GoogleAuth": {
+      "scopes": ["profile", "email", "https://www.googleapis.com/auth/drive.appdata"],
+      "serverClientId": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+    }
+  },
+  "android": {
+    "minWebViewVersion": 60,
+    "allowMixedContent": false,
+    "backgroundColor": "#F0FDFA"
+  }
+}
+```
+
+**ВАЖНО:** `server.url` НИКАДА не трябва да се добавя. Само `hostname: "localhost"` позволява правилна работа с Cloudflare API.
+
+### 5.3 package.json зависимости
+
+```json
+{
+  "devDependencies": {
+    "@capacitor/cli": "^8.3.1",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/camera": "^8.2.0",
+    "@capacitor/local-notifications": "^8.0.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/haptics": "^8.0.0",
+    "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
+    "@capgo/capacitor-navigation-bar": "^8.1.5"
+  }
+}
+```
+
+### 5.4 android-res/ структура
+
+```
+android-res/
+├── APK_BUILD_REFERENCE.md           ← Документ за всички заключени елементи
+├── patch-local-notifications.py     ← Пач за нотификации (КРИТИЧНО!)
+├── patch-app-exit.py                ← Пач за приключване на приложението
+├── build-overrides.gradle           ← Gradle правила за подписване
+├── proguard-rules.pro               ← Обфускация + keep classpath
+└── java/
+    └── com/capacitorjs/plugins/localnotifications/
+        └── GameNotificationActionReceiver.java  ← BroadcastReceiver за action бутони
+```
+
+**GameNotificationActionReceiver.java:**
+- BroadcastReceiver, който обработва натискане на action бутони
+- НЕ пуска WebView или Activity
+- Запазва отговора в SharedPreferences/localStorage
+- При отваряне на приложението, план.html синхронизира отговора
+
+---
+
+## 6. ДА ПРЕВРАТИМ VANILLA REPO В APK: Пълни стъпки
+
+### Преди Capacitor (подготовка):
+
+1. **Обикновен web проект:**
+   ```bash
+   my-app/
+   ├── index.html
+   ├── app.js, style.css
+   ├── manifest.json (PWA manifest)
+   └── package.json
+   ```
+
+2. **Какво трябва:**
+   - PWA иконка (512×512 PNG)
+   - Service Worker (`sw.js`)
+   - manifest.json с правилна конфигурация
+
+### Стъпки 1-5: Capacitor инсталация
+
+```bash
+# 1. Инсталирай npm зависимости
+npm install @capacitor/cli @capacitor/core @capacitor/android
+
+# 2. Инициализирай Capacitor
+npx cap init my-app com.mycompany.myapp
+
+# 3. Добави Android платформа
+npx cap add android
+
+# 4. Синхронизирай
+npx cap sync android
+
+# 5. Отвори Android Studio (opcional)
+npx cap open android
+```
+
+**Резултат:** `android/` папка с Gradle проект
+
+### Стъпки 6-10: Конфигурация
+
+6. **Отвори `capacitor.config.json`:**
+   ```json
+   {
+     "appId": "com.mycompany.myapp",
+     "appName": "MyApp",
+     "webDir": "www",  ← ЛИ build folder
+     "server": {
+       "androidScheme": "https",
+       "hostname": "localhost"
+     },
+     "plugins": {
+       "LocalNotifications": {
+         "smallIcon": "ic_stat_my_icon",
+         "iconColor": "#FF00FF"
+       }
+     }
+   }
+   ```
+
+7. **Добави пермисии в `android/app/src/main/AndroidManifest.xml`:**
+   ```xml
+   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+   <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+   <uses-permission android:name="android.permission.INTERNET" />
+   ```
+
+8. **Икона:** Постави `icon-512x512.png` в корена на проекта
+
+9. **Нотификации:** Добави нотификационни канали в JavaScript:
+   ```javascript
+   const { LocalNotifications } = 
+       window.Capacitor.registerPlugin('LocalNotifications');
+   
+   await LocalNotifications.createChannel({
+       id: 'default',
+       name: 'Default',
+       importance: 5,
+       lightColor: '#FF0000'
+   });
+   ```
+
+10. **Java пач:** Копирай `GameNotificationActionReceiver.java` в:
+    ```
+    android/app/src/main/java/com/mycompany/myapp/GameNotificationActionReceiver.java
+    ```
+
+### Стъпки 11-14: Билд и подписване
+
+11. **Генериране на подписен keystore (ако го нямаш):**
+    ```bash
+    keytool -genkey -v -keystore my-app.keystore \
+        -keyalg RSA -keysize 2048 -validity 10000 \
+        -alias my-app-key
+    ```
+
+12. **Gradle конфигурация (android/app/build.gradle):**
+    ```gradle
+    android {
+        signingConfigs {
+            release {
+                storeFile file('/path/to/my-app.keystore')
+                storePassword 'YOUR_STORE_PASSWORD'
+                keyAlias 'my-app-key'
+                keyPassword 'YOUR_KEY_PASSWORD'
+            }
+        }
+        buildTypes {
+            release {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+    ```
+
+13. **Билд чрез Android Studio или Gradle:**
+    ```bash
+    cd android
+    ./gradlew assembleRelease
+    ```
+
+14. **Резултат:** `app-release.apk` в `android/app/build/outputs/apk/release/`
+
+### Стъпки 15-17: Тестване и публикуване
+
+15. **Тестване на локално устройство:**
+    ```bash
+    adb install app-release.apk
+    ```
+
+16. **Google Play Console:**
+    - Подложи `.apk` файла
+    - Попълни дескрипция, иконка, скрийншотове
+    - Процес одобрение: 24 часа - 1 седмица
+
+17. **GitHub Actions CI/CD:**
+    - Постави всичко в `.github/workflows/build-apk.yml`
+    - Всеки push на main → автоматичен bilд + release
+
+---
+
+## 7. МАКСИМАЛЕН СИСТЕМЕН ДОСТЪП: Какво може APK?
+
+### 7.1 Текущи пермисии на NutriPlan
+
+| Пермисия | Роля | Ниво на достъп |
+|----------|------|---|
+| POST_NOTIFICATIONS | Показване на нотификации | Системен (user approves) |
+| CAMERA | Снимане на храна | User-approves |
+| READ_MEDIA_IMAGES | Избор на снимки | User-approves |
+| INTERNET | API заявки + backup | Network |
+| SCHEDULE_EXACT_ALARM | Пробуждане в точен час | System (requires SCHEDULE_EXACT_ALARM) |
+| RECEIVE_BOOT_COMPLETED | Спускане при рестарт | System |
+| WAKE_LOCK | Пробуждане на CPU | System |
+| VIBRATE | Хаптик feedback | Безопасно |
+
+### 7.2 Допълнителни пермисии (ако е нужно)
+
+```xml
+<!-- Биометрия (отпечатък, лице) -->
+<uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+<!-- Здравни данни (Google Fit API) -->
+<!-- Изисква Google Play Services -->
+
+<!-- Местоположение (GPS) -->
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+<!-- Здравни сензори (мониторинг на сърцебиене) -->
+<uses-permission android:name="android.permission.BODY_SENSORS" />
+```
+
+### 7.3 Ограничения (Android 12+)
+
+- **Background restrictions:** Нотификациите трябва да се показват в foreground или чрез Alarms
+- **11+ пермисии:** CAMERA, READ_MEDIA_* изискват runtime permission requests
+- **Battery optimization:** DozeMode може да блокира будилници (SCHEDULE_EXACT_ALARM + WAKE_LOCK помагат)
+
+---
+
+## 8. КРИТИЧНИ ФАЙЛОВЕ: Кордов список
+
+| Файл | Роля | Критичност |
+|------|------|-----------|
+| `.github/workflows/build-apk.yml` | CI/CD скрипт | 🔴 КРИТИЧНО |
+| `capacitor.config.json` | Capacitor конфигурация | 🔴 КРИТИЧНО |
+| `package.json` | npm зависимости (Capacitor версии) | 🔴 КРИТИЧНО |
+| `android-res/patch-local-notifications.py` | Нотификационен пач | 🔴 КРИТИЧНО |
+| `android-res/build-overrides.gradle` | Gradle подписване | 🔴 КРИТИЧНО |
+| `local-scheduler.js` | GameNotifier система | 🟠 ВАЖНО |
+| `native-backup.js` | SharedPreferences синхронизация | 🟠 ВАЖНО |
+| `drive-backup.js` | Google Drive backup | 🟡 ВТОРИЧНО |
+| `index.html` | Entry point + Capacitor инициализация | 🟠 ВАЖНО |
+
+---
+
+## 9. ТИПИЧНИ ПРОБЛЕМИ И РЕШЕНИЯ
+
+### 9.1 Нотификациите не пристигат
+
+**Проблем:** LocalNotifications обектът е null
+
+**Решение:**
+```javascript
+// ГРЕШНО:
+const ln = window.Capacitor.Plugins.LocalNotifications;
+
+// ПРАВИЛНО:
+let ln = (window.Capacitor && window.Capacitor.Plugins && 
+          window.Capacitor.Plugins.LocalNotifications) || null;
+if (!ln && typeof window.Capacitor.registerPlugin === 'function') {
+    ln = window.Capacitor.registerPlugin('LocalNotifications');
+}
+```
+
+### 9.2 AndroidManifest.xml грешки
+
+**Проблем:** "Receiver not registered" или "<receiver> outside <application>"
+
+**Решение:** patch-local-notifications.py трябва да тече СЛЕД `cap sync`:
+```bash
+npx cap sync android
+python3 android-res/patch-local-notifications.py
+```
+
+### 9.3 API заявките от WebView блокирани (CORS)
+
+**Проблем:** `GET /api/plan` връща 403 или CORS error
+
+**Решение:** Гарантирай че `server.url` НИКАДА не е зададен:
+```json
+"server": {
+  "androidScheme": "https",
+  "hostname": "localhost"
+}
+```
+
+Всяка заявка към `https://aidiet.radilov-k.workers.dev/api/*` трябва да работи на localhost.
+
+### 9.4 Приложението се затваря при натискане на бутона
+
+**Проблем:** `App.exitApp()` оставя процеса в recents
+
+**Решение:** patch-app-exit.py хакува exitApp():
+```java
+// ПРЕДИ:
+System.exit(0);
+
+// СЛЕД:
+activity.finishAndRemoveTask(); // Приложението НЕ остава в recents
+```
+
+---
+
+## 10. ЗАКЛЮЧЕНИЕ
+
+Превръщането на vanilla web repo в нативен APK с максимален системен достъп изисква:
+
+1. **Capacitor** — JavaScript→Native bridge
+2. **LocalNotifications** — надеждни нотификации в APK
+3. **Патчове** — критична Java логика за action бутони
+4. **Пермисии** — правилен набор от Android разрешения
+5. **CI/CD** — автоматичен Gradle bilд + подписване
+6. **Синхронизация** — SharedPreferences (локално) + Google Drive (облак)
+7. **Конфигурация** — capacitor.config.json + gradle.build
+
+Всяко от тези парчета е критично. Липса или неправилна конфигурация на един елемент разваля цялата система.
+
+**За нов проект:**
+- Копирай `capacitor.config.json`, `.github/workflows/build-apk.yml`, `android-res/` като шаблон
+- Адаптирай `appId`, `appName`, пемисии според нуждите
+- Изслужи пълен процес с GitHub Actions CI/CD за автоматичен bilд
+
+---
+
+**Версия:** 1.0  
+**Дата:** 2026-06-07  
+**Автор:** NutriPlan Development  
+**Статус:** Заключен документ — не променяй без изрична задача
