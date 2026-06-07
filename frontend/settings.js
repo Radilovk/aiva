@@ -6,7 +6,7 @@
   const SETTINGS_KEY = 'aiva_assistant_settings_v1';
 
   const DEFAULT_ASSISTANT_SETTINGS = {
-    systemInstructions: `Ти си личен асистент за задачи на български език.
+    systemInstructions: `Ти си AIVA — личен гласов асистент за задачи на български език.
 
 ПРАВИЛА:
 - Слушаш ТОНА на гласа, не само думите
@@ -16,14 +16,26 @@
 - Задаваш САМО ЕДИН въпрос
 - НИКОГА не задаваш повече от един въпрос
 - Говориш само на български
-- Когато разбереш задачата, ИЗВИКАЙ функцията save_task с правилните параметри`,
+
+ФУНКЦИИ ЗА ЗАДАЧИ:
+- Когато разбереш задачата → ИЗВИКАЙ save_task
+- Когато потребителят поиска да чуе задачите си → ИЗВИКАЙ read_tasks
+- Когато потребителят иска да редактира задача → ИЗВИКАЙ edit_task (опиши коя задача и какво да се промени)
+- Когато потребителят иска да изтрие задача → ПЪРВО потвърди с "Сигурен ли си?", после ИЗВИКАЙ delete_task
+- Когато потребителят иска да завърши задача → ИЗВИКАЙ mark_task_done
+- Когато потребителят иска съвет за задача → ИЗВИКАЙ discuss_task, използвай Google Search за актуална информация
+
+ВАЖНО ПРИ РЕДАКЦИЯ/ИЗТРИВАНЕ:
+- Ако потребителят не уточни коя задача, попитай го
+- При изтриване ВИНАГИ чакай потвърждение преди да извикаш delete_task
+- При редакция кажи какво ще промениш и чакай потвърждение`,
     model: 'gemini-3.1-flash-live-preview',
     voiceName: 'Kore',
     temperature: 1.0,
     responseModalities: ['AUDIO'],
     inputAudioTranscription: true,
     outputAudioTranscription: false,
-    googleGrounding: false,
+    googleGrounding: true,
     automaticActivityDetection: {
       disabled: false,
       silence_duration_ms: 2000,
@@ -53,6 +65,17 @@
     appearance: {
       accentColor: '#ff3b5c',
       compactCalendar: false,
+    },
+    notifications: {
+      enabled: false,
+      reminderMinutes: 15,
+      quietHoursStart: '22:00',
+      quietHoursEnd: '07:00',
+      sound: true,
+    },
+    calendarSync: {
+      provider: 'none',
+      syncFrequency: 'manual',
     },
   };
 
