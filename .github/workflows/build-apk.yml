@@ -1,0 +1,110 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'capacitor.config.json'
+      - 'android-res/**'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Capacitor dependencies
+        run: |
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android \
+            @capacitor/local-notifications @capacitor/preferences @capacitor/haptics \
+            @capacitor/app
+
+      - name: Build Capacitor web shell
+        run: |
+          rm -rf capacitor-shell
+          mkdir -p capacitor-shell
+          rsync -av --exclude='*.md' --exclude='node_modules' \
+            --exclude='android' --exclude='capacitor-shell' \
+            --exclude='.git' --exclude='.github' --exclude='workers' \
+            --exclude='android-res' --exclude='*.txt' \
+            frontend/ capacitor-shell/
+
+      - name: Add Android platform
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Patch AndroidManifest
+        run: python3 android-res/patch-local-notifications.py
+
+      - name: Copy BroadcastReceiver
+        run: |
+          mkdir -p android/app/src/main/java/com/capacitorjs/plugins/localnotifications/
+          cp android-res/java/com/capacitorjs/plugins/localnotifications/AivaNotificationReceiver.java \
+             android/app/src/main/java/com/capacitorjs/plugins/localnotifications/
+
+      - name: Copy ProGuard rules
+        run: cp android-res/proguard-rules.pro android/app/proguard-rules.pro
+
+      - name: Generate icons
+        run: |
+          # Use the PWA icons for the APK as well
+          MIPMAP_BASE="android/app/src/main/res"
+          for SIZE_DIR in mipmap-mdpi:48 mipmap-hdpi:72 mipmap-xhdpi:96 mipmap-xxhdpi:144 mipmap-xxxhdpi:192; do
+            DIR=$(echo $SIZE_DIR | cut -d: -f1)
+            SIZE=$(echo $SIZE_DIR | cut -d: -f2)
+            mkdir -p "$MIPMAP_BASE/$DIR"
+            python3 -c "
+          from PIL import Image
+          img = Image.open('frontend/icons/icon-512.png')
+          img = img.resize(($SIZE, $SIZE), Image.LANCZOS)
+          img.save('$MIPMAP_BASE/$DIR/ic_launcher.png')
+          img.save('$MIPMAP_BASE/$DIR/ic_launcher_round.png')
+          " 2>/dev/null || cp frontend/icons/icon-192.png "$MIPMAP_BASE/$DIR/ic_launcher.png"
+          done
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIVA-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v-$(date +%Y%m%d%H%M)-$(git rev-parse --short HEAD)"
+          cp android/app/build/outputs/apk/debug/app-debug.apk AIVA.apk
+          gh release create "$TAG" AIVA.apk \
+            --title "AIVA $TAG" \
+            --notes "Автоматичен build от commit $(git rev-parse --short HEAD)" \
+            --latest

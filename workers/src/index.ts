@@ -7,6 +7,7 @@ import {
   getIncompleteTasks,
   markTaskDone,
   registerUser,
+  searchTasks,
   updateTask,
 } from './tasks';
 import { handleCron } from './cron';
@@ -239,6 +240,109 @@ app.post('/api/tasks', async (c) => {
   } catch (e) {
     console.error('Task save error:', e);
     return c.json({ error: 'Грешка при запис на задачата' }, 500);
+  }
+});
+
+// --- Search tasks endpoint (for voice commands) ---
+
+app.get('/api/tasks/:user_id/search', async (c) => {
+  const userId = c.req.param('user_id');
+  const query = c.req.query('q') || '';
+  if (!query.trim()) return c.json({ tasks: [] });
+
+  try {
+    const tasks = await searchTasks(c.env.DB, userId, query);
+    return c.json({ tasks });
+  } catch (e) {
+    console.error('Search tasks error:', e);
+    return c.json({ tasks: [] }, 500);
+  }
+});
+
+// --- ICS Calendar feed ---
+
+app.get('/api/calendar.ics', async (c) => {
+  const userId = c.req.query('user_id');
+  if (!userId) return c.text('user_id е задължителен', 400);
+
+  try {
+    const tasks = await getIncompleteTasks(c.env.DB, userId);
+    const lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//AIVA//Task Calendar//BG',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'X-WR-CALNAME:AIVA Задачи',
+      'X-WR-TIMEZONE:Europe/Sofia',
+    ];
+
+    for (const task of tasks) {
+      const dateStr = task.due_date ? task.due_date.replace(/-/g, '') : null;
+      if (!dateStr) continue;
+
+      const timeStr = task.due_time ? task.due_time.replace(':', '') + '00' : '090000';
+      const dtStart = `${dateStr}T${timeStr}`;
+
+      // Calculate end time
+      const durationMin = task.estimated_minutes || 30;
+      const startH = parseInt(timeStr.slice(0, 2), 10);
+      const startM = parseInt(timeStr.slice(2, 4), 10);
+      const endTotal = startH * 60 + startM + durationMin;
+      const endH = String(Math.floor(endTotal / 60) % 24).padStart(2, '0');
+      const endM = String(endTotal % 60).padStart(2, '0');
+      const dtEnd = `${dateStr}T${endH}${endM}00`;
+
+      // Escape special chars for iCal
+      const escape = (s: string) => (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:aiva-task-${task.id}@aiva.radilov-k.workers.dev`);
+      lines.push(`DTSTART:${dtStart}`);
+      lines.push(`DTEND:${dtEnd}`);
+      lines.push(`SUMMARY:${escape(task.content)}`);
+      if (task.notes) lines.push(`DESCRIPTION:${escape(task.notes)}`);
+      if (task.location) lines.push(`LOCATION:${escape(task.location)}`);
+      lines.push(`PRIORITY:${Math.min(9, task.priority * 2)}`);
+      if (task.tags) lines.push(`CATEGORIES:${escape(task.tags)}`);
+      lines.push('BEGIN:VALARM');
+      lines.push('TRIGGER:-PT15M');
+      lines.push('ACTION:DISPLAY');
+      lines.push(`DESCRIPTION:${escape(task.content)}`);
+      lines.push('END:VALARM');
+      lines.push('END:VEVENT');
+    }
+
+    lines.push('END:VCALENDAR');
+
+    return new Response(lines.join('\r\n'), {
+      headers: {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="aiva-tasks.ics"',
+        'Cache-Control': 'no-cache, max-age=0',
+      },
+    });
+  } catch (e) {
+    console.error('ICS generation error:', e);
+    return c.text('Грешка при генериране на ICS', 500);
+  }
+});
+
+// --- Push subscription endpoint ---
+
+app.post('/api/push/subscribe', async (c) => {
+  const body = await c.req.json<{ user_id: string; subscription: any }>().catch(() => null);
+  if (!body?.user_id || !body?.subscription) {
+    return c.json({ error: 'user_id и subscription са задължителни' }, 400);
+  }
+
+  try {
+    const key = `push:${body.user_id}`;
+    await c.env.SESSIONS.put(key, JSON.stringify(body.subscription), { expirationTtl: 30 * 86400 });
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Push subscribe error:', e);
+    return c.json({ error: 'Грешка при запис на subscription' }, 500);
   }
 });
 

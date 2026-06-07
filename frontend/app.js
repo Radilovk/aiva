@@ -88,6 +88,129 @@ class SaveTaskTool extends FunctionCallDefinition {
   }
 }
 
+// --- read_tasks tool ---
+class ReadTasksTool extends FunctionCallDefinition {
+  constructor() {
+    super(
+      'read_tasks',
+      'Чете задачите на потребителя за определен период. Извикай когато потребителят поиска да чуе задачите си.',
+      {
+        type: 'object',
+        properties: {
+          period: {
+            type: 'string',
+            description: 'Период: today, tomorrow, week, all',
+            enum: ['today', 'tomorrow', 'week', 'all'],
+          },
+          date: { type: 'string', description: 'Конкретна дата YYYY-MM-DD, ако потребителят посочи' },
+        },
+      },
+      []
+    );
+  }
+
+  functionToCall() {
+    return 'pending';
+  }
+}
+
+// --- edit_task tool ---
+class EditTaskTool extends FunctionCallDefinition {
+  constructor() {
+    super(
+      'edit_task',
+      'Редактира съществуваща задача. Извикай след като потребителят потвърди промяната.',
+      {
+        type: 'object',
+        properties: {
+          task_id: { type: 'integer', description: 'ID на задачата за редактиране' },
+          search_text: { type: 'string', description: 'Текст за търсене на задачата, ако потребителят не знае ID' },
+          content: { type: 'string', description: 'Нов текст на задачата' },
+          due_date: { type: 'string', description: 'Нова дата YYYY-MM-DD' },
+          due_time: { type: 'string', description: 'Нов час HH:MM' },
+          priority: { type: 'integer', description: 'Нов приоритет 1-5' },
+          notes: { type: 'string', description: 'Нови бележки' },
+          location: { type: 'string', description: 'Нова локация' },
+          tags: { type: 'string', description: 'Нови тагове' },
+        },
+      },
+      []
+    );
+  }
+
+  functionToCall() {
+    return 'pending';
+  }
+}
+
+// --- delete_task tool ---
+class DeleteTaskTool extends FunctionCallDefinition {
+  constructor() {
+    super(
+      'delete_task',
+      'Изтрива задача. САМО след потвърждение от потребителя!',
+      {
+        type: 'object',
+        properties: {
+          task_id: { type: 'integer', description: 'ID на задачата за изтриване' },
+          search_text: { type: 'string', description: 'Текст за търсене на задачата, ако потребителят не знае ID' },
+        },
+      },
+      []
+    );
+  }
+
+  functionToCall() {
+    return 'pending';
+  }
+}
+
+// --- mark_task_done tool ---
+class MarkTaskDoneTool extends FunctionCallDefinition {
+  constructor() {
+    super(
+      'mark_task_done',
+      'Маркира задача като завършена.',
+      {
+        type: 'object',
+        properties: {
+          task_id: { type: 'integer', description: 'ID на задачата' },
+          search_text: { type: 'string', description: 'Текст за търсене на задачата, ако потребителят не знае ID' },
+        },
+      },
+      []
+    );
+  }
+
+  functionToCall() {
+    return 'pending';
+  }
+}
+
+// --- discuss_task tool ---
+class DiscussTaskTool extends FunctionCallDefinition {
+  constructor() {
+    super(
+      'discuss_task',
+      'Обсъжда задача и дава съвети. Може да добави съвета като бележка към задачата.',
+      {
+        type: 'object',
+        properties: {
+          task_id: { type: 'integer', description: 'ID на задачата за обсъждане' },
+          search_text: { type: 'string', description: 'Текст за търсене на задачата' },
+          add_note: { type: 'boolean', description: 'Дали да добави съвета като бележка към задачата' },
+          advice: { type: 'string', description: 'Съвет или информация за добавяне към задачата' },
+        },
+      },
+      []
+    );
+  }
+
+  functionToCall() {
+    return 'pending';
+  }
+}
+
 // --- Date helpers ---
 function pad(value) {
   return String(value).padStart(2, '0');
@@ -360,6 +483,129 @@ function moveCalendar(direction) {
 }
 
 // --- Tasks API ---
+function findTaskBySearch(searchText) {
+  if (!searchText) return null;
+  const lower = searchText.toLowerCase();
+  return tasks.find((t) => t.content.toLowerCase().includes(lower)) || null;
+}
+
+function resolveTaskId(args) {
+  if (args.task_id) return args.task_id;
+  if (args.search_text) {
+    const found = findTaskBySearch(args.search_text);
+    return found ? found.id : null;
+  }
+  return null;
+}
+
+function readTasksForPeriod(period, date) {
+  const today = toISODate(new Date());
+  let filtered;
+
+  if (date) {
+    filtered = tasks.filter((t) => t.due_date === date);
+  } else if (period === 'today') {
+    filtered = tasks.filter((t) => t.due_date === today);
+  } else if (period === 'tomorrow') {
+    const tomorrow = toISODate(addDays(new Date(), 1));
+    filtered = tasks.filter((t) => t.due_date === tomorrow);
+  } else if (period === 'week') {
+    const weekEnd = toISODate(addDays(new Date(), 7));
+    filtered = tasks.filter((t) => t.due_date && t.due_date >= today && t.due_date <= weekEnd);
+  } else {
+    filtered = tasks;
+  }
+
+  return sortedTasks(filtered);
+}
+
+async function handleVoiceReadTasks(args) {
+  const result = readTasksForPeriod(args.period || 'today', args.date);
+  if (!result.length) {
+    return { success: true, message: 'Няма задачи за този период.', tasks: [] };
+  }
+  const summary = result.map((t, i) =>
+    `${i + 1}. ${t.content} (приоритет ${t.priority}${t.due_time ? ', ' + t.due_time : ''}${t.location ? ', ' + t.location : ''})`
+  ).join('; ');
+  return { success: true, count: result.length, summary, tasks: result.map((t) => ({ id: t.id, content: t.content, priority: t.priority, due_date: t.due_date, due_time: t.due_time })) };
+}
+
+async function handleVoiceEditTask(args) {
+  const taskId = resolveTaskId(args);
+  if (!taskId) return { error: 'Не намерих задача с това описание. Уточни коя задача.' };
+
+  const updates = {};
+  if (args.content) updates.content = args.content;
+  if (args.due_date) updates.due_date = args.due_date;
+  if (args.due_time) updates.due_time = args.due_time;
+  if (args.priority) updates.priority = args.priority;
+  if (args.notes) updates.notes = args.notes;
+  if (args.location) updates.location = args.location;
+  if (args.tags) updates.tags = args.tags;
+
+  const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, ...updates }),
+  });
+  const data = await res.json();
+  if (!res.ok) return { error: data.error || 'Грешка при редакция' };
+  await loadTasks();
+  showToast(data.task);
+  return { success: true, task_id: taskId, content: data.task.content, message: 'Задачата е редактирана.' };
+}
+
+async function handleVoiceDeleteTask(args) {
+  const taskId = resolveTaskId(args);
+  if (!taskId) return { error: 'Не намерих задача с това описание.' };
+
+  try {
+    await removeTask(taskId);
+    return { success: true, task_id: taskId, message: 'Задачата е изтрита.' };
+  } catch (e) {
+    return { error: e.message || 'Грешка при изтриване' };
+  }
+}
+
+async function handleVoiceMarkDone(args) {
+  const taskId = resolveTaskId(args);
+  if (!taskId) return { error: 'Не намерих задача с това описание.' };
+
+  try {
+    await markDone(taskId);
+    return { success: true, task_id: taskId, message: 'Задачата е маркирана като завършена.' };
+  } catch (e) {
+    return { error: e.message || 'Грешка' };
+  }
+}
+
+async function handleVoiceDiscussTask(args) {
+  const taskId = resolveTaskId(args);
+  const task = taskId ? getTaskById(taskId) : null;
+
+  if (args.add_note && taskId && args.advice) {
+    const currentTask = task || {};
+    const newNotes = currentTask.notes ? `${currentTask.notes}\n\n📌 ${args.advice}` : `📌 ${args.advice}`;
+    await fetch(`${API_BASE}/api/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, notes: newNotes }),
+    });
+    await loadTasks();
+    return { success: true, message: 'Съветът е добавен като бележка към задачата.' };
+  }
+
+  if (task) {
+    return {
+      success: true,
+      task: { id: task.id, content: task.content, priority: task.priority, due_date: task.due_date, notes: task.notes, tags: task.tags },
+      message: 'Ето контекста на задачата. Дай съвет на базата на тази информация.',
+    };
+  }
+
+  return { success: true, message: 'Обсъждаме задачата. Използвай Google Search за актуална информация.' };
+}
+
 async function loadTasks() {
   try {
     const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`);
@@ -370,6 +616,10 @@ async function loadTasks() {
     const data = await res.json();
     tasks = data.tasks || [];
     renderCalendar();
+    // Re-schedule notifications when tasks are refreshed
+    if (window.AIVA_NOTIFIER && assistantSettings.notifications?.enabled) {
+      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
+    }
   } catch (e) {
     console.error('loadTasks:', e);
   }
@@ -574,36 +824,34 @@ async function handleGeminiMessage(message) {
     case MultimodalLiveResponseType.TOOL_CALL: {
       const functionResponses = [];
       for (const call of message.data.functionCalls || []) {
-        if (call.name === 'save_task') {
-          try {
-            const result = await persistTask(call.args || {});
-            functionResponses.push({
-              id: call.id,
-              name: call.name,
-              response: { result },
-            });
-          } catch (e) {
-            functionResponses.push({
-              id: call.id,
-              name: call.name,
-              response: { error: e.message || 'Грешка при запис' },
-            });
+        try {
+          let result;
+          switch (call.name) {
+            case 'save_task':
+              result = await persistTask(call.args || {});
+              break;
+            case 'read_tasks':
+              result = await handleVoiceReadTasks(call.args || {});
+              break;
+            case 'edit_task':
+              result = await handleVoiceEditTask(call.args || {});
+              break;
+            case 'delete_task':
+              result = await handleVoiceDeleteTask(call.args || {});
+              break;
+            case 'mark_task_done':
+              result = await handleVoiceMarkDone(call.args || {});
+              break;
+            case 'discuss_task':
+              result = await handleVoiceDiscussTask(call.args || {});
+              break;
+            default:
+              result = client.callFunction(call.name, call.args || {}) ?? 'ok';
+              break;
           }
-        } else {
-          try {
-            const result = client.callFunction(call.name, call.args || {});
-            functionResponses.push({
-              id: call.id,
-              name: call.name,
-              response: { result: result ?? 'ok' },
-            });
-          } catch (e) {
-            functionResponses.push({
-              id: call.id,
-              name: call.name,
-              response: { error: e.message },
-            });
-          }
+          functionResponses.push({ id: call.id, name: call.name, response: { result } });
+        } catch (e) {
+          functionResponses.push({ id: call.id, name: call.name, response: { error: e.message || 'Грешка' } });
         }
       }
       if (functionResponses.length) client.sendToolResponse(functionResponses);
@@ -661,6 +909,11 @@ async function connectSession() {
     client.automaticActivityDetection = assistantSettings.automaticActivityDetection;
     client.activityHandling = assistantSettings.activityHandling;
     client.addFunction(new SaveTaskTool());
+    client.addFunction(new ReadTasksTool());
+    client.addFunction(new EditTaskTool());
+    client.addFunction(new DeleteTaskTool());
+    client.addFunction(new MarkTaskDoneTool());
+    client.addFunction(new DiscussTaskTool());
 
     client.onReceiveResponse = handleGeminiMessage;
     client.onOpen = () => setStatus('Свързване...', true);
@@ -825,3 +1078,12 @@ window.addEventListener('aiva:settings-updated', () => {
 applyPreferences();
 renderCalendar();
 loadTasks();
+
+// Initialize notification scheduler
+if (window.AIVA_NOTIFIER) {
+  window.AIVA_NOTIFIER.init().then(() => {
+    if (assistantSettings.notifications?.enabled) {
+      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
+    }
+  });
+}
