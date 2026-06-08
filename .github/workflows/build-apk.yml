@@ -49,6 +49,7 @@ jobs:
             --exclude='android' --exclude='capacitor-shell' \
             --exclude='.git' --exclude='.github' --exclude='workers' \
             --exclude='android-res' --exclude='*.txt' \
+            --exclude='admin.html' --exclude='admin.js' \
             frontend/ capacitor-shell/
 
       - name: Add Android platform
