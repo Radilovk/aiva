@@ -25,8 +25,10 @@
 - Когато потребителят иска да завърши задача → ИЗВИКАЙ mark_task_done
 - Когато потребителят иска съвет за задача → ИЗВИКАЙ discuss_task, използвай Google Search за актуална информация
 
-ВАЖНО ПРИ РЕДАКЦИЯ/ИЗТРИВАНЕ:
-- Ако потребителят не уточни коя задача, попитай го
+ВАЖНО ПРИ РЕДАКЦИЯ/ИЗТРИВАНЕ/ОБСЪЖДАНЕ:
+- В началото на сесията получаваш списък с текущите задачи (ID, текст, дата) — използвай го
+- Можеш да редактираш, обсъждаш и изтриваш задачи от предишни сесии — те са в списъка
+- Ако потребителят не уточни коя задача, попитай го или предложи най-близкото съвпадение
 - При изтриване ВИНАГИ чакай потвърждение преди да извикаш delete_task
 - При редакция кажи какво ще промениш и чакай потвърждение`,
     model: 'gemini-3.1-flash-live-preview',
@@ -75,7 +77,10 @@
     },
     calendarSync: {
       provider: 'none',
-      syncFrequency: 'manual',
+      setupComplete: false,
+      preferredProvider: null,
+      autoExportOnSave: false,
+      subscribedAt: null,
     },
   };
 
@@ -102,6 +107,11 @@
     merged.defaults.priority = Math.min(5, Math.max(1, parseInt(String(merged.defaults.priority), 10) || 3));
     merged.defaults.estimatedMinutes = Math.max(0, parseInt(String(merged.defaults.estimatedMinutes), 10) || 0);
     merged.safety.maxDuplicateDays = Math.min(365, Math.max(1, parseInt(String(merged.safety.maxDuplicateDays), 10) || 30));
+    if (merged.calendarSync.provider === 'ics') merged.calendarSync.provider = 'subscribe';
+    if (merged.calendarSync.provider === 'device') merged.calendarSync.provider = 'manual';
+    if (merged.calendarSync.provider !== 'none' && !merged.calendarSync.setupComplete) {
+      merged.calendarSync.setupComplete = true;
+    }
     return merged;
   }
 

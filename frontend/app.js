@@ -40,6 +40,7 @@ const closeTaskModalBtn = document.getElementById('closeTaskModal');
 const deleteTaskBtn = document.getElementById('deleteTaskBtn');
 const duplicateTaskBtn = document.getElementById('duplicateTaskBtn');
 const addToCalendarBtn = document.getElementById('addToCalendarBtn');
+const discussTaskBtn = document.getElementById('discussTaskBtn');
 const duplicateRowsField = document.getElementById('duplicateRows');
 const taskIdField = document.getElementById('taskId');
 
@@ -54,6 +55,7 @@ let tasks = [];
 let currentDate = new Date();
 let calendarView = assistantSettings.calendar.defaultView || 'day';
 let touchStartX = null;
+let voiceFocusTask = null;
 
 // --- save_task tool (Gemini function declaration format) ---
 class SaveTaskTool extends FunctionCallDefinition {
@@ -295,6 +297,14 @@ function showError(msg) {
   setTimeout(() => errorToast.classList.remove('visible'), 5000);
 }
 
+window.showCalendarSyncToast = function showCalendarSyncToast(task) {
+  showToast({
+    content: task?.content ? `${task.content} → календар` : 'Добавена в календара',
+    emotion: 'neutral',
+    priority: 3,
+  });
+};
+
 function showToast(task) {
   toastContent.textContent = task.content;
   const emotionMap = { stress: '😰', tired: '😴', urgent: '⚡', neutral: '😊' };
@@ -484,19 +494,81 @@ function moveCalendar(direction) {
 }
 
 // --- Tasks API ---
-function findTaskBySearch(searchText) {
-  if (!searchText) return null;
-  const lower = searchText.toLowerCase();
-  return tasks.find((t) => t.content.toLowerCase().includes(lower)) || null;
+async function parseJsonResponse(res, fallbackMessage) {
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const preview = (await res.text()).trim().slice(0, 80);
+    throw new Error(
+      preview.startsWith('<!')
+        ? 'API връща HTML вместо JSON. Проверете API адреса (config.js).'
+        : fallbackMessage || `Невалиден отговор от сървъра (${res.status})`
+    );
+  }
+  return res.json();
 }
 
-function resolveTaskId(args) {
+function findTaskBySearch(searchText) {
+  if (!searchText) return null;
+  const lower = searchText.toLowerCase().trim();
+  const exact = tasks.find((t) => t.content.toLowerCase() === lower);
+  if (exact) return exact;
+  const partial = tasks.filter((t) => t.content.toLowerCase().includes(lower));
+  if (partial.length === 1) return partial[0];
+  if (partial.length > 1) {
+    return partial.sort((a, b) => a.content.length - b.content.length)[0];
+  }
+  const words = lower.split(/\s+/).filter((w) => w.length > 2);
+  if (!words.length) return null;
+  let best = null;
+  let bestScore = 0;
+  for (const task of tasks) {
+    const content = task.content.toLowerCase();
+    const score = words.reduce((sum, word) => sum + (content.includes(word) ? 1 : 0), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = task;
+    }
+  }
+  return bestScore > 0 ? best : null;
+}
+
+async function resolveTaskId(args) {
   if (args.task_id) return args.task_id;
   if (args.search_text) {
     const found = findTaskBySearch(args.search_text);
-    return found ? found.id : null;
+    if (found) return found.id;
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/tasks/${encodeURIComponent(userId)}/search?q=${encodeURIComponent(args.search_text)}`
+      );
+      if (res.ok) {
+        const data = await parseJsonResponse(res, 'Грешка при търсене на задача');
+        if (data.tasks?.length) return data.tasks[0].id;
+      }
+    } catch (e) {
+      console.warn('resolveTaskId search:', e);
+    }
+    return null;
   }
   return null;
+}
+
+function buildTasksContextForAssistant() {
+  if (!tasks.length) {
+    return '\n\nТЕКУЩИ ЗАДАЧИ: няма активни задачи.';
+  }
+
+  const lines = tasks.slice(0, 60).map((task) => {
+    const parts = [`ID ${task.id}: "${task.content}"`];
+    if (task.due_date) parts.push(`дата ${task.due_date}`);
+    if (task.due_time) parts.push(`час ${task.due_time}`);
+    if (task.priority) parts.push(`приоритет ${task.priority}`);
+    if (task.notes) parts.push(`бележки: ${String(task.notes).slice(0, 120)}`);
+    return `- ${parts.join(', ')}`;
+  });
+
+  return `\n\nТЕКУЩИ ЗАДАЧИ НА ПОТРЕБИТЕЛЯ (${tasks.length}):\n${lines.join('\n')}\n\nПри редакция, изтриване или обсъждане използвай task_id от списъка. Ако потребителят спомене задача по име, намери най-близкото съвпадение.`;
 }
 
 function readTasksForPeriod(period, date) {
@@ -532,7 +604,7 @@ async function handleVoiceReadTasks(args) {
 }
 
 async function handleVoiceEditTask(args) {
-  const taskId = resolveTaskId(args);
+  const taskId = await resolveTaskId(args);
   if (!taskId) return { error: 'Не намерих задача с това описание. Уточни коя задача.' };
 
   const updates = {};
@@ -557,7 +629,7 @@ async function handleVoiceEditTask(args) {
 }
 
 async function handleVoiceDeleteTask(args) {
-  const taskId = resolveTaskId(args);
+  const taskId = await resolveTaskId(args);
   if (!taskId) return { error: 'Не намерих задача с това описание.' };
 
   try {
@@ -569,7 +641,7 @@ async function handleVoiceDeleteTask(args) {
 }
 
 async function handleVoiceMarkDone(args) {
-  const taskId = resolveTaskId(args);
+  const taskId = await resolveTaskId(args);
   if (!taskId) return { error: 'Не намерих задача с това описание.' };
 
   try {
@@ -581,7 +653,7 @@ async function handleVoiceMarkDone(args) {
 }
 
 async function handleVoiceDiscussTask(args) {
-  const taskId = resolveTaskId(args);
+  const taskId = await resolveTaskId(args);
   const task = taskId ? getTaskById(taskId) : null;
 
   if (args.add_note && taskId && args.advice) {
@@ -617,6 +689,9 @@ async function loadTasks() {
     const data = await res.json();
     tasks = data.tasks || [];
     renderCalendar();
+    if (window.AIVA_CALENDAR_ONBOARD) {
+      window.AIVA_CALENDAR_ONBOARD.checkAfterLoad(tasks);
+    }
     // Re-schedule notifications when tasks are refreshed
     if (window.AIVA_NOTIFIER && assistantSettings.notifications?.enabled) {
       window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
@@ -658,6 +733,9 @@ async function persistTask(args) {
   if (!res.ok) throw new Error(data.error || 'Грешка при запис');
   showToast(data.task);
   await loadTasks();
+  if (window.AIVA_CALENDAR_SYNC) {
+    await window.AIVA_CALENDAR_SYNC.handleTaskSaved(data.task);
+  }
   return { success: true, task_id: data.task.id, content: data.task.content };
 }
 
@@ -693,6 +771,9 @@ async function saveTaskFromForm() {
   if (!res.ok) throw new Error(data.error || 'Грешка при запис');
   await loadTasks();
   showToast(data.task);
+  if (window.AIVA_CALENDAR_SYNC) {
+    await window.AIVA_CALENDAR_SYNC.handleTaskSaved(data.task, { skipPrompt: !!id });
+  }
   return data.task;
 }
 
@@ -772,6 +853,7 @@ function openTaskModal(task = null) {
   modalTitle.textContent = task ? 'Детайли за задачата' : 'Нова задача';
   deleteTaskBtn.hidden = !task;
   duplicateTaskBtn.hidden = !task;
+  discussTaskBtn.hidden = !task;
   fillTaskForm(task);
   taskModal.classList.add('visible');
   taskModal.setAttribute('aria-hidden', 'false');
@@ -878,7 +960,7 @@ async function fetchToken() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: userId }),
   });
-  const data = await res.json();
+  const data = await parseJsonResponse(res, 'Грешка при заявка за токен');
   if (!res.ok) throw new Error(data.error || `Грешка ${res.status}`);
   if (!data.token) throw new Error('Невалиден токен');
   return data.token;
@@ -896,11 +978,18 @@ async function connectSession() {
       throw new Error('Микрофонът не се поддържа в този браузър');
     }
 
+    await loadTasks();
+
     const token = await fetchToken();
     const model = assistantSettings.model || LIVE_MODEL;
 
     client = new GeminiLiveAPI(token, model);
-    client.systemInstructions = assistantSettings.systemInstructions;
+    let instructions = assistantSettings.systemInstructions + buildTasksContextForAssistant();
+    if (voiceFocusTask) {
+      instructions += `\n\nФОКУС: Потребителят иска да обсъди или редактира задача ID ${voiceFocusTask.id}: "${voiceFocusTask.content}". Започни с кратко потвърждение и предложи помощ (редакция, съвет, изтриване, маркиране като готова).`;
+      voiceFocusTask = null;
+    }
+    client.systemInstructions = instructions;
     client.inputAudioTranscription = assistantSettings.inputAudioTranscription;
     client.outputAudioTranscription = assistantSettings.outputAudioTranscription;
     client.responseModalities = assistantSettings.responseModalities;
@@ -1063,6 +1152,16 @@ duplicateTaskBtn.addEventListener('click', async () => {
   }
 });
 
+discussTaskBtn.addEventListener('click', () => {
+  const task = getTaskById(taskIdField.value);
+  if (!task) return;
+  voiceFocusTask = task;
+  closeTaskModal();
+  if (!isSessionActive && !isConnecting) {
+    connectSession();
+  }
+});
+
 addToCalendarBtn.addEventListener('click', async () => {
   const task = {
     id: taskIdField.value || `new-${Date.now()}`,
@@ -1099,6 +1198,12 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('aiva:settings-updated', () => {
   applyPreferences();
   renderCalendar();
+  window.AIVA_CALENDAR_ONBOARD?.updateHeaderStatus?.();
+  window.AIVA_CALENDAR_ONBOARD?.updateBanner?.(tasks.some((t) => t.due_date));
+});
+
+window.addEventListener('aiva:calendar-connected', () => {
+  showToast({ content: 'Календарът е свързан', emotion: 'neutral', priority: 3 });
 });
 
 applyPreferences();

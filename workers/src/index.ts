@@ -259,7 +259,47 @@ app.get('/api/tasks/:user_id/search', async (c) => {
   }
 });
 
-// --- ICS Calendar feed ---
+// --- ICS Calendar feed (webcal subscription — simplest cross-platform sync) ---
+
+function escapeICS(s: string): string {
+  return (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+function toICSStamp(isoOrSql: string | null | undefined): string {
+  const d = isoOrSql ? new Date(isoOrSql.replace(' ', 'T')) : new Date();
+  if (Number.isNaN(d.getTime())) return toICSStamp(null);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    d.getUTCFullYear() +
+    pad(d.getUTCMonth() + 1) +
+    pad(d.getUTCDate()) +
+    'T' +
+    pad(d.getUTCHours()) +
+    pad(d.getUTCMinutes()) +
+    pad(d.getUTCSeconds()) +
+    'Z'
+  );
+}
+
+const SOFIA_TZ = [
+  'BEGIN:VTIMEZONE',
+  'TZID:Europe/Sofia',
+  'BEGIN:STANDARD',
+  'DTSTART:19701025T040000',
+  'RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10',
+  'TZOFFSETFROM:+0300',
+  'TZOFFSETTO:+0200',
+  'TZNAME:EET',
+  'END:STANDARD',
+  'BEGIN:DAYLIGHT',
+  'DTSTART:19700329T030000',
+  'RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3',
+  'TZOFFSETFROM:+0200',
+  'TZOFFSETTO:+0300',
+  'TZNAME:EEST',
+  'END:DAYLIGHT',
+  'END:VTIMEZONE',
+];
 
 app.get('/api/calendar.ics', async (c) => {
   const userId = c.req.query('user_id');
@@ -267,6 +307,7 @@ app.get('/api/calendar.ics', async (c) => {
 
   try {
     const tasks = await getIncompleteTasks(c.env.DB, userId);
+    const nowStamp = toICSStamp(null);
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -275,16 +316,18 @@ app.get('/api/calendar.ics', async (c) => {
       'METHOD:PUBLISH',
       'X-WR-CALNAME:AIVA Задачи',
       'X-WR-TIMEZONE:Europe/Sofia',
+      'REFRESH-INTERVAL;VALUE=DURATION:PT15M',
+      'X-PUBLISHED-TTL:PT15M',
+      ...SOFIA_TZ,
     ];
 
     for (const task of tasks) {
-      const dateStr = task.due_date ? task.due_date.replace(/-/g, '') : null;
-      if (!dateStr) continue;
+      if (!task.due_date) continue;
 
+      const dateStr = task.due_date.replace(/-/g, '');
       const timeStr = task.due_time ? task.due_time.replace(':', '') + '00' : '090000';
       const dtStart = `${dateStr}T${timeStr}`;
 
-      // Calculate end time
       const durationMin = task.estimated_minutes || 30;
       const startH = parseInt(timeStr.slice(0, 2), 10);
       const startM = parseInt(timeStr.slice(2, 4), 10);
@@ -292,23 +335,23 @@ app.get('/api/calendar.ics', async (c) => {
       const endH = String(Math.floor(endTotal / 60) % 24).padStart(2, '0');
       const endM = String(endTotal % 60).padStart(2, '0');
       const dtEnd = `${dateStr}T${endH}${endM}00`;
-
-      // Escape special chars for iCal
-      const escape = (s: string) => (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+      const modified = toICSStamp(task.updated_at || task.created_at);
 
       lines.push('BEGIN:VEVENT');
       lines.push(`UID:aiva-task-${task.id}@aiva.radilov-k.workers.dev`);
-      lines.push(`DTSTART:${dtStart}`);
-      lines.push(`DTEND:${dtEnd}`);
-      lines.push(`SUMMARY:${escape(task.content)}`);
-      if (task.notes) lines.push(`DESCRIPTION:${escape(task.notes)}`);
-      if (task.location) lines.push(`LOCATION:${escape(task.location)}`);
+      lines.push(`DTSTAMP:${nowStamp}`);
+      lines.push(`LAST-MODIFIED:${modified}`);
+      lines.push(`DTSTART;TZID=Europe/Sofia:${dtStart}`);
+      lines.push(`DTEND;TZID=Europe/Sofia:${dtEnd}`);
+      lines.push(`SUMMARY:${escapeICS(task.content)}`);
+      if (task.notes) lines.push(`DESCRIPTION:${escapeICS(task.notes)}`);
+      if (task.location) lines.push(`LOCATION:${escapeICS(task.location)}`);
       lines.push(`PRIORITY:${Math.min(9, task.priority * 2)}`);
-      if (task.tags) lines.push(`CATEGORIES:${escape(task.tags)}`);
+      if (task.tags) lines.push(`CATEGORIES:${escapeICS(task.tags)}`);
       lines.push('BEGIN:VALARM');
       lines.push('TRIGGER:-PT15M');
       lines.push('ACTION:DISPLAY');
-      lines.push(`DESCRIPTION:${escape(task.content)}`);
+      lines.push(`DESCRIPTION:${escapeICS(task.content)}`);
       lines.push('END:VALARM');
       lines.push('END:VEVENT');
     }
@@ -318,8 +361,8 @@ app.get('/api/calendar.ics', async (c) => {
     return new Response(lines.join('\r\n'), {
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="aiva-tasks.ics"',
-        'Cache-Control': 'no-cache, max-age=0',
+        'Content-Disposition': 'inline; filename="aiva-tasks.ics"',
+        'Cache-Control': 'no-cache, max-age=0, must-revalidate',
       },
     });
   } catch (e) {

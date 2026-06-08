@@ -8,6 +8,12 @@
 
   function resolveApiBase() {
     const host = location.hostname;
+
+    // Capacitor APK serves the shell at https://localhost — there is no local API.
+    if (window.Capacitor?.isNativePlatform?.()) {
+      return WORKER_ORIGIN;
+    }
+
     if (host === 'localhost' || host === '127.0.0.1') {
       return '';
     }
