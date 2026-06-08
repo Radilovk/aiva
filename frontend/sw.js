@@ -12,6 +12,8 @@ const ASSETS = [
   '/admin.js',
   '/lib/geminilive.js',
   '/lib/mediaUtils.js',
+  '/lib/deviceCalendar.js',
+  '/lib/calendarSync.js',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

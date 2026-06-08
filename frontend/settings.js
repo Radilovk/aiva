@@ -77,7 +77,8 @@
     },
     calendarSync: {
       provider: 'none',
-      syncFrequency: 'manual',
+      autoExportOnSave: false,
+      subscribedAt: null,
     },
   };
 
@@ -104,6 +105,8 @@
     merged.defaults.priority = Math.min(5, Math.max(1, parseInt(String(merged.defaults.priority), 10) || 3));
     merged.defaults.estimatedMinutes = Math.max(0, parseInt(String(merged.defaults.estimatedMinutes), 10) || 0);
     merged.safety.maxDuplicateDays = Math.min(365, Math.max(1, parseInt(String(merged.safety.maxDuplicateDays), 10) || 30));
+    if (merged.calendarSync.provider === 'ics') merged.calendarSync.provider = 'subscribe';
+    if (merged.calendarSync.provider === 'device') merged.calendarSync.provider = 'manual';
     return merged;
   }
 

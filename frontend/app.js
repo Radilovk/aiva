@@ -722,6 +722,9 @@ async function persistTask(args) {
   if (!res.ok) throw new Error(data.error || 'Грешка при запис');
   showToast(data.task);
   await loadTasks();
+  if (window.AIVA_CALENDAR_SYNC) {
+    await window.AIVA_CALENDAR_SYNC.onTaskSaved(data.task);
+  }
   return { success: true, task_id: data.task.id, content: data.task.content };
 }
 
@@ -757,6 +760,9 @@ async function saveTaskFromForm() {
   if (!res.ok) throw new Error(data.error || 'Грешка при запис');
   await loadTasks();
   showToast(data.task);
+  if (!id && window.AIVA_CALENDAR_SYNC) {
+    await window.AIVA_CALENDAR_SYNC.onTaskSaved(data.task);
+  }
   return data.task;
 }
 
