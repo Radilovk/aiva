@@ -297,6 +297,14 @@ function showError(msg) {
   setTimeout(() => errorToast.classList.remove('visible'), 5000);
 }
 
+window.showCalendarSyncToast = function showCalendarSyncToast(task) {
+  showToast({
+    content: task?.content ? `${task.content} → календар` : 'Добавена в календара',
+    emotion: 'neutral',
+    priority: 3,
+  });
+};
+
 function showToast(task) {
   toastContent.textContent = task.content;
   const emotionMap = { stress: '😰', tired: '😴', urgent: '⚡', neutral: '😊' };
@@ -681,6 +689,9 @@ async function loadTasks() {
     const data = await res.json();
     tasks = data.tasks || [];
     renderCalendar();
+    if (window.AIVA_CALENDAR_ONBOARD) {
+      window.AIVA_CALENDAR_ONBOARD.checkAfterLoad(tasks);
+    }
     // Re-schedule notifications when tasks are refreshed
     if (window.AIVA_NOTIFIER && assistantSettings.notifications?.enabled) {
       window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
@@ -723,7 +734,7 @@ async function persistTask(args) {
   showToast(data.task);
   await loadTasks();
   if (window.AIVA_CALENDAR_SYNC) {
-    await window.AIVA_CALENDAR_SYNC.onTaskSaved(data.task);
+    await window.AIVA_CALENDAR_SYNC.handleTaskSaved(data.task);
   }
   return { success: true, task_id: data.task.id, content: data.task.content };
 }
@@ -760,8 +771,8 @@ async function saveTaskFromForm() {
   if (!res.ok) throw new Error(data.error || 'Грешка при запис');
   await loadTasks();
   showToast(data.task);
-  if (!id && window.AIVA_CALENDAR_SYNC) {
-    await window.AIVA_CALENDAR_SYNC.onTaskSaved(data.task);
+  if (window.AIVA_CALENDAR_SYNC) {
+    await window.AIVA_CALENDAR_SYNC.handleTaskSaved(data.task, { skipPrompt: !!id });
   }
   return data.task;
 }
@@ -1187,6 +1198,12 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('aiva:settings-updated', () => {
   applyPreferences();
   renderCalendar();
+  window.AIVA_CALENDAR_ONBOARD?.updateHeaderStatus?.();
+  window.AIVA_CALENDAR_ONBOARD?.updateBanner?.(tasks.some((t) => t.due_date));
+});
+
+window.addEventListener('aiva:calendar-connected', () => {
+  showToast({ content: 'Календарът е свързан', emotion: 'neutral', priority: 3 });
 });
 
 applyPreferences();

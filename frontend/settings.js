@@ -77,6 +77,8 @@
     },
     calendarSync: {
       provider: 'none',
+      setupComplete: false,
+      preferredProvider: null,
       autoExportOnSave: false,
       subscribedAt: null,
     },
@@ -107,6 +109,9 @@
     merged.safety.maxDuplicateDays = Math.min(365, Math.max(1, parseInt(String(merged.safety.maxDuplicateDays), 10) || 30));
     if (merged.calendarSync.provider === 'ics') merged.calendarSync.provider = 'subscribe';
     if (merged.calendarSync.provider === 'device') merged.calendarSync.provider = 'manual';
+    if (merged.calendarSync.provider !== 'none' && !merged.calendarSync.setupComplete) {
+      merged.calendarSync.setupComplete = true;
+    }
     return merged;
   }
 

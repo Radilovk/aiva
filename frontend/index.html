@@ -138,6 +138,129 @@
       transform: translateY(-1px);
     }
 
+    .calendar-sync-chip {
+      border: 1px solid rgba(45, 212, 168, 0.25);
+      background: rgba(45, 212, 168, 0.1);
+      color: #9ef0d3;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: inherit;
+      font-size: 0.74rem;
+      cursor: pointer;
+    }
+
+    .calendar-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 59, 92, 0.2);
+      background: rgba(255, 59, 92, 0.08);
+      font-size: 0.84rem;
+    }
+
+    .calendar-banner[hidden],
+    .calendar-sync-chip[hidden] { display: none !important; }
+
+    .calendar-banner-btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 8px 14px;
+      background: var(--accent);
+      color: white;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .calendar-onboard {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .calendar-onboard.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .calendar-onboard-card {
+      width: min(100%, 420px);
+      border-radius: 24px 24px 18px 18px;
+      border: 1px solid var(--border);
+      background: #111117;
+      padding: 22px 20px 18px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    }
+
+    .calendar-onboard-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .calendar-onboard-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .calendar-onboard-text {
+      color: var(--text-secondary);
+      line-height: 1.5;
+      font-size: 0.92rem;
+      margin-bottom: 16px;
+    }
+
+    .calendar-onboard-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .calendar-onboard-primary,
+    .calendar-onboard-secondary,
+    .calendar-onboard-ghost {
+      width: 100%;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font: inherit;
+      font-size: 0.92rem;
+      cursor: pointer;
+    }
+
+    .calendar-onboard-primary {
+      border: 0;
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+    }
+
+    .calendar-onboard-secondary {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .calendar-onboard-ghost {
+      border: 0;
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
     .view-tab.active {
       color: white;
       box-shadow: inset 0 0 0 1px rgba(255, 59, 92, 0.35);
@@ -952,10 +1075,16 @@
         <div class="logo">AIVA</div>
         <div class="tagline">гласов асистент за задачи</div>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="calendar-sync-chip" id="calendarSyncChip" type="button" hidden title="Календар">📅 Календар</button>
         <a class="admin-link" href="./settings.html">⚙ Настройки</a>
       </div>
     </header>
+
+    <div class="calendar-banner" id="calendarBanner" hidden>
+      <span>Свържи календара си — задачите ще се появяват автоматично</span>
+      <button class="calendar-banner-btn" id="calendarBannerConnect" type="button">Свържи</button>
+    </div>
 
     <section class="voice-section">
       <div class="record-wrapper">
@@ -1106,11 +1235,28 @@
   <!-- Error toast -->
   <div class="error-toast" id="errorToast"></div>
 
+  <!-- Calendar onboarding -->
+  <div class="calendar-onboard" id="calendarOnboard" aria-hidden="true">
+    <div class="calendar-onboard-card" role="dialog" aria-modal="true" aria-labelledby="calendarOnboardTitle">
+      <div class="calendar-onboard-top">
+        <div class="calendar-onboard-title" id="calendarOnboardTitle">📅 Календар</div>
+        <button class="calendar-onboard-ghost" id="calendarOnboardClose" type="button" aria-label="Затвори">×</button>
+      </div>
+      <p class="calendar-onboard-text" id="calendarOnboardText">Задачите с дата могат да се появяват автоматично в календара ти.</p>
+      <div class="calendar-onboard-actions">
+        <button class="calendar-onboard-primary" id="calendarOnboardPrimary" type="button">Свържи календара</button>
+        <button class="calendar-onboard-secondary" id="calendarOnboardDevice" type="button">Само тази задача в календара</button>
+        <button class="calendar-onboard-ghost" id="calendarOnboardLater" type="button">Не сега</button>
+      </div>
+    </div>
+  </div>
+
   <script src="config.js"></script>
   <script src="settings.js"></script>
   <script src="local-scheduler.js"></script>
   <script src="lib/deviceCalendar.js"></script>
   <script src="lib/calendarSync.js"></script>
+  <script src="lib/calendarOnboarding.js"></script>
   <script src="lib/geminilive.js"></script>
   <script src="lib/mediaUtils.js"></script>
   <script src="app.js"></script>

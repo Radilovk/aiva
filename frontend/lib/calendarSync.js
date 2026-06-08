@@ -125,16 +125,40 @@
     return getSyncSettings().provider === 'manual' || getSyncSettings().provider === 'device';
   }
 
-  async function onTaskSaved(task) {
-    if (!task?.due_date || !isManualMode()) return;
-    if (!getSyncSettings().autoExportOnSave) return;
-    if (!window.AIVA_CALENDAR) return;
+  function isConfigured() {
+    const sync = getSyncSettings();
+    return !!sync.setupComplete && sync.provider && sync.provider !== 'none';
+  }
 
-    try {
-      await window.AIVA_CALENDAR.addToDevice(task);
-    } catch (e) {
-      if (e?.name !== 'AbortError') console.warn('Calendar auto-export:', e);
+  async function onTaskSaved(task) {
+    return handleTaskSaved(task);
+  }
+
+  async function handleTaskSaved(task, options = {}) {
+    if (!task?.due_date) return { action: 'skip' };
+
+    const onboard = window.AIVA_CALENDAR_ONBOARD;
+    if (onboard && !isConfigured() && !options.skipPrompt) {
+      if (onboard.maybePrompt(task)) return { action: 'prompted' };
     }
+
+    if (isSubscribeMode()) {
+      if (options.showToast !== false && typeof window.showCalendarSyncToast === 'function') {
+        window.showCalendarSyncToast(task);
+      }
+      return { action: 'subscribed' };
+    }
+
+    if (isManualMode() && getSyncSettings().autoExportOnSave && window.AIVA_CALENDAR) {
+      try {
+        await window.AIVA_CALENDAR.addToDevice(task);
+        return { action: 'shared' };
+      } catch (e) {
+        if (e?.name !== 'AbortError') console.warn('Calendar auto-export:', e);
+      }
+    }
+
+    return { action: 'none' };
   }
 
   window.AIVA_CALENDAR_SYNC = {
@@ -146,7 +170,9 @@
     exportAllToDevice,
     buildMultiEventICS,
     onTaskSaved,
+    handleTaskSaved,
     isSubscribeMode,
     isManualMode,
+    isConfigured,
   };
 })();

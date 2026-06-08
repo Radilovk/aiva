@@ -211,16 +211,16 @@
     </div>
 
     <!-- Calendar Sync -->
-    <div class="section">
+    <div class="section" id="calendar-sync">
       <div class="section-title">📅 Синхронизация с календар</div>
       <div class="field">
-        <span class="field-label">Режим</span>
+        <span class="field-label">Как да се синхронизира</span>
         <select id="calendarProvider">
-          <option value="none">Без синхронизация</option>
-          <option value="subscribe">Автоматично — абониране (препоръчано)</option>
-          <option value="manual">Ръчно — бутон 📅 във всяка задача</option>
+          <option value="none">Изключено</option>
+          <option value="subscribe">Автоматично (препоръчано)</option>
+          <option value="manual">При всяка нова задача</option>
         </select>
-        <div class="field-hint">Автоматичният режим добавя всички задачи в избрания от вас календар (Google, Apple, Samsung, Outlook). Работи еднакво в уеб и APK.</div>
+        <div class="field-hint">Автоматичният режим показва всички задачи в избрания от вас календар. Приложението ще ви подкани при първа задача с дата.</div>
       </div>
       <div class="field" id="subscribeSection" style="display:none">
         <span class="field-label">Абонирай се (избери календар)</span>
@@ -526,7 +526,9 @@
         },
         calendarSync: {
           provider: document.getElementById('calendarProvider').value,
+          setupComplete: document.getElementById('calendarProvider').value !== 'none',
           autoExportOnSave: getToggle('toggleAutoExport'),
+          preferredProvider: settings.calendarSync?.preferredProvider || null,
           subscribedAt: document.getElementById('calendarProvider').value === 'subscribe'
             ? (settings.calendarSync?.subscribedAt || new Date().toISOString())
             : settings.calendarSync?.subscribedAt || null,

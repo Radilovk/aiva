@@ -14,6 +14,7 @@ const ASSETS = [
   '/lib/mediaUtils.js',
   '/lib/deviceCalendar.js',
   '/lib/calendarSync.js',
+  '/lib/calendarOnboarding.js',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
