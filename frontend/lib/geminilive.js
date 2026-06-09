@@ -372,11 +372,13 @@ class GeminiLiveAPI {
     }
 
     if (this.googleGrounding) {
-      // Currently can't have both Google Search with custom tools.
-      console.log(
-        "Google Grounding enabled, removing custom function calls if any."
-      );
-      sessionSetupMessage.setup.tools = [{ googleSearch: {} }];
+      // The Live API accepts multiple tool entries, so keep the custom
+      // function declarations (save/edit/delete task, ...) alongside search.
+      console.log("Google Grounding enabled, adding Google Search tool.");
+      sessionSetupMessage.setup.tools = [
+        ...sessionSetupMessage.setup.tools,
+        { googleSearch: {} },
+      ];
     }
 
 
