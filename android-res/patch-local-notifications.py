@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Patch AndroidManifest.xml to add notification permissions and receivers for AIVA.
+Patch AndroidManifest.xml and MainActivity for AIVA calendar + notification support.
 Run from repo root after `npx cap add android && npx cap sync android`.
 """
+import os
 import re
 import sys
-import os
 
 MANIFEST = 'android/app/src/main/AndroidManifest.xml'
+MAIN_ACTIVITY = 'android/app/src/main/java/com/aiva/assistant/MainActivity.java'
 
 if not os.path.exists(MANIFEST):
     print(f'ERROR: {MANIFEST} not found. Run `npx cap add android` first.')
@@ -16,11 +17,6 @@ if not os.path.exists(MANIFEST):
 with open(MANIFEST, 'r') as f:
     content = f.read()
 
-# Add permissions before <application>
-# RECORD_AUDIO + MODIFY_AUDIO_SETTINGS are required so that Capacitor's
-# BridgeWebChromeClient.onPermissionRequest can grant getUserMedia in the WebView.
-# Without them the audio capture request is denied instantly and voice
-# recording/listening fails in the APK while it works on the web.
 PERMISSIONS = """
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
@@ -30,14 +26,24 @@ PERMISSIONS = """
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
 """
 
 if 'POST_NOTIFICATIONS' not in content:
     content = content.replace('<application', PERMISSIONS + '\n    <application', 1)
-    print('✅ Added notification + microphone permissions')
+    print('✅ Added notification + microphone + calendar permissions')
 
-# Ensure RECORD_AUDIO is present even if the notification permissions were
-# already patched in by a previous run.
+if 'READ_CALENDAR' not in content:
+    content = content.replace(
+        '<application',
+        '    <uses-permission android:name="android.permission.READ_CALENDAR" />\n'
+        '    <uses-permission android:name="android.permission.WRITE_CALENDAR" />\n'
+        '    <application',
+        1,
+    )
+    print('✅ Added calendar permissions')
+
 if 'RECORD_AUDIO' not in content:
     content = content.replace(
         '<application',
@@ -48,7 +54,6 @@ if 'RECORD_AUDIO' not in content:
     )
     print('✅ Added microphone permissions')
 
-# Add BroadcastReceiver before </application>
 RECEIVER = """
         <receiver android:name="com.capacitorjs.plugins.localnotifications.AivaNotificationReceiver"
                   android:exported="false">
@@ -65,4 +70,43 @@ if 'AivaNotificationReceiver' not in content:
 with open(MANIFEST, 'w') as f:
     f.write(content)
 
-print('✅ AndroidManifest.xml patched successfully')
+# Patch MainActivity to register AivaCalendarPlugin
+if os.path.exists(MAIN_ACTIVITY):
+    with open(MAIN_ACTIVITY, 'r') as f:
+        main = f.read()
+
+    if 'AivaCalendarPlugin' not in main:
+        if 'import com.aiva.assistant.AivaCalendarPlugin;' not in main:
+            main = main.replace(
+                'import com.getcapacitor.BridgeActivity;',
+                'import com.getcapacitor.BridgeActivity;\nimport com.aiva.assistant.AivaCalendarPlugin;',
+            )
+
+        if 'registerPlugin(AivaCalendarPlugin.class)' not in main:
+            # Capacitor 8 MainActivity extends BridgeActivity without onCreate override
+            if 'onCreate' in main:
+                main = re.sub(
+                    r'(super\.onCreate\(savedInstanceState\);)',
+                    r'registerPlugin(AivaCalendarPlugin.class);\n        \1',
+                    main,
+                    count=1,
+                )
+            else:
+                main = main.replace(
+                    'public class MainActivity extends BridgeActivity {}',
+                    '''public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(android.os.Bundle savedInstanceState) {
+        registerPlugin(AivaCalendarPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}''',
+                )
+
+        with open(MAIN_ACTIVITY, 'w') as f:
+            f.write(main)
+        print('✅ Registered AivaCalendarPlugin in MainActivity')
+else:
+    print(f'⚠ MainActivity not found at {MAIN_ACTIVITY} — plugin registration skipped')
+
+print('✅ Android patches applied successfully')

@@ -165,6 +165,97 @@
     .calendar-banner[hidden],
     .calendar-sync-chip[hidden] { display: none !important; }
 
+    /* Upcoming events strip */
+    .upcoming-strip {
+      margin: 0 0 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(45, 212, 168, 0.2);
+      background: rgba(45, 212, 168, 0.06);
+    }
+
+    .upcoming-strip[hidden] { display: none !important; }
+
+    .upcoming-strip-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #9ef0d3;
+      letter-spacing: 0.3px;
+    }
+
+    .upcoming-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .upcoming-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .upcoming-item:hover { background: var(--surface-hover); }
+    .upcoming-item.is-overdue { border-color: rgba(255, 59, 92, 0.35); background: rgba(255, 59, 92, 0.06); }
+
+    .upcoming-time {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      min-width: 48px;
+      text-align: center;
+    }
+
+    .upcoming-item.is-overdue .upcoming-time { color: var(--accent); }
+
+    .upcoming-body { flex: 1; min-width: 0; }
+    .upcoming-title { font-size: 0.84rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .upcoming-countdown { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; }
+
+    .upcoming-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .upcoming-action-btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 0.68rem;
+      cursor: pointer;
+    }
+
+    .task-item.is-overdue { border-left: 3px solid var(--accent); }
+    .task-item.is-upcoming { border-left: 3px solid #2dd4a8; }
+
+    .task-countdown {
+      font-size: 0.72rem;
+      color: #2dd4a8;
+      font-weight: 500;
+    }
+
+    .task-item.is-overdue .task-countdown { color: var(--accent); }
+
+    .calendar-badge {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(45, 212, 168, 0.12);
+      color: #9ef0d3;
+    }
+
     .calendar-banner-btn {
       border: 0;
       border-radius: 999px;
@@ -1082,9 +1173,17 @@
     </header>
 
     <div class="calendar-banner" id="calendarBanner" hidden>
-      <span>Свържи календара си — задачите ще се появяват автоматично</span>
+      <span>Свържи календара си — задачите ще се появяват автоматично с напомняния</span>
       <button class="calendar-banner-btn" id="calendarBannerConnect" type="button">Свържи</button>
     </div>
+
+    <section class="upcoming-strip" id="upcomingStrip" hidden>
+      <div class="upcoming-strip-header">
+        <span>⏰ Предстоящи</span>
+        <span id="upcomingCount">0</span>
+      </div>
+      <div class="upcoming-list" id="upcomingList"></div>
+    </section>
 
     <section class="voice-section">
       <div class="record-wrapper">
@@ -1253,8 +1352,10 @@
 
   <script src="config.js"></script>
   <script src="settings.js"></script>
+  <script src="lib/icsUtils.js"></script>
   <script src="local-scheduler.js"></script>
   <script src="lib/deviceCalendar.js"></script>
+  <script src="lib/nativeCalendar.js"></script>
   <script src="lib/calendarSync.js"></script>
   <script src="lib/calendarOnboarding.js"></script>
   <script src="lib/geminilive.js"></script>

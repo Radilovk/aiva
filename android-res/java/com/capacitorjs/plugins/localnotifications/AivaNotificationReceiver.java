@@ -8,11 +8,11 @@ import android.util.Log;
 
 /**
  * BroadcastReceiver for AIVA notification action buttons.
- * Handles "done" action without launching the WebView.
+ * Writes pending actions to Capacitor Preferences storage for JS to process.
  */
 public class AivaNotificationReceiver extends BroadcastReceiver {
     private static final String TAG = "AivaNotifReceiver";
-    private static final String PREFS_NAME = "AivaNotificationActions";
+    private static final String PREFS_NAME = "CapacitorStorage";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -25,8 +25,8 @@ public class AivaNotificationReceiver extends BroadcastReceiver {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit()
                 .putString("pending_action", "mark_done")
-                .putInt("pending_task_id", taskId)
-                .putLong("pending_timestamp", System.currentTimeMillis())
+                .putString("pending_task_id", String.valueOf(taskId))
+                .putString("pending_timestamp", String.valueOf(System.currentTimeMillis()))
                 .apply();
             Log.d(TAG, "Saved pending done action for task " + taskId);
         }

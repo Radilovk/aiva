@@ -1,7 +1,7 @@
 /**
  * AIVA Service Worker — offline caching + push notifications
  */
-const CACHE_NAME = 'aiva-v1';
+const CACHE_NAME = 'aiva-v2';
 const ASSETS = [
   '/index.html',
   '/settings.html',
@@ -10,9 +10,12 @@ const ASSETS = [
   '/settings.js',
   '/app.js',
   '/admin.js',
+  '/local-scheduler.js',
+  '/lib/icsUtils.js',
   '/lib/geminilive.js',
   '/lib/mediaUtils.js',
   '/lib/deviceCalendar.js',
+  '/lib/nativeCalendar.js',
   '/lib/calendarSync.js',
   '/lib/calendarOnboarding.js',
   '/manifest.json',
@@ -86,12 +89,27 @@ self.addEventListener('push', (event) => {
 // Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const taskId = event.notification.data?.task_id;
 
-  if (event.action === 'done' && event.notification.data?.task_id) {
-    // Mark task as done via API
-    const apiBase = self.location.origin;
+  if (event.action === 'done' && taskId) {
+    const apiBase = self.location.origin.includes('localhost')
+      ? 'https://aiva.radilov-k.workers.dev'
+      : self.location.origin;
     event.waitUntil(
-      fetch(`${apiBase}/api/tasks/${event.notification.data.task_id}/done`, { method: 'PATCH' })
+      fetch(`${apiBase}/api/tasks/${taskId}/done`, { method: 'PATCH' })
+    );
+    return;
+  }
+
+  if (event.action === 'snooze' && taskId) {
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) {
+          client.postMessage({ type: 'aiva:snooze', taskId, minutes: 10 });
+          if ('focus' in client) return client.focus();
+        }
+        return self.clients.openWindow('/index.html');
+      })
     );
     return;
   }
@@ -100,9 +118,16 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
-        if (client.url.includes('/index.html') && 'focus' in client) return client.focus();
+        if (client.url.includes('index.html') && 'focus' in client) return client.focus();
       }
       return self.clients.openWindow('/index.html');
     })
   );
+});
+
+// Handle snooze messages from SW notification actions
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'aiva:snooze') {
+    // Forwarded to main app via postMessage on client
+  }
 });

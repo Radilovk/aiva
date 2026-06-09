@@ -1,12 +1,10 @@
 /**
  * AIVA Calendar Sync
  *
- * Simplest cross-platform sync: ICS webcal subscription.
- * User subscribes once in Google / Apple / Samsung / Outlook and picks which
- * calendar to use. AIVA pushes task updates via the feed URL — no OAuth,
- * no native plugins.
- *
- * Manual mode keeps the per-task 📅 share flow from deviceCalendar.js.
+ * Cross-platform sync modes:
+ *   subscribe  — ICS webcal feed (Google / Apple / Outlook)
+ *   native     — Direct device calendar via native plugin (Android APK) + ICS fallback
+ *   manual     — Per-task share flow
  */
 (function () {
   const { API_BASE, WORKER_ORIGIN } = window.AIVA_CONFIG;
@@ -19,10 +17,15 @@
     return localStorage.getItem('aiva_user_id') || '';
   }
 
+  function getReminderMinutes() {
+    return window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications?.reminderMinutes ?? 15;
+  }
+
   function getFeedUrl(userId) {
     const id = userId || getUserId();
     if (!id) return '';
-    return `${getApiBase()}/api/calendar.ics?user_id=${encodeURIComponent(id)}`;
+    const reminder = getReminderMinutes();
+    return `${getApiBase()}/api/calendar.ics?user_id=${encodeURIComponent(id)}&reminder=${reminder}`;
   }
 
   function getWebcalUrl(userId) {
@@ -40,17 +43,22 @@
     return `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(feed)}&name=${encodeURIComponent('AIVA Задачи')}`;
   }
 
+  function getSamsungSubscribeUrl(userId) {
+    const webcal = getWebcalUrl(userId);
+    return `samsungcalendar://add?url=${encodeURIComponent(webcal)}`;
+  }
+
   function openSubscribe(provider, userId) {
     const urls = {
       google: getGoogleSubscribeUrl(userId),
       outlook: getOutlookSubscribeUrl(userId),
       apple: getWebcalUrl(userId),
+      samsung: getSamsungSubscribeUrl(userId),
     };
     const url = urls[provider] || getWebcalUrl(userId);
     if (!url) throw new Error('Липсва потребителски ID');
 
-    // webcal: opens the device calendar app on iOS / many Android launchers
-    if (provider === 'apple' || url.startsWith('webcal:')) {
+    if (provider === 'apple' || url.startsWith('webcal:') || url.startsWith('samsungcalendar:')) {
       window.location.href = url;
       return;
     }
@@ -59,31 +67,13 @@
   }
 
   function buildMultiEventICS(tasks) {
-    const withDates = (tasks || []).filter((t) => t.due_date);
-    if (!withDates.length) return null;
-
-    const lines = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//AIVA//Task Calendar//BG',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-      'X-WR-CALNAME:AIVA Задачи',
-      'REFRESH-INTERVAL;VALUE=DURATION:PT15M',
-      'X-PUBLISHED-TTL:PT15M',
-    ];
-
-    for (const task of withDates) {
-      const block = window.AIVA_CALENDAR?.buildICS(task);
-      if (!block) continue;
-      const eventLines = block
-        .split(/\r?\n/)
-        .filter((line) => line && !line.startsWith('BEGIN:VCALENDAR') && !line.startsWith('END:VCALENDAR'));
-      lines.push(...eventLines);
-    }
-
-    lines.push('END:VCALENDAR');
-    return lines.join('\r\n');
+    const opts = {
+      reminderMinutes: getReminderMinutes(),
+      remindAtStart: window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications?.remindAtStart !== false,
+      calendarName: 'AIVA Задачи',
+      includeRefresh: true,
+    };
+    return window.AIVA_ICS?.buildMultiICS(tasks, opts) || null;
   }
 
   async function shareICS(ics, fileName, title) {
@@ -121,6 +111,10 @@
     return provider === 'subscribe' || provider === 'ics';
   }
 
+  function isNativeMode() {
+    return getSyncSettings().provider === 'native';
+  }
+
   function isManualMode() {
     return getSyncSettings().provider === 'manual' || getSyncSettings().provider === 'device';
   }
@@ -128,6 +122,30 @@
   function isConfigured() {
     const sync = getSyncSettings();
     return !!sync.setupComplete && sync.provider && sync.provider !== 'none';
+  }
+
+  async function syncTaskToCalendar(task) {
+    if (!task?.due_date) return { action: 'skip' };
+
+    if (isNativeMode() && window.AIVA_NATIVE_CALENDAR) {
+      try {
+        const result = await window.AIVA_NATIVE_CALENDAR.syncTaskToDevice(task);
+        return { action: 'native', ...result };
+      } catch (e) {
+        if (e?.name !== 'AbortError') console.warn('Native calendar sync:', e);
+      }
+    }
+
+    if (isManualMode() && getSyncSettings().autoExportOnSave && window.AIVA_NATIVE_CALENDAR) {
+      try {
+        const result = await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
+        if (result?.method !== 'aborted') return { action: 'shared', ...result };
+      } catch (e) {
+        if (e?.name !== 'AbortError') console.warn('Manual calendar export:', e);
+      }
+    }
+
+    return { action: 'none' };
   }
 
   async function onTaskSaved(task) {
@@ -149,16 +167,29 @@
       return { action: 'subscribed' };
     }
 
-    if (isManualMode() && getSyncSettings().autoExportOnSave && window.AIVA_CALENDAR) {
-      try {
-        await window.AIVA_CALENDAR.addToDevice(task);
-        return { action: 'shared' };
-      } catch (e) {
-        if (e?.name !== 'AbortError') console.warn('Calendar auto-export:', e);
-      }
+    const syncResult = await syncTaskToCalendar(task);
+    if (syncResult.action !== 'none') return syncResult;
+
+    // Schedule local notification for new/updated task
+    if (window.AIVA_NOTIFIER?.isEnabled?.()) {
+      const mins = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications?.reminderMinutes;
+      await window.AIVA_NOTIFIER.scheduleForTask(task, mins);
     }
 
     return { action: 'none' };
+  }
+
+  async function onTaskRemoved(taskId) {
+    if (window.AIVA_NATIVE_CALENDAR?.removeFromDeviceCalendar) {
+      await window.AIVA_NATIVE_CALENDAR.removeFromDeviceCalendar(taskId);
+    }
+    if (window.AIVA_NOTIFIER?.cancelForTask) {
+      await window.AIVA_NOTIFIER.cancelForTask(taskId);
+    }
+  }
+
+  async function onTaskDone(taskId) {
+    await onTaskRemoved(taskId);
   }
 
   window.AIVA_CALENDAR_SYNC = {
@@ -166,12 +197,17 @@
     getWebcalUrl,
     getGoogleSubscribeUrl,
     getOutlookSubscribeUrl,
+    getSamsungSubscribeUrl,
     openSubscribe,
     exportAllToDevice,
     buildMultiEventICS,
     onTaskSaved,
     handleTaskSaved,
+    onTaskRemoved,
+    onTaskDone,
+    syncTaskToCalendar,
     isSubscribeMode,
+    isNativeMode,
     isManualMode,
     isConfigured,
   };

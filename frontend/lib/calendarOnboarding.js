@@ -1,6 +1,5 @@
 /**
- * Intuitive calendar setup — shown in-context when it matters,
- * not buried in settings.
+ * Intuitive calendar + notification setup — shown in-context when it matters.
  */
 (function () {
   const DISMISS_KEY = 'aiva_calendar_dismissed_until';
@@ -11,7 +10,8 @@
   }
 
   function isIOS() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   }
 
   function isAndroid() {
@@ -20,14 +20,25 @@
 
   function detectPreferredProvider() {
     if (isIOS()) return 'apple';
-    if (isAndroid() || isNative()) return 'google';
+    if (isAndroid()) {
+      const ua = navigator.userAgent.toLowerCase();
+      if (ua.includes('samsung')) return 'samsung';
+      return 'google';
+    }
     return 'google';
+  }
+
+  function detectRecommendedMode() {
+    if (isNative() && isAndroid()) return 'native';
+    if (isIOS()) return 'subscribe';
+    return 'subscribe';
   }
 
   function getProviderLabel(provider) {
     const labels = {
       google: 'Google Calendar',
-      apple: 'Календара на устройството',
+      apple: 'Apple Calendar',
+      samsung: 'Samsung Calendar',
       outlook: 'Outlook',
     };
     return labels[provider] || 'календара';
@@ -56,6 +67,15 @@
     });
   }
 
+  function saveNotificationSettings(patch) {
+    const { loadAssistantSettings, saveAssistantSettings } = window.AIVA_SETTINGS;
+    const current = loadAssistantSettings();
+    saveAssistantSettings({
+      ...current,
+      notifications: { ...current.notifications, ...patch },
+    });
+  }
+
   function isConfigured() {
     const sync = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
     return sync.setupComplete && sync.provider && sync.provider !== 'none';
@@ -72,16 +92,26 @@
     const chip = document.getElementById('calendarSyncChip');
     if (!chip) return;
     const sync = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
+    const notif = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications || {};
+
     if (sync.setupComplete && sync.provider === 'subscribe') {
       chip.hidden = false;
-      chip.textContent = '📅 Календар';
-      chip.title = 'Задачите се синхронизират автоматично';
+      chip.textContent = '📅 Синхрон';
+      chip.title = 'Задачите се синхронизират автоматично с календара';
+    } else if (sync.setupComplete && sync.provider === 'native') {
+      chip.hidden = false;
+      chip.textContent = '📅 Устройство';
+      chip.title = 'Задачите се записват директно в календара на телефона';
     } else if (sync.setupComplete && sync.provider === 'manual') {
       chip.hidden = false;
       chip.textContent = '📅 Ръчен';
       chip.title = 'Новите задачи се предлагат за календар';
     } else {
       chip.hidden = true;
+    }
+
+    if (notif.enabled && !chip.hidden) {
+      chip.textContent += ' · 🔔';
     }
   }
 
@@ -96,17 +126,34 @@
     if (!modal) return;
 
     const provider = detectPreferredProvider();
+    const mode = detectRecommendedMode();
     const primaryBtn = document.getElementById('calendarOnboardPrimary');
     const text = document.getElementById('calendarOnboardText');
+    const deviceBtn = document.getElementById('calendarOnboardDevice');
+
+    const platformLabel = window.AIVA_NATIVE_CALENDAR?.getPlatformLabel?.() || getProviderLabel(provider);
 
     if (text) {
       text.textContent = task?.content
-        ? `„${task.content}" има дата. Да я добавим в ${getProviderLabel(provider)}?`
-        : `Задачите с дата могат да се появяват автоматично в ${getProviderLabel(provider)}.`;
+        ? `„${task.content}" има дата. Да я добавим в ${platformLabel} и да включим напомняния?`
+        : `Задачите с дата могат да се появяват в ${platformLabel} с автоматични напомняния на телефона.`;
     }
+
     if (primaryBtn) {
-      primaryBtn.textContent = `Свържи с ${getProviderLabel(provider)}`;
-      primaryBtn.dataset.provider = provider;
+      if (mode === 'native') {
+        primaryBtn.textContent = '📅 Добави в календара на телефона';
+        primaryBtn.dataset.mode = 'native';
+      } else {
+        primaryBtn.textContent = `Свържи с ${getProviderLabel(provider)}`;
+        primaryBtn.dataset.mode = 'subscribe';
+        primaryBtn.dataset.provider = provider;
+      }
+    }
+
+    if (deviceBtn) {
+      deviceBtn.textContent = mode === 'native'
+        ? 'Само тази задача (.ics)'
+        : 'Само тази задача в календара';
     }
 
     modal._pendingTask = task || null;
@@ -122,6 +169,13 @@
     modal._pendingTask = null;
   }
 
+  async function enableNotifications() {
+    if (!window.AIVA_NOTIFIER) return false;
+    const granted = await window.AIVA_NOTIFIER.requestPermission();
+    saveNotificationSettings({ enabled: granted });
+    return granted;
+  }
+
   async function enableAutoSync(provider, task) {
     clearDismiss();
     saveCalendarSettings({
@@ -132,9 +186,35 @@
       autoExportOnSave: false,
     });
 
+    await enableNotifications();
+
     const sync = window.AIVA_CALENDAR_SYNC;
     if (sync) {
       sync.openSubscribe(provider || detectPreferredProvider());
+    }
+
+    updateHeaderStatus();
+    updateBanner(false);
+    window.dispatchEvent(new CustomEvent('aiva:calendar-connected'));
+  }
+
+  async function enableNativeSync(task) {
+    clearDismiss();
+    saveCalendarSettings({
+      provider: 'native',
+      setupComplete: true,
+      preferredProvider: 'android-native',
+      autoExportOnSave: true,
+    });
+
+    await enableNotifications();
+
+    if (task?.due_date && window.AIVA_NATIVE_CALENDAR) {
+      try {
+        await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
+      } catch (e) {
+        if (e?.name !== 'AbortError') console.warn('Native calendar setup:', e);
+      }
     }
 
     updateHeaderStatus();
@@ -150,9 +230,11 @@
       autoExportOnSave: true,
     });
 
-    if (task?.due_date && window.AIVA_CALENDAR) {
+    await enableNotifications();
+
+    if (task?.due_date && window.AIVA_NATIVE_CALENDAR) {
       try {
-        await window.AIVA_CALENDAR.addToDevice(task);
+        await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
       } catch (e) {
         if (e?.name !== 'AbortError') console.warn('Device calendar export:', e);
       }
@@ -176,7 +258,6 @@
     if (!isConfigured() && hasDated && !isDismissed()) {
       const modal = document.getElementById('calendarOnboard');
       if (modal && !modal.classList.contains('visible')) {
-        // Gentle delayed prompt if user already has dated tasks but never connected
         setTimeout(() => {
           if (!isConfigured() && !isDismissed()) showModal(null);
         }, 1200);
@@ -190,10 +271,17 @@
     modal._bound = true;
 
     document.getElementById('calendarOnboardPrimary')?.addEventListener('click', async () => {
-      const provider = document.getElementById('calendarOnboardPrimary')?.dataset.provider || detectPreferredProvider();
+      const btn = document.getElementById('calendarOnboardPrimary');
+      const mode = btn?.dataset.mode || 'subscribe';
+      const provider = btn?.dataset.provider || detectPreferredProvider();
       const task = modal._pendingTask;
       hideModal();
-      await enableAutoSync(provider, task);
+
+      if (mode === 'native') {
+        await enableNativeSync(task);
+      } else {
+        await enableAutoSync(provider, task);
+      }
     });
 
     document.getElementById('calendarOnboardDevice')?.addEventListener('click', async () => {
@@ -231,12 +319,15 @@
 
   window.AIVA_CALENDAR_ONBOARD = {
     detectPreferredProvider,
+    detectRecommendedMode,
     isConfigured,
     shouldPrompt,
     maybePrompt,
     checkAfterLoad,
     enableAutoSync,
+    enableNativeSync,
     enableDevicePerTask,
+    enableNotifications,
     updateHeaderStatus,
     bindUI,
   };
