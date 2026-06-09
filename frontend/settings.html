@@ -221,9 +221,40 @@
 
     <!-- Calendar Sync -->
     <div class="section" id="calendar-sync">
-      <div class="section-title">📅 Синхронизация с календар</div>
+      <div class="section-title">📅 Календар</div>
       <div class="field">
-        <span class="field-label">Как да се синхронизира</span>
+        <span class="field-label">Свържи облачен календар (основен режим)</span>
+        <div class="subscribe-actions">
+          <button class="btn primary" type="button" id="connectGoogleBtn">Свържи Google</button>
+          <button class="btn primary" type="button" id="connectMicrosoftBtn">Свържи Outlook</button>
+        </div>
+        <p class="sync-note" id="cloudStatusText">Не е свързан облачен календар.</p>
+      </div>
+      <div class="field">
+        <span class="field-label">Избери календар след свързване</span>
+        <div class="row-grid">
+          <select id="cloudProviderSelect">
+            <option value="google">Google</option>
+            <option value="microsoft">Outlook</option>
+          </select>
+          <select id="cloudCalendarSelect">
+            <option value="">Няма заредени календари</option>
+          </select>
+        </div>
+        <div class="subscribe-actions" style="margin-top:10px">
+          <button class="btn" type="button" id="refreshCloudCalendarsBtn">Обнови календари</button>
+          <button class="btn" type="button" id="saveCloudCalendarBtn">Запази избор</button>
+          <button class="btn danger" type="button" id="disconnectCloudBtn">Разкачи провайдъра</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Apple / iCloud (втори режим)</span>
+        <p class="sync-note">iCloud е добавен като отделен режим чрез CalDAV/абонамент, за да запазим прост поток за масовите потребители (Google/Outlook).</p>
+        <button class="btn" type="button" id="connectAppleFallbackBtn">iCloud / Apple (fallback)</button>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+      <div class="field">
+        <span class="field-label">Fallback синхронизация (резервен режим)</span>
         <select id="calendarProvider">
           <option value="none">Изключено</option>
           <option value="subscribe">Автоматично — абонамент (препоръчано за iOS/уеб)</option>
@@ -491,6 +522,171 @@
       return API_BASE || WORKER_ORIGIN || location.origin;
     }
 
+    function getUserId() {
+      return localStorage.getItem('aiva_user_id') || '';
+    }
+
+    async function fetchCloudProviderStatus() {
+      const userId = getUserId();
+      if (!userId) return [];
+      const res = await fetch(`${getApiBase()}/api/calendar/providers/status/${encodeURIComponent(userId)}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.providers || [];
+    }
+
+    async function renderCloudStatus() {
+      const statuses = await fetchCloudProviderStatus();
+      const statusEl = document.getElementById('cloudStatusText');
+      const provider = document.getElementById('cloudProviderSelect').value;
+      const current = statuses.find((s) => s.provider === provider);
+
+      if (!current) {
+        statusEl.textContent = 'Не е свързан облачен календар.';
+        return;
+      }
+
+      if (!current.configured) {
+        statusEl.textContent = `${provider === 'google' ? 'Google' : 'Outlook'} не е конфигуриран в сървъра.`;
+        return;
+      }
+
+      statusEl.textContent = current.connected
+        ? `Свързан: ${provider === 'google' ? 'Google' : 'Outlook'}${current.selectedCalendarName ? ` · ${current.selectedCalendarName}` : ''}`
+        : `Не е свързан ${provider === 'google' ? 'Google' : 'Outlook'} календар.`;
+    }
+
+    async function loadCloudCalendars() {
+      const userId = getUserId();
+      const provider = document.getElementById('cloudProviderSelect').value;
+      const select = document.getElementById('cloudCalendarSelect');
+      select.innerHTML = '<option value=\"\">Зареждане...</option>';
+
+      if (!userId) {
+        select.innerHTML = '<option value=\"\">Липсва user_id</option>';
+        return;
+      }
+
+      const res = await fetch(`${getApiBase()}/api/calendar/calendars?user_id=${encodeURIComponent(userId)}&provider=${encodeURIComponent(provider)}`);
+      if (!res.ok) {
+        select.innerHTML = '<option value=\"\">Няма връзка с провайдъра</option>';
+        await renderCloudStatus();
+        return;
+      }
+
+      const data = await res.json();
+      const calendars = data.calendars || [];
+      if (!calendars.length) {
+        select.innerHTML = '<option value=\"\">Няма налични календари</option>';
+        await renderCloudStatus();
+        return;
+      }
+
+      select.innerHTML = '';
+      for (const cal of calendars) {
+        const opt = document.createElement('option');
+        opt.value = cal.id;
+        opt.textContent = `${cal.name}${cal.primary ? ' (основен)' : ''}`;
+        if (cal.selected) opt.selected = true;
+        select.appendChild(opt);
+      }
+      await renderCloudStatus();
+    }
+
+    async function startCloudConnect(provider) {
+      const userId = getUserId();
+      if (!userId) {
+        alert('Липсва потребителски ID');
+        return;
+      }
+
+      const res = await fetch(`${getApiBase()}/api/calendar/connect/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          provider,
+          redirect_uri: `${location.origin}${location.pathname}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        alert(data.error || 'Неуспешно стартиране на OAuth');
+        return;
+      }
+
+      localStorage.setItem('aiva_cloud_pending_provider', provider);
+      location.href = data.url;
+    }
+
+    async function handleCloudOauthCallback() {
+      const code = new URLSearchParams(location.search).get('code');
+      const state = new URLSearchParams(location.search).get('state');
+      if (!code || !state) return;
+
+      const provider = localStorage.getItem('aiva_cloud_pending_provider');
+      const userId = getUserId();
+      if (!provider || !userId) return;
+
+      const res = await fetch(`${getApiBase()}/api/calendar/connect/callback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          provider,
+          code,
+          state,
+          redirect_uri: `${location.origin}${location.pathname}`,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Неуспешно свързване на календара');
+      }
+
+      localStorage.removeItem('aiva_cloud_pending_provider');
+      history.replaceState({}, document.title, location.pathname + location.hash);
+    }
+
+    async function saveSelectedCloudCalendar() {
+      const userId = getUserId();
+      const provider = document.getElementById('cloudProviderSelect').value;
+      const calendarId = document.getElementById('cloudCalendarSelect').value;
+      if (!userId || !calendarId) {
+        alert('Избери календар');
+        return;
+      }
+
+      const res = await fetch(`${getApiBase()}/api/calendar/calendars/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, provider, calendar_id: calendarId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Неуспешно запазване');
+        return;
+      }
+      await renderCloudStatus();
+      showSavedToast();
+    }
+
+    async function disconnectCloudProvider() {
+      const userId = getUserId();
+      const provider = document.getElementById('cloudProviderSelect').value;
+      if (!userId) return;
+      if (!confirm('Сигурни ли сте, че искате да разкачите провайдъра?')) return;
+
+      await fetch(`${getApiBase()}/api/calendar/connect`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, provider }),
+      });
+
+      await loadCloudCalendars();
+      await renderCloudStatus();
+    }
+
     function updateCalendarSyncUI() {
       const provider = document.getElementById('calendarProvider').value;
       const subscribeSection = document.getElementById('subscribeSection');
@@ -596,6 +792,17 @@
     });
 
     document.getElementById('calendarProvider').addEventListener('change', updateCalendarSyncUI);
+    document.getElementById('cloudProviderSelect').addEventListener('change', async () => {
+      await loadCloudCalendars();
+    });
+    document.getElementById('connectGoogleBtn').addEventListener('click', () => startCloudConnect('google'));
+    document.getElementById('connectMicrosoftBtn').addEventListener('click', () => startCloudConnect('microsoft'));
+    document.getElementById('refreshCloudCalendarsBtn').addEventListener('click', loadCloudCalendars);
+    document.getElementById('saveCloudCalendarBtn').addEventListener('click', saveSelectedCloudCalendar);
+    document.getElementById('disconnectCloudBtn').addEventListener('click', disconnectCloudProvider);
+    document.getElementById('connectAppleFallbackBtn').addEventListener('click', () => {
+      try { calendarSync.openSubscribe('apple'); } catch (e) { alert(e.message); }
+    });
 
     document.getElementById('copyIcsBtn').addEventListener('click', () => {
       const input = document.getElementById('icsUrl');
@@ -709,7 +916,12 @@
       e.target.value = '';
     });
 
-    populateUI();
+    (async () => {
+      await handleCloudOauthCallback();
+      populateUI();
+      await loadCloudCalendars();
+      await renderCloudStatus();
+    })();
   </script>
 </body>
 </html>
