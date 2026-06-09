@@ -5,17 +5,39 @@ import {
   deleteTask,
   duplicateTask,
   getIncompleteTasks,
+  getTaskById,
   markTaskDone,
   registerUser,
   searchTasks,
   updateTask,
 } from './tasks';
 import { handleCron } from './cron';
+import {
+  calendarCapabilities,
+  completeOAuthConnect,
+  disconnectProvider,
+  getProviderStatuses,
+  listExternalEvents,
+  listProviderCalendars,
+  normalizeProvider,
+  removeTaskFromCloudCalendars,
+  requestOrigin,
+  setSelectedCalendar,
+  startOAuthConnect,
+  syncTaskToCloudCalendars,
+} from './calendar';
 
 interface Env {
   DB: D1Database;
   SESSIONS: KVNamespace;
   GEMINI_API_KEY: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_REDIRECT_URI?: string;
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
+  MICROSOFT_REDIRECT_URI?: string;
+  MICROSOFT_TENANT_ID?: string;
 }
 
 // --- Cost protection constants ---
@@ -49,6 +71,10 @@ app.patch('/api/tasks/:id/done', async (c) => {
   const id = parseInt(c.req.param('id'), 10);
   const success = await markTaskDone(c.env.DB, id);
   if (!success) return c.json({ error: 'Задачата не е намерена' }, 404);
+  const updatedTask = await getTaskById(c.env.DB, id);
+  if (updatedTask) {
+    await removeTaskFromCloudCalendars(c.env, updatedTask.user_id, updatedTask.id, requestOrigin(new URL(c.req.url)));
+  }
   return c.json({ success: true });
 });
 
@@ -94,6 +120,7 @@ app.patch('/api/tasks/:id', async (c) => {
       body.user_id
     );
     if (!task) return c.json({ error: 'Задачата не е намерена' }, 404);
+    await syncTaskToCloudCalendars(c.env, task, requestOrigin(new URL(c.req.url)));
     return c.json({ success: true, task });
   } catch (e) {
     console.error('Task update error:', e);
@@ -110,8 +137,12 @@ app.delete('/api/tasks/:id', async (c) => {
   }
 
   try {
+    const existingTask = await getTaskById(c.env.DB, id, body.user_id);
     const success = await deleteTask(c.env.DB, id, body.user_id);
     if (!success) return c.json({ error: 'Задачата не е намерена' }, 404);
+    if (existingTask) {
+      await removeTaskFromCloudCalendars(c.env, existingTask.user_id, existingTask.id, requestOrigin(new URL(c.req.url)));
+    }
     return c.json({ success: true });
   } catch (e) {
     console.error('Task delete error:', e);
@@ -236,11 +267,131 @@ app.post('/api/tasks', async (c) => {
       repeat_rule: body.repeat_rule || null,
       tags: body.tags || null,
     });
+    await syncTaskToCloudCalendars(c.env, task, requestOrigin(new URL(c.req.url)));
     return c.json({ success: true, task });
   } catch (e) {
     console.error('Task save error:', e);
     return c.json({ error: 'Грешка при запис на задачата' }, 500);
   }
+});
+
+// --- Cloud calendar providers (Google + Microsoft primary flow) ---
+
+app.get('/api/calendar/providers/status/:user_id', async (c) => {
+  const userId = c.req.param('user_id');
+  const providers = await getProviderStatuses(c.env, userId);
+  return c.json({
+    providers,
+    capabilities: calendarCapabilities(),
+  });
+});
+
+app.post('/api/calendar/connect/start', async (c) => {
+  const body = await c.req.json<{
+    user_id?: string;
+    provider?: string;
+    redirect_uri?: string;
+  }>().catch(() => ({} as { user_id?: string; provider?: string; redirect_uri?: string }));
+
+  const provider = normalizeProvider(body.provider);
+  if (!body.user_id || !provider) {
+    return c.json({ error: 'user_id и provider са задължителни' }, 400);
+  }
+
+  try {
+    const { url, state } = await startOAuthConnect(
+      c.env,
+      provider,
+      body.user_id,
+      requestOrigin(new URL(c.req.url)),
+      body.redirect_uri
+    );
+    return c.json({ url, state });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : 'OAuth start error' }, 400);
+  }
+});
+
+app.post('/api/calendar/connect/callback', async (c) => {
+  const body = await c.req.json<{
+    user_id?: string;
+    provider?: string;
+    code?: string;
+    state?: string;
+    redirect_uri?: string;
+  }>().catch(() => ({} as { user_id?: string; provider?: string; code?: string; state?: string; redirect_uri?: string }));
+
+  const provider = normalizeProvider(body.provider);
+  if (!body.user_id || !provider || !body.code || !body.state) {
+    return c.json({ error: 'user_id, provider, code и state са задължителни' }, 400);
+  }
+
+  try {
+    await completeOAuthConnect(c.env, {
+      userId: body.user_id,
+      provider,
+      code: body.code,
+      state: body.state,
+      origin: requestOrigin(new URL(c.req.url)),
+      redirectUri: body.redirect_uri,
+    });
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : 'OAuth callback error' }, 400);
+  }
+});
+
+app.get('/api/calendar/calendars', async (c) => {
+  const userId = c.req.query('user_id');
+  const provider = normalizeProvider(c.req.query('provider'));
+  if (!userId || !provider) {
+    return c.json({ error: 'user_id и provider са задължителни' }, 400);
+  }
+
+  try {
+    const calendars = await listProviderCalendars(c.env, userId, provider, requestOrigin(new URL(c.req.url)));
+    return c.json({ calendars });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : 'Calendar list error' }, 500);
+  }
+});
+
+app.post('/api/calendar/calendars/select', async (c) => {
+  const body = await c.req.json<{
+    user_id?: string;
+    provider?: string;
+    calendar_id?: string;
+  }>().catch(() => ({} as { user_id?: string; provider?: string; calendar_id?: string }));
+  const provider = normalizeProvider(body.provider);
+  if (!body.user_id || !provider || !body.calendar_id) {
+    return c.json({ error: 'user_id, provider и calendar_id са задължителни' }, 400);
+  }
+
+  await setSelectedCalendar(c.env.DB, body.user_id, provider, body.calendar_id);
+  return c.json({ success: true });
+});
+
+app.delete('/api/calendar/connect', async (c) => {
+  const body = await c.req.json<{ user_id?: string; provider?: string }>().catch(() => ({} as { user_id?: string; provider?: string }));
+  const provider = normalizeProvider(body.provider);
+  if (!body.user_id || !provider) {
+    return c.json({ error: 'user_id и provider са задължителни' }, 400);
+  }
+  await disconnectProvider(c.env.DB, body.user_id, provider);
+  return c.json({ success: true });
+});
+
+app.get('/api/calendar/events', async (c) => {
+  const userId = c.req.query('user_id');
+  const provider = normalizeProvider(c.req.query('provider'));
+  if (!userId || !provider) {
+    return c.json({ error: 'user_id и provider са задължителни' }, 400);
+  }
+
+  const from = c.req.query('from') || new Date().toISOString();
+  const to = c.req.query('to') || new Date(Date.now() + 14 * 86400000).toISOString();
+  const events = await listExternalEvents(c.env, userId, provider, requestOrigin(new URL(c.req.url)), from, to);
+  return c.json({ events });
 });
 
 // --- Search tasks endpoint (for voice commands) ---
