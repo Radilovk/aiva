@@ -43,6 +43,9 @@ const addToCalendarBtn = document.getElementById('addToCalendarBtn');
 const discussTaskBtn = document.getElementById('discussTaskBtn');
 const duplicateRowsField = document.getElementById('duplicateRows');
 const taskIdField = document.getElementById('taskId');
+const upcomingStrip = document.getElementById('upcomingStrip');
+const upcomingList = document.getElementById('upcomingList');
+const upcomingCount = document.getElementById('upcomingCount');
 
 // --- State ---
 let client = null;
@@ -324,6 +327,65 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function getTaskDateTime(task) {
+  if (!task?.due_date) return null;
+  const [year, month, day] = task.due_date.split('-').map(Number);
+  let hours = 9;
+  let minutes = 0;
+  if (task.due_time) {
+    [hours, minutes] = task.due_time.split(':').map(Number);
+  }
+  return new Date(year, month - 1, day, hours, minutes);
+}
+
+function isTaskOverdue(task) {
+  const dt = getTaskDateTime(task);
+  if (!dt) return false;
+  return dt < new Date();
+}
+
+function getTaskCountdown(task) {
+  const dt = getTaskDateTime(task);
+  if (!dt || !window.AIVA_NOTIFIER?.formatCountdown) return '';
+  return window.AIVA_NOTIFIER.formatCountdown(dt.getTime() - Date.now());
+}
+
+function renderUpcomingStrip() {
+  if (!upcomingStrip || !upcomingList) return;
+  const show = assistantSettings.notifications?.showUpcomingStrip !== false;
+  if (!show || !window.AIVA_NOTIFIER?.getUpcomingTasks) {
+    upcomingStrip.hidden = true;
+    return;
+  }
+
+  const upcoming = window.AIVA_NOTIFIER.getUpcomingTasks(tasks, 24).slice(0, 5);
+  if (!upcoming.length) {
+    upcomingStrip.hidden = true;
+    return;
+  }
+
+  upcomingStrip.hidden = false;
+  upcomingCount.textContent = String(upcoming.length);
+
+  upcomingList.innerHTML = upcoming.map(({ task, msUntil }) => {
+    const overdue = msUntil < 0;
+    const countdown = window.AIVA_NOTIFIER.formatCountdown(msUntil);
+    return `
+      <div class="upcoming-item ${overdue ? 'is-overdue' : ''}" data-id="${task.id}" tabindex="0">
+        <div class="upcoming-time">${escapeHtml(task.due_time || '—')}</div>
+        <div class="upcoming-body">
+          <div class="upcoming-title">${escapeHtml(task.content)}</div>
+          <div class="upcoming-countdown">${escapeHtml(countdown)}</div>
+        </div>
+        <div class="upcoming-actions">
+          <button class="upcoming-action-btn" data-action="snooze" data-id="${task.id}" type="button" title="Отложи 10 мин">⏰</button>
+          <button class="upcoming-action-btn" data-action="done" data-id="${task.id}" type="button" title="Готово">✓</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function taskMeta(task) {
   const meta = [];
   if (task.due_time) meta.push(task.due_time);
@@ -335,8 +397,13 @@ function taskMeta(task) {
 
 function renderTaskCard(task, mode = 'agenda') {
   const meta = taskMeta(task);
+  const overdue = isTaskOverdue(task);
+  const countdown = getTaskCountdown(task);
+  const synced = window.AIVA_NATIVE_CALENDAR?.isTaskSynced?.(task.id);
+  const statusClass = overdue ? 'is-overdue' : (countdown.startsWith('след') && countdown.includes('мин') && parseInt(countdown.match(/\d+/)?.[0] || '999', 10) <= 60 ? 'is-upcoming' : '');
+
   return `
-    <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')}" data-id="${task.id}" tabindex="0">
+    <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')} ${statusClass}" data-id="${task.id}" tabindex="0">
       <button class="task-check" data-id="${task.id}" aria-label="Маркирай като готова" type="button">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
@@ -344,10 +411,12 @@ function renderTaskCard(task, mode = 'agenda') {
         <div class="task-row">
           <div class="task-text">${escapeHtml(task.content)}</div>
           <span class="priority-pill">П${escapeHtml(task.priority || 3)}</span>
+          ${synced ? '<span class="calendar-badge">📅</span>' : ''}
         </div>
         <div class="task-info">
           ${task.due_date && mode !== 'month' ? `<span>${escapeHtml(task.due_date)}</span>` : ''}
           ${meta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}
+          ${countdown ? `<span class="task-countdown">${escapeHtml(countdown)}</span>` : ''}
           ${task.repeat_rule ? `<span>↻ ${escapeHtml(task.repeat_rule)}</span>` : ''}
         </div>
         ${task.notes ? `<div class="task-note">${escapeHtml(task.notes)}</div>` : ''}
@@ -467,6 +536,7 @@ function renderMonthView() {
 function renderCalendar() {
   setActiveViewButton();
   tasksCount.textContent = tasks.length;
+  renderUpcomingStrip();
 
   if (calendarView === 'day') {
     renderAgendaView([currentDate]);
@@ -704,6 +774,9 @@ async function loadTasks() {
 async function markDone(taskId) {
   try {
     await fetch(`${API_BASE}/api/tasks/${taskId}/done`, { method: 'PATCH' });
+    if (window.AIVA_CALENDAR_SYNC?.onTaskDone) {
+      await window.AIVA_CALENDAR_SYNC.onTaskDone(taskId);
+    }
     await loadTasks();
   } catch (e) {
     console.error('markDone:', e);
@@ -785,6 +858,9 @@ async function removeTask(taskId) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Грешка при изтриване');
+  if (window.AIVA_CALENDAR_SYNC?.onTaskRemoved) {
+    await window.AIVA_CALENDAR_SYNC.onTaskRemoved(taskId);
+  }
   await loadTasks();
 }
 
@@ -1178,8 +1254,11 @@ addToCalendarBtn.addEventListener('click', async () => {
     return;
   }
   try {
-    const result = await window.AIVA_CALENDAR.addToDevice(task);
-    if (result !== 'aborted') {
+    const native = window.AIVA_NATIVE_CALENDAR;
+    const result = native
+      ? await native.addToDeviceCalendar(task)
+      : await window.AIVA_CALENDAR.addToDevice(task);
+    if (result?.method !== 'aborted' && result !== 'aborted') {
       showToast({ content: 'Добавено в календара на устройството', emotion: 'neutral', priority: 3 });
     }
   } catch (error) {
@@ -1206,6 +1285,43 @@ window.addEventListener('aiva:calendar-connected', () => {
   showToast({ content: 'Календарът е свързан', emotion: 'neutral', priority: 3 });
 });
 
+window.addEventListener('aiva:task-done-from-notif', () => {
+  loadTasks();
+});
+
+window.addEventListener('aiva:notification-fired', () => {
+  renderUpcomingStrip();
+});
+
+if (upcomingList) {
+  upcomingList.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (btn) {
+      e.stopPropagation();
+      const taskId = btn.dataset.id;
+      const action = btn.dataset.action;
+      const task = getTaskById(taskId);
+      if (action === 'done') {
+        await markDone(taskId);
+      } else if (action === 'snooze' && task && window.AIVA_NOTIFIER) {
+        await window.AIVA_NOTIFIER.snoozeTask(taskId, task.content, 10);
+        showToast({ content: 'Напомнянето е отложено с 10 мин', emotion: 'neutral', priority: 3 });
+      }
+      return;
+    }
+    const item = e.target.closest('.upcoming-item');
+    if (item) openTaskModal(getTaskById(item.dataset.id));
+  });
+}
+
+// Refresh countdowns every minute
+setInterval(() => {
+  if (tasks.length) {
+    renderUpcomingStrip();
+    renderCalendar();
+  }
+}, 60000);
+
 applyPreferences();
 renderCalendar();
 loadTasks();
@@ -1215,6 +1331,18 @@ if (window.AIVA_NOTIFIER) {
   window.AIVA_NOTIFIER.init().then(() => {
     if (assistantSettings.notifications?.enabled) {
       window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
+    }
+  });
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', async (event) => {
+    if (event.data?.type === 'aiva:snooze' && window.AIVA_NOTIFIER) {
+      const task = getTaskById(event.data.taskId);
+      if (task) {
+        await window.AIVA_NOTIFIER.snoozeTask(event.data.taskId, task.content, event.data.minutes || 10);
+        showToast({ content: 'Напомнянето е отложено', emotion: 'neutral', priority: 3 });
+      }
     }
   });
 }

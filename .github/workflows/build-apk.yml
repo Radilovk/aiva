@@ -60,11 +60,14 @@ jobs:
       - name: Patch AndroidManifest
         run: python3 android-res/patch-local-notifications.py
 
-      - name: Copy BroadcastReceiver
+      - name: Copy native Java sources
         run: |
           mkdir -p android/app/src/main/java/com/capacitorjs/plugins/localnotifications/
+          mkdir -p android/app/src/main/java/com/aiva/assistant/
           cp android-res/java/com/capacitorjs/plugins/localnotifications/AivaNotificationReceiver.java \
              android/app/src/main/java/com/capacitorjs/plugins/localnotifications/
+          cp android-res/java/com/aiva/assistant/AivaCalendarPlugin.java \
+             android/app/src/main/java/com/aiva/assistant/
 
       - name: Copy ProGuard rules
         run: cp android-res/proguard-rules.pro android/app/proguard-rules.pro

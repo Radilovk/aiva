@@ -305,6 +305,10 @@ app.get('/api/calendar.ics', async (c) => {
   const userId = c.req.query('user_id');
   if (!userId) return c.text('user_id е задължителен', 400);
 
+  const reminderParam = parseInt(c.req.query('reminder') || '15', 10);
+  const reminderMinutes = Math.min(120, Math.max(0, Number.isNaN(reminderParam) ? 15 : reminderParam));
+  const remindAtStart = c.req.query('at_start') !== '0';
+
   try {
     const tasks = await getIncompleteTasks(c.env.DB, userId);
     const nowStamp = toICSStamp(null);
@@ -348,11 +352,20 @@ app.get('/api/calendar.ics', async (c) => {
       if (task.location) lines.push(`LOCATION:${escapeICS(task.location)}`);
       lines.push(`PRIORITY:${Math.min(9, task.priority * 2)}`);
       if (task.tags) lines.push(`CATEGORIES:${escapeICS(task.tags)}`);
-      lines.push('BEGIN:VALARM');
-      lines.push('TRIGGER:-PT15M');
-      lines.push('ACTION:DISPLAY');
-      lines.push(`DESCRIPTION:${escapeICS(task.content)}`);
-      lines.push('END:VALARM');
+      if (reminderMinutes > 0) {
+        lines.push('BEGIN:VALARM');
+        lines.push(`TRIGGER:-PT${reminderMinutes}M`);
+        lines.push('ACTION:DISPLAY');
+        lines.push(`DESCRIPTION:${escapeICS(task.content)}`);
+        lines.push('END:VALARM');
+      }
+      if (remindAtStart) {
+        lines.push('BEGIN:VALARM');
+        lines.push('TRIGGER:-PT0M');
+        lines.push('ACTION:DISPLAY');
+        lines.push(`DESCRIPTION:${escapeICS('Започва: ' + task.content)}`);
+        lines.push('END:VALARM');
+      }
       lines.push('END:VEVENT');
     }
 

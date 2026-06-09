@@ -71,9 +71,11 @@
     notifications: {
       enabled: false,
       reminderMinutes: 15,
+      remindAtStart: true,
       quietHoursStart: '22:00',
       quietHoursEnd: '07:00',
       sound: true,
+      showUpcomingStrip: true,
     },
     calendarSync: {
       provider: 'none',
@@ -109,6 +111,9 @@
     merged.safety.maxDuplicateDays = Math.min(365, Math.max(1, parseInt(String(merged.safety.maxDuplicateDays), 10) || 30));
     if (merged.calendarSync.provider === 'ics') merged.calendarSync.provider = 'subscribe';
     if (merged.calendarSync.provider === 'device') merged.calendarSync.provider = 'manual';
+    if (merged.notifications.reminderMinutes) {
+      merged.notifications.reminderMinutes = Math.min(120, Math.max(0, parseInt(String(merged.notifications.reminderMinutes), 10) || 15));
+    }
     if (merged.calendarSync.provider !== 'none' && !merged.calendarSync.setupComplete) {
       merged.calendarSync.setupComplete = true;
     }

@@ -208,6 +208,15 @@
         <span class="toggle-label">Звук при нотификация</span>
         <div class="toggle" id="toggleSound"></div>
       </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Напомняне в момента на събитието</span>
+        <div class="toggle" id="toggleRemindAtStart"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Показвай лента „Предстоящи"</span>
+        <div class="toggle" id="toggleUpcomingStrip"></div>
+      </div>
+      <p class="sync-note">На Android APK напомнянията работят дори когато приложението е затворено. На iOS и уеб — включете календарния абонамент за напомняния от системния календар.</p>
     </div>
 
     <!-- Calendar Sync -->
@@ -217,16 +226,18 @@
         <span class="field-label">Как да се синхронизира</span>
         <select id="calendarProvider">
           <option value="none">Изключено</option>
-          <option value="subscribe">Автоматично (препоръчано)</option>
+          <option value="subscribe">Автоматично — абонамент (препоръчано за iOS/уеб)</option>
+          <option value="native">Директно в календара на телефона (Android APK)</option>
           <option value="manual">При всяка нова задача</option>
         </select>
-        <div class="field-hint">Автоматичният режим показва всички задачи в избрания от вас календар. Приложението ще ви подкани при първа задача с дата.</div>
+        <div class="field-hint">Абонаментът синхронизира всички задачи в Google / Apple / Samsung / Outlook календар. На Android APK директният режим записва събития в системния календар с напомняния.</div>
       </div>
       <div class="field" id="subscribeSection" style="display:none">
         <span class="field-label">Абонирай се (избери календар)</span>
         <div class="subscribe-actions">
           <button class="btn primary" type="button" id="subscribeGoogleBtn">Google Calendar</button>
-          <button class="btn" type="button" id="subscribeAppleBtn">Apple / устройство</button>
+          <button class="btn" type="button" id="subscribeAppleBtn">Apple Calendar</button>
+          <button class="btn" type="button" id="subscribeSamsungBtn">Samsung Calendar</button>
           <button class="btn" type="button" id="subscribeOutlookBtn">Outlook</button>
         </div>
         <div class="ics-url" style="margin-top:12px">
@@ -244,6 +255,10 @@
           <div class="toggle" id="toggleAutoExport"></div>
         </div>
         <p class="sync-note">При всяка нова задача с дата ще се отвори споделяне към календарното приложение на устройството — изберете кой календар да ползвате.</p>
+      </div>
+      <div class="field" id="nativeSection" style="display:none">
+        <p class="sync-note">Директен режим за Android APK — задачите се записват в системния календар с напомняния. Изисква разрешение за календар при първо ползване.</p>
+        <button class="btn primary" type="button" id="requestCalendarPermBtn">Разреши достъп до календара</button>
       </div>
     </div>
 
@@ -404,7 +419,10 @@
 
   <script src="config.js"></script>
   <script src="settings.js"></script>
+  <script src="lib/icsUtils.js"></script>
+  <script src="local-scheduler.js"></script>
   <script src="lib/deviceCalendar.js"></script>
+  <script src="lib/nativeCalendar.js"></script>
   <script src="lib/calendarSync.js"></script>
   <script>
     const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.AIVA_SETTINGS;
@@ -420,10 +438,12 @@
       document.getElementById('quietStart').value = settings.notifications?.quietHoursStart || '22:00';
       document.getElementById('quietEnd').value = settings.notifications?.quietHoursEnd || '07:00';
       setToggle('toggleSound', settings.notifications?.sound !== false);
+      setToggle('toggleRemindAtStart', settings.notifications?.remindAtStart !== false);
+      setToggle('toggleUpcomingStrip', settings.notifications?.showUpcomingStrip !== false);
 
       // Calendar sync
       const provider = settings.calendarSync?.provider || 'none';
-      const normalizedProvider = provider === 'ics' || provider === 'device' ? (provider === 'ics' ? 'subscribe' : 'manual') : provider;
+      const normalizedProvider = provider === 'ics' ? 'subscribe' : provider === 'device' ? 'manual' : provider;
       document.getElementById('calendarProvider').value = normalizedProvider;
       setToggle('toggleAutoExport', settings.calendarSync?.autoExportOnSave);
       updateCalendarSyncUI();
@@ -478,6 +498,8 @@
 
       subscribeSection.style.display = provider === 'subscribe' ? '' : 'none';
       manualSection.style.display = provider === 'manual' ? '' : 'none';
+      const nativeSection = document.getElementById('nativeSection');
+      if (nativeSection) nativeSection.style.display = provider === 'native' ? '' : 'none';
 
       if (provider === 'subscribe') {
         const userId = localStorage.getItem('aiva_user_id') || 'unknown';
@@ -520,9 +542,11 @@
         notifications: {
           enabled: getToggle('toggleNotifications'),
           reminderMinutes: parseInt(document.getElementById('reminderMinutes').value, 10) || 15,
+          remindAtStart: getToggle('toggleRemindAtStart'),
           quietHoursStart: document.getElementById('quietStart').value,
           quietHoursEnd: document.getElementById('quietEnd').value,
           sound: getToggle('toggleSound'),
+          showUpcomingStrip: getToggle('toggleUpcomingStrip'),
         },
         calendarSync: {
           provider: document.getElementById('calendarProvider').value,
@@ -588,6 +612,9 @@
     document.getElementById('subscribeAppleBtn').addEventListener('click', () => {
       try { calendarSync.openSubscribe('apple'); } catch (e) { alert(e.message); }
     });
+    document.getElementById('subscribeSamsungBtn')?.addEventListener('click', () => {
+      try { calendarSync.openSubscribe('samsung'); } catch (e) { alert(e.message); }
+    });
     document.getElementById('subscribeOutlookBtn').addEventListener('click', () => {
       try { calendarSync.openSubscribe('outlook'); } catch (e) { alert(e.message); }
     });
@@ -602,9 +629,29 @@
       }
     });
 
-    document.getElementById('saveBtn').addEventListener('click', () => {
+    document.getElementById('requestCalendarPermBtn')?.addEventListener('click', async () => {
+      if (!window.AIVA_NATIVE_CALENDAR) {
+        alert('Нативният календар е наличен само в Android APK');
+        return;
+      }
+      const result = await window.AIVA_NATIVE_CALENDAR.requestNativePermissions();
+      alert(result.granted ? '✓ Достъпът до календара е разрешен' : 'Достъпът е отказан — опитайте от настройките на телефона');
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
       settings = saveAssistantSettings(collectSettings());
-      if (getToggle('toggleNotifications')) enablePushNotifications();
+      if (getToggle('toggleNotifications')) {
+        if (window.AIVA_NOTIFIER) {
+          const granted = await window.AIVA_NOTIFIER.requestPermission();
+          if (granted) {
+            const userId = localStorage.getItem('aiva_user_id');
+            const res = await fetch(`${API_BASE || WORKER_ORIGIN}/api/tasks/${encodeURIComponent(userId)}`);
+            const data = await res.json();
+            await window.AIVA_NOTIFIER.scheduleAll(data.tasks || [], settings.notifications.reminderMinutes);
+          }
+        }
+        enablePushNotifications();
+      }
       showSavedToast();
     });
 
