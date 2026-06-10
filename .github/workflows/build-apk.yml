@@ -39,7 +39,7 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android \
             @capacitor/local-notifications @capacitor/preferences @capacitor/haptics \
-            @capacitor/app @capacitor-community/calendar
+            @capacitor/app
 
       - name: Build Capacitor web shell
         run: |
