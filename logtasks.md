@@ -1,5 +1,35 @@
 # AIVA — Лог на задачите
 
+## 2026-06-10: Входящ поток на外部 календарни събития — syncIncomingEvents
+
+### Какво е имплементирано
+- `frontend/lib/calendarCrud.js`: добавена функция `getLocalEventIds()`, която връща Set от всички Android eventId-та, записани от AIVA — използва се за защита срещу infinite sync loops.
+- `frontend/lib/calendarSync.js`: добавена `syncIncomingEvents(startDate, endDate)` — извиква `readAivaEvents`, филтрира AIVA-създадени събития чрез `getLocalEventIds`, нормализира резултата до AIVA task модел с `isExternal: true`.
+- `frontend/app.js`:
+  - Добавена state variable `externalEvents = []`.
+  - Добавена `refreshExternalEvents()` — изчислява date range спрямо текущия view, зарежда external events, рендерира.
+  - `tasksForDate()` включва `externalEvents` при рендера.
+  - `renderTaskCard()` добавя CSS клас `external-event` и `data-external="true"` за readonly събития.
+  - Click и keydown handler-и игнорират карти с `data-external`.
+  - `refreshExternalEvents()` се вика при: init, `moveCalendar`, смяна на view, „Днес" бутон.
+
+
+
+### Какво е имплементирано
+- Добавен е нов абстрактен слой `frontend/lib/calendarCrud.js` за календарни CRUD операции с platform routing:
+  - `Capacitor.getPlatform() === 'android'` → `Calendar.requestPermissions/getCalendars/createEvent/updateEvent/deleteEvent` към локалния календар на устройството.
+  - `web` → запазва възможност за текущия fetch flow (чрез web operation fallback).
+- Добавен е Android local calendar selection flow в `frontend/settings.html`:
+  - условен UI рендер за `web` срещу `android`;
+  - бутон „Свържи локален календар“, заявка за права, зареждане на локални календари, `<select>` и запазване на `calendarId` в `localStorage`.
+- Интеграция на новия CRUD слой в календарната синхронизация:
+  - `frontend/lib/calendarSync.js` използва `AIVA_CALENDAR_CRUD` за Android native режим при create/update/delete.
+- Обновени asset/script връзки:
+  - `frontend/index.html`, `frontend/settings.html`, `frontend/sw.js` (cache bump до `aiva-v3`) включват `lib/calendarCrud.js`.
+- Android build конфигурация:
+  - `.github/workflows/build-apk.yml` добавя `@capacitor-community/calendar` към Capacitor зависимостите.
+  - Calendar permissions (`READ_CALENDAR`/`WRITE_CALENDAR`) остават покрити от `android-res/patch-local-notifications.py`.
+
 ## 2026-06-09: Feature — опростена cloud calendar интеграция (Google + Outlook) + fallback режими
 
 ### Какво е имплементирано

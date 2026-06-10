@@ -222,7 +222,7 @@
     <!-- Calendar Sync -->
     <div class="section" id="calendar-sync">
       <div class="section-title">📅 Календар</div>
-      <div class="field">
+      <div class="field" data-calendar-platform="web">
         <span class="field-label">Свържи облачен календар (основен режим)</span>
         <div class="subscribe-actions">
           <button class="btn primary" type="button" id="connectGoogleBtn">Свържи Google</button>
@@ -230,7 +230,7 @@
         </div>
         <p class="sync-note" id="cloudStatusText">Не е свързан облачен календар.</p>
       </div>
-      <div class="field">
+      <div class="field" data-calendar-platform="web">
         <span class="field-label">Избери календар след свързване</span>
         <div class="row-grid">
           <select id="cloudProviderSelect">
@@ -247,10 +247,21 @@
           <button class="btn danger" type="button" id="disconnectCloudBtn">Разкачи провайдъра</button>
         </div>
       </div>
-      <div class="field">
+      <div class="field" data-calendar-platform="web">
         <span class="field-label">Apple / iCloud (втори режим)</span>
         <p class="sync-note">iCloud е добавен като отделен режим чрез CalDAV/абонамент, за да запазим прост поток за масовите потребители (Google/Outlook).</p>
         <button class="btn" type="button" id="connectAppleFallbackBtn">iCloud / Apple (fallback)</button>
+      </div>
+      <div class="field" id="androidLocalCalendarSection" data-calendar-platform="android" style="display:none">
+        <span class="field-label">Свържи локален календар</span>
+        <button class="btn primary" type="button" id="connectLocalCalendarBtn">Свържи локален календар</button>
+        <div class="row-grid" id="localCalendarPicker" style="margin-top:10px;display:none">
+          <select id="localCalendarSelect">
+            <option value="">Няма намерени локални календари</option>
+          </select>
+          <button class="btn" type="button" id="saveLocalCalendarBtn">Запази</button>
+        </div>
+        <p class="sync-note" id="localCalendarStatusText">Не е избран локален календар.</p>
       </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
       <div class="field">
@@ -454,11 +465,15 @@
   <script src="local-scheduler.js"></script>
   <script src="lib/deviceCalendar.js"></script>
   <script src="lib/nativeCalendar.js"></script>
+  <script src="lib/calendarCrud.js"></script>
   <script src="lib/calendarSync.js"></script>
   <script>
     const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.AIVA_SETTINGS;
     const { API_BASE, WORKER_ORIGIN } = window.AIVA_CONFIG;
     const calendarSync = window.AIVA_CALENDAR_SYNC;
+    const calendarCrud = window.AIVA_CALENDAR_CRUD;
+    const platform = window.Capacitor?.getPlatform?.() || 'web';
+    const isAndroidPlatform = platform === 'android';
     let settings = loadAssistantSettings();
 
     // --- Populate UI from settings ---
@@ -526,7 +541,77 @@
       return localStorage.getItem('aiva_user_id') || '';
     }
 
+    function applyCalendarPlatformUI() {
+      document.querySelectorAll('[data-calendar-platform="web"]').forEach((el) => {
+        el.style.display = isAndroidPlatform ? 'none' : '';
+      });
+      document.querySelectorAll('[data-calendar-platform="android"]').forEach((el) => {
+        el.style.display = isAndroidPlatform ? '' : 'none';
+      });
+      if (isAndroidPlatform) {
+        document.getElementById('calendarProvider').value = 'native';
+      }
+    }
+
+    async function connectLocalCalendar() {
+      if (!calendarCrud?.isAndroid?.()) {
+        alert('Локалният календар е наличен само на Android APK');
+        return;
+      }
+      const permissions = await calendarCrud.requestPermissions();
+      if (!permissions.granted) {
+        alert('Достъпът до календара е отказан');
+        return;
+      }
+
+      const calendars = await calendarCrud.getCalendars();
+      const select = document.getElementById('localCalendarSelect');
+      select.innerHTML = '';
+      if (!calendars.length) {
+        select.innerHTML = '<option value=\"\">Няма налични локални календари</option>';
+      } else {
+        for (const cal of calendars) {
+          const opt = document.createElement('option');
+          opt.value = cal.id;
+          opt.textContent = cal.name;
+          select.appendChild(opt);
+        }
+        const savedId = calendarCrud.getSelectedCalendarId();
+        if (savedId) select.value = savedId;
+      }
+      document.getElementById('localCalendarPicker').style.display = '';
+    }
+
+    function syncAndroidCalendarStatus() {
+      if (!isAndroidPlatform) return;
+      const status = document.getElementById('localCalendarStatusText');
+      const selectedId = calendarCrud?.getSelectedCalendarId?.() || '';
+      status.textContent = selectedId
+        ? `Свързан локален календар: ${selectedId}`
+        : 'Не е избран локален календар.';
+    }
+
+    function saveSelectedLocalCalendar() {
+      const selectedId = document.getElementById('localCalendarSelect').value;
+      if (!selectedId) {
+        alert('Избери локален календар');
+        return;
+      }
+      calendarCrud.setSelectedCalendarId(selectedId);
+      settings = saveAssistantSettings({
+        ...settings,
+        calendarSync: {
+          ...settings.calendarSync,
+          provider: 'native',
+          setupComplete: true,
+        },
+      });
+      syncAndroidCalendarStatus();
+      showSavedToast();
+    }
+
     async function fetchCloudProviderStatus() {
+      if (isAndroidPlatform) return [];
       const userId = getUserId();
       if (!userId) return [];
       const res = await fetch(`${getApiBase()}/api/calendar/providers/status/${encodeURIComponent(userId)}`);
@@ -557,6 +642,7 @@
     }
 
     async function loadCloudCalendars() {
+      if (isAndroidPlatform) return;
       const userId = getUserId();
       const provider = document.getElementById('cloudProviderSelect').value;
       const select = document.getElementById('cloudCalendarSelect');
@@ -594,6 +680,7 @@
     }
 
     async function startCloudConnect(provider) {
+      if (isAndroidPlatform) return;
       const userId = getUserId();
       if (!userId) {
         alert('Липсва потребителски ID');
@@ -620,6 +707,7 @@
     }
 
     async function handleCloudOauthCallback() {
+      if (isAndroidPlatform) return;
       const code = new URLSearchParams(location.search).get('code');
       const state = new URLSearchParams(location.search).get('state');
       if (!code || !state) return;
@@ -649,6 +737,7 @@
     }
 
     async function saveSelectedCloudCalendar() {
+      if (isAndroidPlatform) return;
       const userId = getUserId();
       const provider = document.getElementById('cloudProviderSelect').value;
       const calendarId = document.getElementById('cloudCalendarSelect').value;
@@ -672,6 +761,7 @@
     }
 
     async function disconnectCloudProvider() {
+      if (isAndroidPlatform) return;
       const userId = getUserId();
       const provider = document.getElementById('cloudProviderSelect').value;
       if (!userId) return;
@@ -688,7 +778,11 @@
     }
 
     function updateCalendarSyncUI() {
-      const provider = document.getElementById('calendarProvider').value;
+      let provider = document.getElementById('calendarProvider').value;
+      if (isAndroidPlatform) {
+        provider = 'native';
+        document.getElementById('calendarProvider').value = 'native';
+      }
       const subscribeSection = document.getElementById('subscribeSection');
       const manualSection = document.getElementById('manualSection');
 
@@ -745,11 +839,11 @@
           showUpcomingStrip: getToggle('toggleUpcomingStrip'),
         },
         calendarSync: {
-          provider: document.getElementById('calendarProvider').value,
-          setupComplete: document.getElementById('calendarProvider').value !== 'none',
+          provider: isAndroidPlatform ? 'native' : document.getElementById('calendarProvider').value,
+          setupComplete: isAndroidPlatform ? !!calendarCrud?.getSelectedCalendarId?.() : document.getElementById('calendarProvider').value !== 'none',
           autoExportOnSave: getToggle('toggleAutoExport'),
           preferredProvider: settings.calendarSync?.preferredProvider || null,
-          subscribedAt: document.getElementById('calendarProvider').value === 'subscribe'
+          subscribedAt: (!isAndroidPlatform && document.getElementById('calendarProvider').value === 'subscribe')
             ? (settings.calendarSync?.subscribedAt || new Date().toISOString())
             : settings.calendarSync?.subscribedAt || null,
         },
@@ -792,17 +886,28 @@
     });
 
     document.getElementById('calendarProvider').addEventListener('change', updateCalendarSyncUI);
-    document.getElementById('cloudProviderSelect').addEventListener('change', async () => {
-      await loadCloudCalendars();
+    if (!isAndroidPlatform) {
+      document.getElementById('cloudProviderSelect').addEventListener('change', async () => {
+        await loadCloudCalendars();
+      });
+      document.getElementById('connectGoogleBtn').addEventListener('click', () => startCloudConnect('google'));
+      document.getElementById('connectMicrosoftBtn').addEventListener('click', () => startCloudConnect('microsoft'));
+      document.getElementById('refreshCloudCalendarsBtn').addEventListener('click', loadCloudCalendars);
+      document.getElementById('saveCloudCalendarBtn').addEventListener('click', saveSelectedCloudCalendar);
+      document.getElementById('disconnectCloudBtn').addEventListener('click', disconnectCloudProvider);
+      document.getElementById('connectAppleFallbackBtn').addEventListener('click', () => {
+        try { calendarSync.openSubscribe('apple'); } catch (e) { alert(e.message); }
+      });
+    }
+
+    document.getElementById('connectLocalCalendarBtn')?.addEventListener('click', async () => {
+      try {
+        await connectLocalCalendar();
+      } catch (e) {
+        alert(e.message || 'Грешка при свързване на локален календар');
+      }
     });
-    document.getElementById('connectGoogleBtn').addEventListener('click', () => startCloudConnect('google'));
-    document.getElementById('connectMicrosoftBtn').addEventListener('click', () => startCloudConnect('microsoft'));
-    document.getElementById('refreshCloudCalendarsBtn').addEventListener('click', loadCloudCalendars);
-    document.getElementById('saveCloudCalendarBtn').addEventListener('click', saveSelectedCloudCalendar);
-    document.getElementById('disconnectCloudBtn').addEventListener('click', disconnectCloudProvider);
-    document.getElementById('connectAppleFallbackBtn').addEventListener('click', () => {
-      try { calendarSync.openSubscribe('apple'); } catch (e) { alert(e.message); }
-    });
+    document.getElementById('saveLocalCalendarBtn')?.addEventListener('click', saveSelectedLocalCalendar);
 
     document.getElementById('copyIcsBtn').addEventListener('click', () => {
       const input = document.getElementById('icsUrl');
@@ -837,11 +942,11 @@
     });
 
     document.getElementById('requestCalendarPermBtn')?.addEventListener('click', async () => {
-      if (!window.AIVA_NATIVE_CALENDAR) {
+      if (!calendarCrud?.isAndroid?.()) {
         alert('Нативният календар е наличен само в Android APK');
         return;
       }
-      const result = await window.AIVA_NATIVE_CALENDAR.requestNativePermissions();
+      const result = await calendarCrud.requestPermissions();
       alert(result.granted ? '✓ Достъпът до календара е разрешен' : 'Достъпът е отказан — опитайте от настройките на телефона');
     });
 
@@ -917,10 +1022,17 @@
     });
 
     (async () => {
-      await handleCloudOauthCallback();
+      applyCalendarPlatformUI();
+      if (!isAndroidPlatform) {
+        await handleCloudOauthCallback();
+      }
       populateUI();
-      await loadCloudCalendars();
-      await renderCloudStatus();
+      if (!isAndroidPlatform) {
+        await loadCloudCalendars();
+        await renderCloudStatus();
+      } else {
+        syncAndroidCalendarStatus();
+      }
     })();
   </script>
 </body>

@@ -55,6 +55,7 @@ let isSessionActive = false;
 let isConnecting = false;
 let assistantSettings = loadAssistantSettings();
 let tasks = [];
+let externalEvents = [];
 let currentDate = new Date();
 let calendarView = assistantSettings.calendar.defaultView || 'day';
 let touchStartX = null;
@@ -403,7 +404,7 @@ function renderTaskCard(task, mode = 'agenda') {
   const statusClass = overdue ? 'is-overdue' : (countdown.startsWith('след') && countdown.includes('мин') && parseInt(countdown.match(/\d+/)?.[0] || '999', 10) <= 60 ? 'is-upcoming' : '');
 
   return `
-    <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')} ${statusClass}" data-id="${task.id}" tabindex="0">
+    <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')} ${statusClass}${task.isExternal ? ' external-event' : ''}" data-id="${task.id}"${task.isExternal ? ' data-external="true"' : ''} tabindex="0">
       <button class="task-check" data-id="${task.id}" aria-label="Маркирай като готова" type="button">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
@@ -427,7 +428,9 @@ function renderTaskCard(task, mode = 'agenda') {
 
 function tasksForDate(date) {
   const iso = toISODate(date);
-  return sortedTasks(tasks.filter((task) => task.due_date === iso));
+  const local = tasks.filter((task) => task.due_date === iso);
+  const external = externalEvents.filter((ev) => ev.due_date === iso);
+  return sortedTasks([...local, ...external]);
 }
 
 function unscheduledTasks() {
@@ -561,6 +564,7 @@ function moveCalendar(direction) {
     currentDate = addMonths(currentDate, direction);
   }
   renderCalendar();
+  refreshExternalEvents();
 }
 
 // --- Tasks API ---
@@ -747,6 +751,28 @@ async function handleVoiceDiscussTask(args) {
   }
 
   return { success: true, message: 'Обсъждаме задачата. Използвай Google Search за актуална информация.' };
+}
+
+async function refreshExternalEvents() {
+  if (!window.AIVA_CALENDAR_SYNC?.syncIncomingEvents) return;
+  let start, end;
+  if (calendarView === 'week') {
+    const s = startOfWeek(currentDate);
+    start = toISODate(s);
+    end = toISODate(addDays(s, 6));
+  } else if (calendarView === 'month') {
+    const s = startOfWeek(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
+    start = toISODate(s);
+    end = toISODate(addDays(s, 41));
+  } else if (calendarView === 'three') {
+    start = toISODate(currentDate);
+    end = toISODate(addDays(currentDate, 2));
+  } else {
+    start = toISODate(currentDate);
+    end = start;
+  }
+  externalEvents = await window.AIVA_CALENDAR_SYNC.syncIncomingEvents(start, end);
+  renderCalendar();
 }
 
 async function loadTasks() {
@@ -1138,6 +1164,7 @@ viewButtons.forEach((button) => {
   button.addEventListener('click', () => {
     calendarView = button.dataset.view;
     renderCalendar();
+    refreshExternalEvents();
   });
 });
 
@@ -1146,6 +1173,7 @@ nextRangeBtn.addEventListener('click', () => moveCalendar(1));
 todayBtn.addEventListener('click', () => {
   currentDate = new Date();
   renderCalendar();
+  refreshExternalEvents();
 });
 addTaskBtn.addEventListener('click', () => openTaskModal());
 
@@ -1171,7 +1199,7 @@ tasksContainer.addEventListener('click', (e) => {
   }
 
   const card = e.target.closest('.task-card');
-  if (card) {
+  if (card && !card.dataset.external) {
     openTaskModal(getTaskById(card.dataset.id));
   }
 });
@@ -1179,7 +1207,7 @@ tasksContainer.addEventListener('click', (e) => {
 tasksContainer.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const card = e.target.closest('.task-card');
-  if (!card) return;
+  if (!card || card.dataset.external) return;
   e.preventDefault();
   openTaskModal(getTaskById(card.dataset.id));
 });
@@ -1254,10 +1282,15 @@ addToCalendarBtn.addEventListener('click', async () => {
     return;
   }
   try {
-    const native = window.AIVA_NATIVE_CALENDAR;
-    const result = native
-      ? await native.addToDeviceCalendar(task)
-      : await window.AIVA_CALENDAR.addToDevice(task);
+    let result;
+    if (window.AIVA_CALENDAR_CRUD?.isAndroid?.()) {
+      result = await window.AIVA_CALENDAR_CRUD.createAivaEvent(task);
+    } else {
+      const native = window.AIVA_NATIVE_CALENDAR;
+      result = native
+        ? await native.addToDeviceCalendar(task)
+        : await window.AIVA_CALENDAR.addToDevice(task);
+    }
     if (result?.method !== 'aborted' && result !== 'aborted') {
       showToast({ content: 'Добавено в календара на устройството', emotion: 'neutral', priority: 3 });
     }
@@ -1325,6 +1358,7 @@ setInterval(() => {
 applyPreferences();
 renderCalendar();
 loadTasks();
+refreshExternalEvents();
 
 // Initialize notification scheduler
 if (window.AIVA_NOTIFIER) {
