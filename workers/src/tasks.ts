@@ -129,17 +129,6 @@ export async function getIncompleteTasks(db: D1Database, userId: string): Promis
   return results;
 }
 
-export async function getTaskById(db: D1Database, taskId: number, userId?: string): Promise<Task | null> {
-  await ensureTaskSchema(db);
-
-  const task = await db
-    .prepare(`SELECT * FROM tasks WHERE id = ?${userId ? ' AND user_id = ?' : ''}`)
-    .bind(...(userId ? [taskId, userId] : [taskId]))
-    .first<Task>();
-
-  return task ?? null;
-}
-
 export async function getAllIncompleteTasks(db: D1Database): Promise<Task[]> {
   await ensureTaskSchema(db);
 
