@@ -57,9 +57,6 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Patch AndroidManifest
-        run: python3 android-res/patch-local-notifications.py
-
       - name: Copy native Java sources
         run: |
           mkdir -p android/app/src/main/java/com/capacitorjs/plugins/localnotifications/
@@ -68,6 +65,9 @@ jobs:
              android/app/src/main/java/com/capacitorjs/plugins/localnotifications/
           cp android-res/java/com/aiva/assistant/AivaCalendarPlugin.java \
              android/app/src/main/java/com/aiva/assistant/
+
+      - name: Patch AndroidManifest and register AivaCalendar plugin
+        run: python3 android-res/patch-local-notifications.py
 
       - name: Copy ProGuard rules
         run: cp android-res/proguard-rules.pro android/app/proguard-rules.pro

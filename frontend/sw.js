@@ -1,7 +1,7 @@
 /**
  * AIVA Service Worker — offline caching + push notifications
  */
-const CACHE_NAME = 'aiva-v3';
+const CACHE_NAME = 'aiva-v4';
 const ASSETS = [
   '/index.html',
   '/settings.html',

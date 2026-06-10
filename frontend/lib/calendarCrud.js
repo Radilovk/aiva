@@ -12,7 +12,9 @@
 
   function getCalendarPlugin() {
     try {
-      return window.Capacitor?.Plugins?.Calendar || window.Capacitor?.registerPlugin?.('Calendar') || null;
+      return window.Capacitor?.Plugins?.AivaCalendar ||
+        window.Capacitor?.registerPlugin?.('AivaCalendar') ||
+        null;
     } catch {
       return null;
     }
@@ -81,7 +83,7 @@
     if (!isAndroid()) return { granted: false, platform: getPlatform() };
     const calendar = getCalendarPlugin();
     if (!calendar?.requestPermissions) {
-      throw new Error('Calendar plugin не е наличен');
+      throw new Error('AivaCalendar plugin не е наличен');
     }
     const result = await calendar.requestPermissions();
     const granted = result?.granted === true ||
@@ -97,7 +99,7 @@
     const calendar = getCalendarPlugin();
     const reader = calendar?.getCalendars || calendar?.listCalendars;
     if (!reader) {
-      throw new Error('Calendar.getCalendars() не е наличен');
+      throw new Error('AivaCalendar.getCalendars() не е наличен');
     }
     const result = await reader.call(calendar);
     return normalizeCalendars(result);
@@ -127,11 +129,12 @@
     const calendarId = getSelectedCalendarId();
     if (!calendarId) throw new Error('Липсва избран локален календар');
     const calendar = getCalendarPlugin();
-    if (!calendar?.createEvent) {
-      throw new Error('Calendar.createEvent() не е наличен');
+    const createEvent = calendar?.createEvent || calendar?.addEvent;
+    if (!createEvent) {
+      throw new Error('AivaCalendar.createEvent() не е наличен');
     }
     const payload = buildAndroidPayload(eventData, calendarId);
-    const result = await calendar.createEvent(payload);
+    const result = await createEvent.call(calendar, payload);
     const eventId = String(result?.eventId || result?.id || '');
     if (eventId && eventData?.id) {
       const map = loadEventMap();

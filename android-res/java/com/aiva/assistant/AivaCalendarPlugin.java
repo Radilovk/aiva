@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.provider.CalendarContract;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -16,6 +17,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import java.util.TimeZone;
 
 /**
@@ -53,6 +57,138 @@ public class AivaCalendarPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void createEvent(PluginCall call) {
+        addEvent(call);
+    }
+
+    @PluginMethod
+    public void getCalendars(PluginCall call) {
+        listCalendars(call);
+    }
+
+    @PluginMethod
+    public void listCalendars(PluginCall call) {
+        if (!ensureCalendarPermission(call)) return;
+
+        try {
+            JSArray calendars = new JSArray();
+            ContentResolver cr = getContext().getContentResolver();
+            String[] projection = new String[]{
+                CalendarContract.Calendars._ID,
+                CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+                CalendarContract.Calendars.ACCOUNT_NAME,
+                CalendarContract.Calendars.IS_PRIMARY
+            };
+            String selection = CalendarContract.Calendars.VISIBLE + " = 1";
+            android.database.Cursor cursor = cr.query(
+                CalendarContract.Calendars.CONTENT_URI,
+                projection,
+                selection,
+                null,
+                CalendarContract.Calendars.CALENDAR_DISPLAY_NAME + " ASC"
+            );
+
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    JSObject cal = new JSObject();
+                    cal.put("id", String.valueOf(cursor.getLong(0)));
+                    cal.put("calendarId", String.valueOf(cursor.getLong(0)));
+                    cal.put("name", cursor.getString(1));
+                    cal.put("title", cursor.getString(1));
+                    cal.put("accountName", cursor.getString(2));
+                    cal.put("isPrimary", cursor.getInt(3) == 1);
+                    calendars.put(cal);
+                }
+                cursor.close();
+            }
+
+            JSObject result = new JSObject();
+            result.put("calendars", calendars);
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("Грешка при зареждане на календари: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void getEvents(PluginCall call) {
+        listEvents(call);
+    }
+
+    @PluginMethod
+    public void listEvents(PluginCall call) {
+        if (!ensureCalendarPermission(call)) return;
+
+        String calendarIdStr = call.getString("calendarId");
+        String fromStr = call.getString("from");
+        String toStr = call.getString("to");
+
+        if (fromStr == null || toStr == null) {
+            call.reject("from и to са задължителни");
+            return;
+        }
+
+        try {
+            long startMillis = parseDateBoundary(fromStr, true);
+            long endMillis = parseDateBoundary(toStr, false);
+
+            Uri.Builder builder = CalendarContract.Instances.CONTENT_URI.buildUpon();
+            ContentUris.appendId(builder, startMillis);
+            ContentUris.appendId(builder, endMillis);
+            Uri uri = builder.build();
+
+            String[] projection = new String[]{
+                CalendarContract.Instances.EVENT_ID,
+                CalendarContract.Instances.TITLE,
+                CalendarContract.Instances.BEGIN,
+                CalendarContract.Instances.END,
+                CalendarContract.Instances.CALENDAR_ID
+            };
+
+            String selection = null;
+            String[] selectionArgs = null;
+            if (calendarIdStr != null && !calendarIdStr.isEmpty()) {
+                selection = CalendarContract.Instances.CALENDAR_ID + " = ?";
+                selectionArgs = new String[]{calendarIdStr};
+            }
+
+            android.database.Cursor cursor = getContext().getContentResolver().query(
+                uri,
+                projection,
+                selection,
+                selectionArgs,
+                CalendarContract.Instances.BEGIN + " ASC"
+            );
+
+            JSArray events = new JSArray();
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    long eventId = cursor.getLong(0);
+                    String title = cursor.getString(1);
+                    long begin = cursor.getLong(2);
+                    long end = cursor.getLong(3);
+
+                    JSObject ev = new JSObject();
+                    ev.put("eventId", String.valueOf(eventId));
+                    ev.put("id", String.valueOf(eventId));
+                    ev.put("title", title);
+                    ev.put("summary", title);
+                    ev.put("startDate", formatIsoDateTime(begin));
+                    ev.put("endDate", formatIsoDateTime(end));
+                    events.put(ev);
+                }
+                cursor.close();
+            }
+
+            JSObject result = new JSObject();
+            result.put("events", events);
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("Грешка при четене на събития: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
     public void addEvent(PluginCall call) {
         if (!ensureCalendarPermission(call)) return;
 
@@ -64,6 +200,7 @@ public class AivaCalendarPlugin extends Plugin {
         int reminderMinutes = call.getInt("reminderMinutes", 15);
         boolean remindAtStart = call.getBoolean("remindAtStart", true);
         int taskId = call.getInt("taskId", 0);
+        String calendarIdStr = call.getString("calendarId");
 
         if (startTime <= 0) {
             call.reject("startTime е задължителен");
@@ -71,7 +208,9 @@ public class AivaCalendarPlugin extends Plugin {
         }
 
         try {
-            long calendarId = getDefaultCalendarId();
+            long calendarId = calendarIdStr != null && !calendarIdStr.isEmpty()
+                ? Long.parseLong(calendarIdStr)
+                : getDefaultCalendarId();
             if (calendarId < 0) {
                 call.reject("Няма наличен календар на устройството");
                 return;
@@ -236,5 +375,25 @@ public class AivaCalendarPlugin extends Plugin {
             CalendarContract.Reminders.EVENT_ID + " = ?",
             new String[]{String.valueOf(eventId)}
         );
+    }
+
+    private long parseDateBoundary(String isoDate, boolean startOfDay) throws java.text.ParseException {
+        SimpleDateFormat dateOnly = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        dateOnly.setTimeZone(TimeZone.getDefault());
+        Date date = dateOnly.parse(isoDate);
+        if (date == null) {
+            throw new java.text.ParseException("Invalid date: " + isoDate, 0);
+        }
+        long millis = date.getTime();
+        if (!startOfDay) {
+            millis += 24L * 60L * 60L * 1000L - 1L;
+        }
+        return millis;
+    }
+
+    private String formatIsoDateTime(long millis) {
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+        formatter.setTimeZone(TimeZone.getDefault());
+        return formatter.format(new Date(millis));
     }
 }
