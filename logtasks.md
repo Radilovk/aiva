@@ -1,34 +1,5 @@
 # AIVA — Лог на задачите
 
-## 2026-06-09: Feature — опростена cloud calendar интеграция (Google + Outlook) + fallback режими
-
-### Какво е имплементирано
-- Добавен е нов cloud calendar слой в backend (`workers/src/calendar.ts`) с:
-  - OAuth start/callback за **Google Calendar API** и **Microsoft Graph Calendar API**
-  - съхранение на връзки, календари и sync map в D1 (`calendar_connections`, `calendar_calendars`, `calendar_sync_map`)
-  - избор на конкретен календар след свързване
-  - endpoint за четене на външни събития от избрания календар
-- Добавени са API endpoints в Worker:
-  - `GET /api/calendar/providers/status/:user_id`
-  - `POST /api/calendar/connect/start`
-  - `POST /api/calendar/connect/callback`
-  - `GET /api/calendar/calendars?user_id=&provider=`
-  - `POST /api/calendar/calendars/select`
-  - `DELETE /api/calendar/connect`
-  - `GET /api/calendar/events?user_id=&provider=&from=&to=`
-- Връзка с lifecycle на задачите:
-  - при create/update на задача → sync към cloud calendar (ако има връзка)
-  - при done/delete → премахване от cloud calendar
-- Настройки (`frontend/settings.html`) са преработени към централен екран „Календар“:
-  - бутони **„Свържи Google“** и **„Свържи Outlook“**
-  - избор и запазване на конкретен календар
-  - отделен iCloud/Apple fallback бутон
-  - fallback режимите (subscribe/native/manual) остават налични като резервен път
-- Схемата (`schema.sql`) е разширена с нужните таблици/индекси за cloud sync.
-
-### Бележка
-- Cloud provider интеграцията е активна при налични server secrets/vars за OAuth клиентите.
-
 ## 2026-06-09: Fix — гласовите команди не създават/изтриват задачи при включен Google Grounding
 
 ### Проблем
