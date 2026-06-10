@@ -1254,10 +1254,15 @@ addToCalendarBtn.addEventListener('click', async () => {
     return;
   }
   try {
-    const native = window.AIVA_NATIVE_CALENDAR;
-    const result = native
-      ? await native.addToDeviceCalendar(task)
-      : await window.AIVA_CALENDAR.addToDevice(task);
+    let result;
+    if (window.AIVA_CALENDAR_CRUD?.isAndroid?.()) {
+      result = await window.AIVA_CALENDAR_CRUD.createAivaEvent(task);
+    } else {
+      const native = window.AIVA_NATIVE_CALENDAR;
+      result = native
+        ? await native.addToDeviceCalendar(task)
+        : await window.AIVA_CALENDAR.addToDevice(task);
+    }
     if (result?.method !== 'aborted' && result !== 'aborted') {
       showToast({ content: 'Добавено в календара на устройството', emotion: 'neutral', priority: 3 });
     }

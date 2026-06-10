@@ -1,5 +1,22 @@
 # AIVA — Лог на задачите
 
+## 2026-06-10: Hybrid Calendar Routing — web OAuth + Android local calendar
+
+### Какво е имплементирано
+- Добавен е нов абстрактен слой `frontend/lib/calendarCrud.js` за календарни CRUD операции с platform routing:
+  - `Capacitor.getPlatform() === 'android'` → `Calendar.requestPermissions/getCalendars/createEvent/updateEvent/deleteEvent` към локалния календар на устройството.
+  - `web` → запазва възможност за текущия fetch flow (чрез web operation fallback).
+- Добавен е Android local calendar selection flow в `frontend/settings.html`:
+  - условен UI рендер за `web` срещу `android`;
+  - бутон „Свържи локален календар“, заявка за права, зареждане на локални календари, `<select>` и запазване на `calendarId` в `localStorage`.
+- Интеграция на новия CRUD слой в календарната синхронизация:
+  - `frontend/lib/calendarSync.js` използва `AIVA_CALENDAR_CRUD` за Android native режим при create/update/delete.
+- Обновени asset/script връзки:
+  - `frontend/index.html`, `frontend/settings.html`, `frontend/sw.js` (cache bump до `aiva-v3`) включват `lib/calendarCrud.js`.
+- Android build конфигурация:
+  - `.github/workflows/build-apk.yml` добавя `@capacitor-community/calendar` към Capacitor зависимостите.
+  - Calendar permissions (`READ_CALENDAR`/`WRITE_CALENDAR`) остават покрити от `android-res/patch-local-notifications.py`.
+
 ## 2026-06-09: Feature — опростена cloud calendar интеграция (Google + Outlook) + fallback режими
 
 ### Какво е имплементирано

@@ -127,6 +127,20 @@
   async function syncTaskToCalendar(task) {
     if (!task?.due_date) return { action: 'skip' };
 
+    if (isNativeMode() && window.AIVA_CALENDAR_CRUD?.isAndroid?.()) {
+      try {
+        const crud = window.AIVA_CALENDAR_CRUD;
+        if (crud.hasLocalEvent(task.id)) {
+          const result = await crud.updateAivaEvent(task);
+          return { action: 'updated', method: 'android-local', ...result };
+        }
+        const result = await crud.createAivaEvent(task);
+        return { action: 'native', method: 'android-local', ...result };
+      } catch (e) {
+        if (e?.name !== 'AbortError') console.warn('Android local calendar sync:', e);
+      }
+    }
+
     if (isNativeMode() && window.AIVA_NATIVE_CALENDAR) {
       try {
         const result = await window.AIVA_NATIVE_CALENDAR.syncTaskToDevice(task);
@@ -180,6 +194,13 @@
   }
 
   async function onTaskRemoved(taskId) {
+    if (window.AIVA_CALENDAR_CRUD?.isAndroid?.()) {
+      try {
+        await window.AIVA_CALENDAR_CRUD.deleteAivaEvent(taskId);
+      } catch (e) {
+        console.warn('Android local calendar remove:', e);
+      }
+    }
     if (window.AIVA_NATIVE_CALENDAR?.removeFromDeviceCalendar) {
       await window.AIVA_NATIVE_CALENDAR.removeFromDeviceCalendar(taskId);
     }
