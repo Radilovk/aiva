@@ -1,6 +1,19 @@
 # AIVA — Лог на задачите
 
-## 2026-06-10: Hybrid Calendar Routing — web OAuth + Android local calendar
+## 2026-06-10: Входящ поток на外部 календарни събития — syncIncomingEvents
+
+### Какво е имплементирано
+- `frontend/lib/calendarCrud.js`: добавена функция `getLocalEventIds()`, която връща Set от всички Android eventId-та, записани от AIVA — използва се за защита срещу infinite sync loops.
+- `frontend/lib/calendarSync.js`: добавена `syncIncomingEvents(startDate, endDate)` — извиква `readAivaEvents`, филтрира AIVA-създадени събития чрез `getLocalEventIds`, нормализира резултата до AIVA task модел с `isExternal: true`.
+- `frontend/app.js`:
+  - Добавена state variable `externalEvents = []`.
+  - Добавена `refreshExternalEvents()` — изчислява date range спрямо текущия view, зарежда external events, рендерира.
+  - `tasksForDate()` включва `externalEvents` при рендера.
+  - `renderTaskCard()` добавя CSS клас `external-event` и `data-external="true"` за readonly събития.
+  - Click и keydown handler-и игнорират карти с `data-external`.
+  - `refreshExternalEvents()` се вика при: init, `moveCalendar`, смяна на view, „Днес" бутон.
+
+
 
 ### Какво е имплементирано
 - Добавен е нов абстрактен слой `frontend/lib/calendarCrud.js` за календарни CRUD операции с platform routing:

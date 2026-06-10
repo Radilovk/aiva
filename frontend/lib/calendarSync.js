@@ -193,6 +193,29 @@
     return { action: 'none' };
   }
 
+  async function syncIncomingEvents(startDate, endDate) {
+    const crud = window.AIVA_CALENDAR_CRUD;
+    if (!crud?.isAndroid?.() || !crud.getSelectedCalendarId()) return [];
+    try {
+      const { events = [] } = await crud.readAivaEvents({ from: startDate, to: endDate });
+      const localIds = crud.getLocalEventIds?.() || new Set();
+      return events
+        .filter((ev) => !localIds.has(String(ev.eventId || ev.id || '')))
+        .map((ev) => ({
+          id: `ext_${ev.eventId || ev.id || Math.random().toString(36).slice(2)}`,
+          content: ev.title || ev.summary || 'Външно събитие',
+          due_date: ev.startDate ? ev.startDate.slice(0, 10) : null,
+          due_time: ev.startDate ? ev.startDate.slice(11, 16) : null,
+          priority: 3,
+          emotion: 'neutral',
+          isExternal: true,
+        }));
+    } catch (e) {
+      console.warn('syncIncomingEvents:', e);
+      return [];
+    }
+  }
+
   async function onTaskRemoved(taskId) {
     if (window.AIVA_CALENDAR_CRUD?.isAndroid?.()) {
       try {
@@ -231,5 +254,6 @@
     isNativeMode,
     isManualMode,
     isConfigured,
+    syncIncomingEvents,
   };
 })();

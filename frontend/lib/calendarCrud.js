@@ -52,6 +52,10 @@
     return loadEventMap()[String(taskId)]?.eventId || '';
   }
 
+  function getLocalEventIds() {
+    return new Set(Object.values(loadEventMap()).map((e) => String(e.eventId)).filter(Boolean));
+  }
+
   function parseTaskDateTime(task) {
     const parsed = window.AIVA_ICS?.parseTaskDateTime?.(task);
     if (parsed?.start && parsed?.end) return parsed;
@@ -201,6 +205,7 @@
     getSelectedCalendarId,
     setSelectedCalendarId,
     hasLocalEvent,
+    getLocalEventIds,
     createAivaEvent,
     updateAivaEvent,
     deleteAivaEvent,
