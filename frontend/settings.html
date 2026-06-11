@@ -570,14 +570,30 @@
       if (!calendars.length) {
         select.innerHTML = '<option value=\"\">Няма налични локални календари</option>';
       } else {
+        let primaryId = '';
         for (const cal of calendars) {
           const opt = document.createElement('option');
           opt.value = cal.id;
-          opt.textContent = cal.name;
+          const isPrimary = cal.isPrimary === true;
+          opt.textContent = isPrimary ? `${cal.name} (основен)` : cal.name;
           select.appendChild(opt);
+          if (isPrimary) primaryId = cal.id;
         }
         const savedId = calendarCrud.getSelectedCalendarId();
-        if (savedId) select.value = savedId;
+        const defaultId = savedId || primaryId || calendars[0]?.id || '';
+        select.value = defaultId;
+        if (!savedId && defaultId) {
+          calendarCrud.setSelectedCalendarId(defaultId);
+          settings = saveAssistantSettings({
+            ...settings,
+            calendarSync: {
+              ...settings.calendarSync,
+              provider: 'native',
+              setupComplete: true,
+            },
+          });
+          syncAndroidCalendarStatus();
+        }
       }
       document.getElementById('localCalendarPicker').style.display = '';
     }

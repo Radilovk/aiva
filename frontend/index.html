@@ -517,6 +517,15 @@
       color: var(--accent);
     }
 
+    .status.assistant-speech {
+      color: var(--text);
+      font-size: 0.88rem;
+      line-height: 1.45;
+      max-width: 34rem;
+      margin-inline: auto;
+      padding-inline: 0.5rem;
+    }
+
     /* Task confirmation toast */
     .toast {
       position: fixed;
@@ -810,6 +819,30 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
+    .agenda-grid.view-three .calendar-day {
+      padding: 10px 8px;
+    }
+
+    .agenda-grid.view-three .day-name {
+      font-size: 0.62rem;
+    }
+
+    .agenda-grid.view-three .day-header strong {
+      font-size: 0.82rem;
+    }
+
+    .agenda-grid.view-three .task-item {
+      padding: 8px;
+    }
+
+    .agenda-grid.view-three .task-text {
+      font-size: 0.76rem;
+    }
+
+    .agenda-grid.view-three .task-info {
+      font-size: 0.66rem;
+    }
+
     .agenda-grid.view-week {
       grid-template-columns: repeat(7, minmax(120px, 1fr));
       overflow-x: auto;
@@ -1088,6 +1121,10 @@
       .orbit-1 { width: 105px; height: 105px; }
       .orbit-2 { width: 130px; height: 130px; }
       .record-wrapper { width: 140px; height: 140px; }
+
+      .agenda-grid.view-three {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 720px) {
@@ -1099,7 +1136,13 @@
         align-items: flex-start;
       }
 
-      .agenda-grid.view-three,
+      .agenda-grid.view-three {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        overflow-x: visible;
+      }
+
       .agenda-grid.view-week {
         display: flex;
         overflow-x: auto;
@@ -1107,10 +1150,13 @@
         padding-bottom: 4px;
       }
 
-      .agenda-grid.view-three .calendar-day,
       .agenda-grid.view-week .calendar-day {
         min-width: 82%;
         scroll-snap-align: start;
+      }
+
+      .agenda-grid.view-three .calendar-day {
+        min-width: 0;
       }
 
       .tasks-header {
@@ -1360,6 +1406,7 @@
   <script src="lib/calendarSync.js"></script>
   <script src="lib/calendarOnboarding.js"></script>
   <script src="lib/geminilive.js"></script>
+  <script src="lib/haptics.js"></script>
   <script src="lib/mediaUtils.js"></script>
   <script src="app.js"></script>
   <script>

@@ -75,6 +75,7 @@
     return source.map((cal, index) => ({
       id: String(cal.id ?? cal.calendarId ?? cal.name ?? index),
       name: String(cal.name ?? cal.title ?? cal.id ?? `Календар ${index + 1}`),
+      isPrimary: cal.isPrimary === true,
       raw: cal,
     }));
   }
@@ -177,6 +178,65 @@
     return { branch: 'android', removed: true };
   }
 
+  function parseEventDateTime(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function buildExternalEventPayload(fields = {}) {
+    const start = parseEventDateTime(fields.startDate || fields.start);
+    const end = parseEventDateTime(fields.endDate || fields.end);
+    if (!start) throw new Error('Липсва валидна начална дата/час');
+    const endDate = end && end > start ? end : new Date(start.getTime() + 30 * 60000);
+    return {
+      calendarId: getSelectedCalendarId(),
+      title: fields.title || 'Събитие',
+      description: fields.description || '',
+      location: fields.location || '',
+      startDate: start.toISOString(),
+      endDate: endDate.toISOString(),
+      startTime: start.getTime(),
+      endTime: endDate.getTime(),
+      allDay: false,
+    };
+  }
+
+  async function updateExternalEvent(eventId, fields = {}, webOperation) {
+    if (!eventId) throw new Error('Липсва eventId');
+    if (!isAndroid()) {
+      if (typeof webOperation === 'function') return webOperation();
+      return { branch: 'web', skipped: true };
+    }
+    const calendar = getCalendarPlugin();
+    const updateEvent = calendar?.updateEvent || calendar?.editEvent;
+    if (!updateEvent) throw new Error('AivaCalendar.updateEvent() не е наличен');
+    const payload = buildExternalEventPayload(fields);
+    const result = await updateEvent.call(calendar, {
+      ...payload,
+      eventId: String(eventId),
+      id: String(eventId),
+    });
+    return { branch: 'android', result };
+  }
+
+  async function deleteExternalEvent(eventId, webOperation) {
+    if (!eventId) throw new Error('Липсва eventId');
+    if (!isAndroid()) {
+      if (typeof webOperation === 'function') return webOperation();
+      return { branch: 'web', skipped: true };
+    }
+    const calendar = getCalendarPlugin();
+    const removeEvent = calendar?.deleteEvent || calendar?.removeEvent;
+    if (!removeEvent) throw new Error('AivaCalendar.deleteEvent() не е наличен');
+    const result = await removeEvent.call(calendar, {
+      eventId: String(eventId),
+      id: String(eventId),
+      calendarId: getSelectedCalendarId(),
+    });
+    return { branch: 'android', result };
+  }
+
   async function readAivaEvents(params = {}, webOperation) {
     if (isAndroid()) {
       const calendar = getCalendarPlugin();
@@ -213,5 +273,7 @@
     updateAivaEvent,
     deleteAivaEvent,
     readAivaEvents,
+    updateExternalEvent,
+    deleteExternalEvent,
   };
 })();

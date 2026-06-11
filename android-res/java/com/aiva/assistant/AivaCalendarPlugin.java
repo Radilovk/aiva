@@ -288,6 +288,11 @@ public class AivaCalendarPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void deleteEvent(PluginCall call) {
+        removeEvent(call);
+    }
+
+    @PluginMethod
     public void removeEvent(PluginCall call) {
         if (!ensureCalendarPermission(call)) return;
 

@@ -60,6 +60,10 @@ let currentDate = new Date();
 let calendarView = assistantSettings.calendar.defaultView || 'day';
 let touchStartX = null;
 let voiceFocusTask = null;
+let cachedCalendarEvents = [];
+let awaitingCloseConfirmation = false;
+let pendingUserTranscript = '';
+let assistantTranscriptBuffer = '';
 
 // --- save_task tool (Gemini function declaration format) ---
 class SaveTaskTool extends FunctionCallDefinition {
@@ -218,6 +222,104 @@ class DiscussTaskTool extends FunctionCallDefinition {
   }
 }
 
+// --- read_calendar_events tool ---
+class ReadCalendarEventsTool extends FunctionCallDefinition {
+  constructor() {
+    super(
+      'read_calendar_events',
+      'Чете събития от избрания календар на устройството. Извикай когато потребителят поиска да чуе календарни събития.',
+      {
+        type: 'object',
+        properties: {
+          period: {
+            type: 'string',
+            description: 'Период: today, tomorrow, week, all',
+            enum: ['today', 'tomorrow', 'week', 'all'],
+          },
+          date: { type: 'string', description: 'Конкретна дата YYYY-MM-DD' },
+        },
+      },
+      []
+    );
+  }
+
+  functionToCall() {
+    return 'pending';
+  }
+}
+
+// --- edit_calendar_event tool ---
+class EditCalendarEventTool extends FunctionCallDefinition {
+  constructor() {
+    super(
+      'edit_calendar_event',
+      'Редактира събитие от календара на устройството. Извикай след потвърждение от потребителя.',
+      {
+        type: 'object',
+        properties: {
+          event_id: { type: 'string', description: 'ID на календарното събитие' },
+          search_text: { type: 'string', description: 'Текст за търсене на събитието' },
+          title: { type: 'string', description: 'Ново заглавие' },
+          start_date: { type: 'string', description: 'Нова дата YYYY-MM-DD' },
+          start_time: { type: 'string', description: 'Нов час HH:MM' },
+          end_date: { type: 'string', description: 'Крайна дата YYYY-MM-DD' },
+          end_time: { type: 'string', description: 'Краен час HH:MM' },
+          location: { type: 'string', description: 'Нова локация' },
+          description: { type: 'string', description: 'Ново описание' },
+        },
+      },
+      []
+    );
+  }
+
+  functionToCall() {
+    return 'pending';
+  }
+}
+
+// --- delete_calendar_event tool ---
+class DeleteCalendarEventTool extends FunctionCallDefinition {
+  constructor() {
+    super(
+      'delete_calendar_event',
+      'Изтрива събитие от календара на устройството. САМО след потвърждение!',
+      {
+        type: 'object',
+        properties: {
+          event_id: { type: 'string', description: 'ID на календарното събитие' },
+          search_text: { type: 'string', description: 'Текст за търсене на събитието' },
+        },
+      },
+      []
+    );
+  }
+
+  functionToCall() {
+    return 'pending';
+  }
+}
+
+// --- end_session tool ---
+class EndSessionTool extends FunctionCallDefinition {
+  constructor() {
+    super(
+      'end_session',
+      'Приключва гласовата сесия когато потребителят няма нужда от още помощ.',
+      {
+        type: 'object',
+        properties: {
+          reason: { type: 'string', description: 'Кратка причина за приключване' },
+        },
+      },
+      []
+    );
+  }
+
+  functionToCall() {
+    return 'pending';
+  }
+}
+
 // --- Date helpers ---
 function pad(value) {
   return String(value).padStart(2, '0');
@@ -290,9 +392,48 @@ function applyPreferences() {
   document.body.classList.toggle('compact-calendar', assistantSettings.appearance.compactCalendar);
 }
 
-function setStatus(text, active = false) {
+function setStatus(text, active = false, mode = 'default') {
   statusEl.textContent = text;
   statusEl.classList.toggle('active', active);
+  statusEl.classList.toggle('assistant-speech', mode === 'assistant');
+}
+
+function setAssistantSpeech(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return;
+  setStatus(trimmed, true, 'assistant');
+}
+
+const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още/i;
+const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|не\s+искам|не\s+е\s+нужно)\b/i;
+
+function detectClosingQuestion(text) {
+  if (CLOSING_QUESTION_RE.test(String(text || '').toLowerCase())) {
+    awaitingCloseConfirmation = true;
+  }
+}
+
+function isNegativeCloseResponse(text) {
+  const normalized = String(text || '').toLowerCase().trim().replace(/[.!?,…]+$/g, '');
+  if (!normalized) return false;
+  return NEGATIVE_CLOSE_RE.test(normalized);
+}
+
+function scheduleSessionEnd(delayMs = 700) {
+  awaitingCloseConfirmation = false;
+  pendingUserTranscript = '';
+  setTimeout(() => {
+    if (isSessionActive) disconnectSession();
+  }, delayMs);
+}
+
+function handlePossibleCloseResponse(text, finished = false) {
+  if (!awaitingCloseConfirmation || !text) return;
+  const combined = `${pendingUserTranscript}${text}`.trim();
+  pendingUserTranscript = finished ? '' : combined;
+  if (isNegativeCloseResponse(combined)) {
+    scheduleSessionEnd();
+  }
 }
 
 function showError(msg) {
@@ -645,6 +786,182 @@ function buildTasksContextForAssistant() {
   return `\n\nТЕКУЩИ ЗАДАЧИ НА ПОТРЕБИТЕЛЯ (${tasks.length}):\n${lines.join('\n')}\n\nПри редакция, изтриване или обсъждане използвай task_id от списъка. Ако потребителят спомене задача по име, намери най-близкото съвпадение.`;
 }
 
+async function loadCalendarEventsForAssistant() {
+  cachedCalendarEvents = [];
+  const crud = window.AIVA_CALENDAR_CRUD;
+  if (!crud?.isAndroid?.() || !crud.getSelectedCalendarId()) {
+    return [];
+  }
+
+  const today = toISODate(new Date());
+  const end = toISODate(addDays(new Date(), 14));
+  try {
+    const { events = [] } = await crud.readAivaEvents({ from: today, to: end });
+    cachedCalendarEvents = events;
+    return events;
+  } catch (e) {
+    console.warn('loadCalendarEventsForAssistant:', e);
+    return [];
+  }
+}
+
+function buildCalendarContextForAssistant(events) {
+  if (!window.AIVA_CALENDAR_CRUD?.getSelectedCalendarId?.()) {
+    return '\n\nКАЛЕНДАР НА УСТРОЙСТВОТО: няма избран локален календар.';
+  }
+  if (!events.length) {
+    return '\n\nКАЛЕНДАРНИ СЪБИТИЯ (устройство): няма събития в избрания календар за следващите 2 седмици.';
+  }
+
+  const lines = events.slice(0, 40).map((event) => {
+    const eventId = event.eventId || event.id;
+    const title = event.title || event.summary || 'Събитие';
+    const when = event.startDate ? event.startDate.replace('T', ' ').slice(0, 16) : '';
+    return `- event_id ${eventId}: "${title}" на ${when}`;
+  });
+
+  return `\n\nКАЛЕНДАРНИ СЪБИТИЯ В ИЗБРАНИЯ КАЛЕНДАР (${events.length}):\n${lines.join('\n')}\n\nТова са събития от календара на устройството. За тях използвай read_calendar_events / edit_calendar_event / delete_calendar_event.`;
+}
+
+function findCalendarEventBySearch(searchText) {
+  if (!searchText) return null;
+  const lower = searchText.toLowerCase().trim();
+  const exact = cachedCalendarEvents.find((event) =>
+    String(event.title || event.summary || '').toLowerCase() === lower
+  );
+  if (exact) return exact;
+
+  const partial = cachedCalendarEvents.filter((event) =>
+    String(event.title || event.summary || '').toLowerCase().includes(lower)
+  );
+  if (partial.length === 1) return partial[0];
+  if (partial.length > 1) {
+    return partial.sort((a, b) =>
+      String(a.title || a.summary || '').length - String(b.title || b.summary || '').length
+    )[0];
+  }
+  return null;
+}
+
+function resolveCalendarEventId(args) {
+  if (args.event_id) return String(args.event_id);
+  if (args.search_text) {
+    const found = findCalendarEventBySearch(args.search_text);
+    if (found) return String(found.eventId || found.id || '');
+  }
+  return '';
+}
+
+function filterCalendarEvents(events, period, date) {
+  if (date) {
+    return events.filter((event) => event.startDate?.startsWith(date));
+  }
+  const today = toISODate(new Date());
+  if (period === 'today') {
+    return events.filter((event) => event.startDate?.startsWith(today));
+  }
+  if (period === 'tomorrow') {
+    const tomorrow = toISODate(addDays(new Date(), 1));
+    return events.filter((event) => event.startDate?.startsWith(tomorrow));
+  }
+  if (period === 'week') {
+    const weekEnd = toISODate(addDays(new Date(), 7));
+    return events.filter((event) => {
+      const day = event.startDate?.slice(0, 10);
+      return day && day >= today && day <= weekEnd;
+    });
+  }
+  return events;
+}
+
+function formatCalendarEventSummary(event, index) {
+  const when = event.startDate ? event.startDate.replace('T', ' ').slice(0, 16) : '';
+  return `${index + 1}. ${event.title || event.summary || 'Събитие'} (${when})`;
+}
+
+async function handleVoiceReadCalendarEvents(args) {
+  const events = cachedCalendarEvents.length
+    ? cachedCalendarEvents
+    : await loadCalendarEventsForAssistant();
+  const filtered = filterCalendarEvents(events, args.period || 'today', args.date);
+  if (!filtered.length) {
+    return { success: true, message: 'Няма календарни събития за този период.', events: [] };
+  }
+  const summary = filtered.map((event, index) => formatCalendarEventSummary(event, index)).join('; ');
+  return {
+    success: true,
+    count: filtered.length,
+    summary,
+    events: filtered.map((event) => ({
+      event_id: String(event.eventId || event.id || ''),
+      title: event.title || event.summary || 'Събитие',
+      start: event.startDate || null,
+      end: event.endDate || null,
+    })),
+  };
+}
+
+function buildCalendarEventFields(args, existing) {
+  const fields = {};
+  if (args.title) fields.title = args.title;
+  if (args.location) fields.location = args.location;
+  if (args.description) fields.description = args.description;
+
+  const startDate = args.start_date || existing?.startDate?.slice(0, 10);
+  const startTime = args.start_time || existing?.startDate?.slice(11, 16) || '09:00';
+  if (startDate) fields.startDate = `${startDate}T${startTime}:00`;
+
+  const endDate = args.end_date || existing?.endDate?.slice(0, 10) || startDate;
+  const endTime = args.end_time || existing?.endDate?.slice(11, 16) || startTime;
+  if (endDate) fields.endDate = `${endDate}T${endTime}:00`;
+
+  return fields;
+}
+
+async function handleVoiceEditCalendarEvent(args) {
+  const crud = window.AIVA_CALENDAR_CRUD;
+  if (!crud?.isAndroid?.() || !crud.getSelectedCalendarId()) {
+    return { error: 'Няма избран локален календар на устройството.' };
+  }
+
+  const eventId = resolveCalendarEventId(args);
+  if (!eventId) {
+    return { error: 'Не намерих събитие с това описание. Уточни кое събитие.' };
+  }
+
+  const existing = cachedCalendarEvents.find((event) => String(event.eventId || event.id) === eventId);
+  const fields = buildCalendarEventFields(args, existing);
+  if (!Object.keys(fields).length) {
+    return { error: 'Няма какво да се промени. Кажи какво да обновя.' };
+  }
+
+  await crud.updateExternalEvent(eventId, fields);
+  await loadCalendarEventsForAssistant();
+  await refreshExternalEvents();
+  return {
+    success: true,
+    event_id: eventId,
+    message: 'Календарното събитие е обновено.',
+  };
+}
+
+async function handleVoiceDeleteCalendarEvent(args) {
+  const crud = window.AIVA_CALENDAR_CRUD;
+  if (!crud?.isAndroid?.() || !crud.getSelectedCalendarId()) {
+    return { error: 'Няма избран локален календар на устройството.' };
+  }
+
+  const eventId = resolveCalendarEventId(args);
+  if (!eventId) {
+    return { error: 'Не намерих събитие с това описание.' };
+  }
+
+  await crud.deleteExternalEvent(eventId);
+  await loadCalendarEventsForAssistant();
+  await refreshExternalEvents();
+  return { success: true, event_id: eventId, message: 'Календарното събитие е изтрито.' };
+}
+
 function readTasksForPeriod(period, date) {
   const today = toISODate(new Date());
   let filtered;
@@ -983,6 +1300,7 @@ async function handleGeminiMessage(message) {
         isSessionActive = true;
         recordBtn.classList.add('recording');
         recordBtn.setAttribute('aria-label', 'Спри записа');
+        window.AIVA_HAPTICS?.onListeningStart?.();
       } catch (e) {
         console.error('Audio start failed:', e);
         showError('Няма достъп до микрофона');
@@ -996,13 +1314,26 @@ async function handleGeminiMessage(message) {
 
     case MultimodalLiveResponseType.INPUT_TRANSCRIPTION:
       if (message.data?.text) {
-        setStatus(`„${message.data.text}"`, true);
+        handlePossibleCloseResponse(message.data.text, message.data.finished === true);
       }
       break;
 
     case MultimodalLiveResponseType.OUTPUT_TRANSCRIPTION:
       if (message.data?.text) {
-        console.log('Assistant:', message.data.text);
+        assistantTranscriptBuffer += message.data.text;
+        setAssistantSpeech(assistantTranscriptBuffer);
+        detectClosingQuestion(assistantTranscriptBuffer);
+        if (message.data.finished) {
+          detectClosingQuestion(assistantTranscriptBuffer);
+        }
+      }
+      break;
+
+    case MultimodalLiveResponseType.TEXT:
+      if (message.data) {
+        assistantTranscriptBuffer = String(message.data);
+        setAssistantSpeech(assistantTranscriptBuffer);
+        detectClosingQuestion(assistantTranscriptBuffer);
       }
       break;
 
@@ -1030,6 +1361,19 @@ async function handleGeminiMessage(message) {
             case 'discuss_task':
               result = await handleVoiceDiscussTask(call.args || {});
               break;
+            case 'read_calendar_events':
+              result = await handleVoiceReadCalendarEvents(call.args || {});
+              break;
+            case 'edit_calendar_event':
+              result = await handleVoiceEditCalendarEvent(call.args || {});
+              break;
+            case 'delete_calendar_event':
+              result = await handleVoiceDeleteCalendarEvent(call.args || {});
+              break;
+            case 'end_session':
+              scheduleSessionEnd(500);
+              result = { success: true, message: 'Сесията приключва.' };
+              break;
             default:
               result = client.callFunction(call.name, call.args || {}) ?? 'ok';
               break;
@@ -1043,8 +1387,14 @@ async function handleGeminiMessage(message) {
       break;
     }
 
+    case MultimodalLiveResponseType.TURN_COMPLETE:
+      assistantTranscriptBuffer = '';
+      pendingUserTranscript = '';
+      break;
+
     case MultimodalLiveResponseType.INTERRUPTED:
       if (audioPlayer) audioPlayer.interrupt();
+      assistantTranscriptBuffer = '';
       break;
 
     case MultimodalLiveResponseType.ERROR:
@@ -1081,12 +1431,18 @@ async function connectSession() {
     }
 
     await loadTasks();
+    const calendarEvents = await loadCalendarEventsForAssistant();
 
     const token = await fetchToken();
     const model = assistantSettings.model || LIVE_MODEL;
 
     client = new GeminiLiveAPI(token, model);
-    let instructions = assistantSettings.systemInstructions + buildTasksContextForAssistant();
+    awaitingCloseConfirmation = false;
+    pendingUserTranscript = '';
+    assistantTranscriptBuffer = '';
+    let instructions = assistantSettings.systemInstructions
+      + buildTasksContextForAssistant()
+      + buildCalendarContextForAssistant(calendarEvents);
     if (voiceFocusTask) {
       instructions += `\n\nФОКУС: Потребителят иска да обсъди или редактира задача ID ${voiceFocusTask.id}: "${voiceFocusTask.content}". Започни с кратко потвърждение и предложи помощ (редакция, съвет, изтриване, маркиране като готова).`;
       voiceFocusTask = null;
@@ -1106,6 +1462,10 @@ async function connectSession() {
     client.addFunction(new DeleteTaskTool());
     client.addFunction(new MarkTaskDoneTool());
     client.addFunction(new DiscussTaskTool());
+    client.addFunction(new ReadCalendarEventsTool());
+    client.addFunction(new EditCalendarEventTool());
+    client.addFunction(new DeleteCalendarEventTool());
+    client.addFunction(new EndSessionTool());
 
     client.onReceiveResponse = handleGeminiMessage;
     client.onOpen = () => setStatus('Свързване...', true);
@@ -1134,6 +1494,7 @@ async function connectSession() {
 }
 
 function disconnectSession() {
+  const wasActive = isSessionActive;
   if (audioStreamer) {
     audioStreamer.stop();
     audioStreamer = null;
@@ -1144,11 +1505,18 @@ function disconnectSession() {
   client = null;
   isSessionActive = false;
   isConnecting = false;
+  awaitingCloseConfirmation = false;
+  pendingUserTranscript = '';
+  assistantTranscriptBuffer = '';
   recordBtn.classList.remove('recording');
   recordBtn.disabled = false;
   recordBtn.setAttribute('aria-label', 'Запис');
   waveform.classList.remove('active');
+  statusEl.classList.remove('assistant-speech');
   setStatus('Докоснете за запис');
+  if (wasActive) {
+    window.AIVA_HAPTICS?.onListeningStop?.();
+  }
 }
 
 // --- Events ---
