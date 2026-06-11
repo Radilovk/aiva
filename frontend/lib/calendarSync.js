@@ -203,9 +203,12 @@
         .filter((ev) => !localIds.has(String(ev.eventId || ev.id || '')))
         .map((ev) => ({
           id: `ext_${ev.eventId || ev.id || Math.random().toString(36).slice(2)}`,
+          calendarEventId: String(ev.eventId || ev.id || ''),
           content: ev.title || ev.summary || 'Външно събитие',
           due_date: ev.startDate ? ev.startDate.slice(0, 10) : null,
           due_time: ev.startDate ? ev.startDate.slice(11, 16) : null,
+          end_date: ev.endDate ? ev.endDate.slice(0, 10) : null,
+          end_time: ev.endDate ? ev.endDate.slice(11, 16) : null,
           priority: 3,
           emotion: 'neutral',
           isExternal: true,
