@@ -15,6 +15,7 @@ import { handleCron } from './cron';
 import {
   calendarCapabilities,
   completeOAuthConnect,
+  connectAppleAccount,
   disconnectProvider,
   getProviderStatuses,
   listExternalEvents,
@@ -309,6 +310,31 @@ app.post('/api/calendar/connect/start', async (c) => {
     return c.json({ url, state });
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : 'OAuth start error' }, 400);
+  }
+});
+
+app.post('/api/calendar/connect/apple', async (c) => {
+  const body = await c.req.json<{
+    user_id?: string;
+    apple_id?: string;
+    password?: string;
+  }>().catch(() => ({} as any));
+
+  if (!body.user_id || !body.apple_id || !body.password) {
+    return c.json({ error: 'user_id, apple_id и password са задължителни' }, 400);
+  }
+
+  try {
+    await connectAppleAccount(
+      c.env.DB,
+      body.user_id,
+      body.apple_id,
+      body.password,
+      requestOrigin(new URL(c.req.url))
+    );
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : 'Apple connect error' }, 400);
   }
 });
 

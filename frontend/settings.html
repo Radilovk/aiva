@@ -236,6 +236,7 @@
           <select id="cloudProviderSelect">
             <option value="google">Google</option>
             <option value="microsoft">Outlook</option>
+            <option value="apple">Apple (iCloud)</option>
           </select>
           <select id="cloudCalendarSelect">
             <option value="">Няма заредени календари</option>
@@ -248,9 +249,21 @@
         </div>
       </div>
       <div class="field" data-calendar-platform="web">
-        <span class="field-label">Apple / iCloud (втори режим)</span>
-        <p class="sync-note">iCloud е добавен като отделен режим чрез CalDAV/абонамент, за да запазим прост поток за масовите потребители (Google/Outlook).</p>
-        <button class="btn" type="button" id="connectAppleFallbackBtn">iCloud / Apple (fallback)</button>
+        <span class="field-label">Apple / iCloud (Пълен достъп)</span>
+        <div id="appleConnectForm" style="display:none; margin-top:10px; border:1px solid var(--border); padding:15px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.02);">
+          <div class="field">
+            <span class="field-label">Apple ID (email)</span>
+            <input type="text" id="appleId" placeholder="user@icloud.com">
+          </div>
+          <div class="field">
+            <span class="field-label">App-Specific Password</span>
+            <input type="text" id="applePassword" placeholder="xxxx-xxxx-xxxx-xxxx">
+            <p class="field-hint">Генерирайте парола на <a href="https://appleid.apple.com" target="_blank" style="color:var(--accent)">appleid.apple.com</a></p>
+          </div>
+          <button class="btn primary" type="button" id="submitAppleBtn">Свържи iCloud</button>
+        </div>
+        <button class="btn" type="button" id="showAppleFormBtn">Свържи Apple Календар</button>
+        <p class="sync-note">Използва се CalDAV за двупосочна синхронизация (четене и запис).</p>
       </div>
       <div class="field" id="androidLocalCalendarSection" data-calendar-platform="android" style="display:none">
         <span class="field-label">Свържи локален календар</span>
@@ -911,8 +924,43 @@
       document.getElementById('refreshCloudCalendarsBtn').addEventListener('click', loadCloudCalendars);
       document.getElementById('saveCloudCalendarBtn').addEventListener('click', saveSelectedCloudCalendar);
       document.getElementById('disconnectCloudBtn').addEventListener('click', disconnectCloudProvider);
-      document.getElementById('connectAppleFallbackBtn').addEventListener('click', () => {
-        try { calendarSync.openSubscribe('apple'); } catch (e) { alert(e.message); }
+
+      document.getElementById('showAppleFormBtn').addEventListener('click', () => {
+        const form = document.getElementById('appleConnectForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      });
+
+      document.getElementById('submitAppleBtn').addEventListener('click', async () => {
+        const appleId = document.getElementById('appleId').value.trim();
+        const password = document.getElementById('applePassword').value.trim();
+        if (!appleId || !password) {
+          alert('Моля въведете Apple ID и парола');
+          return;
+        }
+
+        const btn = document.getElementById('submitAppleBtn');
+        btn.disabled = true;
+        btn.textContent = 'Свързване...';
+
+        try {
+          const res = await fetch(`${getApiBase()}/api/calendar/connect/apple`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: getUserId(), apple_id: appleId, password: password }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Грешка при свързване');
+
+          document.getElementById('appleConnectForm').style.display = 'none';
+          document.getElementById('cloudProviderSelect').value = 'apple';
+          await loadCloudCalendars();
+          showSavedToast();
+        } catch (e) {
+          alert(e.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Свържи iCloud';
+        }
       });
     }
 
