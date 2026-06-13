@@ -1,7 +1,7 @@
 import { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import type { Task } from './tasks';
 
-export type CalendarProvider = 'google' | 'microsoft';
+export type CalendarProvider = 'google' | 'microsoft' | 'apple';
 
 export interface CalendarEnv {
   DB: D1Database;
@@ -294,6 +294,8 @@ async function getValidConnection(
   const conn = await getConnection(env.DB, userId, provider);
   if (!conn) return null;
 
+  if (provider === 'apple') return conn;
+
   const expires = new Date(conn.expires_at).getTime();
   if (Number.isFinite(expires) && expires - Date.now() > 60_000) {
     return conn;
@@ -378,9 +380,14 @@ async function syncCalendarsForConnection(env: CalendarEnv, userId: string, prov
   const conn = await getValidConnection(env, userId, provider, origin);
   if (!conn) return;
 
-  const calendars = provider === 'google'
-    ? await fetchGoogleCalendars(conn.access_token)
-    : await fetchMicrosoftCalendars(conn.access_token);
+  let calendars;
+  if (provider === 'google') {
+    calendars = await fetchGoogleCalendars(conn.access_token);
+  } else if (provider === 'microsoft') {
+    calendars = await fetchMicrosoftCalendars(conn.access_token);
+  } else {
+    calendars = await fetchAppleCalendars(conn.provider_user_id!, conn.access_token);
+  }
 
   await upsertCalendars(env.DB, userId, provider, calendars);
 }
@@ -473,6 +480,36 @@ function buildGoogleEvent(task: Task): Record<string, unknown> | null {
   };
 }
 
+function buildAppleEventICS(task: Task): string | null {
+  const range = taskDateRange(task);
+  if (!range) return null;
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const toICSStamp = (iso: string) => iso.replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  const dtStart = toICSStamp(range.startDateTime);
+  const dtEnd = toICSStamp(range.endDateTime);
+  const now = toICSStamp(new Date().toISOString());
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//AIVA//Apple CalDAV//BG',
+    'BEGIN:VEVENT',
+    `UID:aiva-task-${task.id}`,
+    `DTSTAMP:${now}`,
+    `DTSTART;TZID=Europe/Sofia:${dtStart.replace('Z', '')}`,
+    `DTEND;TZID=Europe/Sofia:${dtEnd.replace('Z', '')}`,
+    `SUMMARY:${task.content}`,
+    `DESCRIPTION:${task.notes || ''}`,
+    `LOCATION:${task.location || ''}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ];
+
+  return lines.join('\r\n');
+}
+
 function buildMicrosoftEvent(task: Task): Record<string, unknown> | null {
   const range = taskDateRange(task);
   if (!range) return null;
@@ -550,6 +587,18 @@ async function providerApi(
   const conn = await getValidConnection(env, userId, provider, origin);
   if (!conn) return null;
 
+  if (provider === 'apple') {
+    const baseUrl = path.startsWith('http') ? '' : 'https://caldav.icloud.com';
+    const auth = btoa(`${conn.provider_user_id}:${conn.access_token}`);
+    return fetch(`${baseUrl}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Basic ${auth}`,
+        ...(init.headers || {}),
+      },
+    });
+  }
+
   const url = provider === 'google'
     ? `https://www.googleapis.com${path}`
     : `https://graph.microsoft.com${path}`;
@@ -608,6 +657,14 @@ export async function getProviderStatuses(env: CalendarEnv, userId: string): Pro
       selectedCalendarId: map.get('microsoft')?.external_calendar_id || null,
       selectedCalendarName: map.get('microsoft')?.name || null,
       connectedAt: map.get('microsoft')?.connected_at || null,
+    },
+    {
+      provider: 'apple',
+      configured: true, // Apple integration is always "configured" via CalDAV
+      connected: map.has('apple'),
+      selectedCalendarId: map.get('apple')?.external_calendar_id || null,
+      selectedCalendarName: map.get('apple')?.name || null,
+      connectedAt: map.get('apple')?.connected_at || null,
     },
   ];
 }
@@ -787,6 +844,28 @@ export async function syncTaskToCloudCalendars(env: CalendarEnv, task: Task, ori
       if (!selected) continue;
 
       const existing = await readSyncMap(env.DB, task.id, task.user_id, provider);
+
+      if (provider === 'apple') {
+        const ics = buildAppleEventICS(task);
+        if (!ics) continue;
+
+        const eventPath = existing?.external_event_id || `${selected.id}aiva-task-${task.id}.ics`;
+        const resp = await providerApi(env, task.user_id, 'apple', origin, eventPath, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/calendar; charset=utf-8' },
+          body: ics,
+        });
+
+        if (resp?.ok) {
+          if (!existing) {
+            await upsertSyncMap(env.DB, task.id, task.user_id, 'apple', selected.id, eventPath);
+          }
+        } else {
+          console.error('Apple CalDAV sync failed:', await resp?.text());
+        }
+        continue;
+      }
+
       const payload = provider === 'google' ? buildGoogleEvent(task) : buildMicrosoftEvent(task);
       if (!payload) continue;
 
@@ -877,9 +956,14 @@ async function removeTaskFromCloudCalendar(
   const map = await readSyncMap(env.DB, taskId, userId, provider);
   if (!map) return;
 
-  const path = provider === 'google'
-    ? `/calendar/v3/calendars/${encodeURIComponent(map.external_calendar_id)}/events/${encodeURIComponent(map.external_event_id)}`
-    : `/v1.0/me/calendars/${encodeURIComponent(map.external_calendar_id)}/events/${encodeURIComponent(map.external_event_id)}`;
+  let path;
+  if (provider === 'apple') {
+    path = map.external_event_id;
+  } else if (provider === 'google') {
+    path = `/calendar/v3/calendars/${encodeURIComponent(map.external_calendar_id)}/events/${encodeURIComponent(map.external_event_id)}`;
+  } else {
+    path = `/v1.0/me/calendars/${encodeURIComponent(map.external_calendar_id)}/events/${encodeURIComponent(map.external_event_id)}`;
+  }
 
   const resp = await providerApi(env, userId, provider, origin, path, { method: 'DELETE' });
   if (resp && !resp.ok && resp.status !== 404) {
@@ -899,6 +983,56 @@ export async function listExternalEvents(
 ): Promise<Array<{ id: string; title: string; start: string | null; end: string | null }>> {
   const selected = await getSelectedCalendar(env.DB, userId, provider);
   if (!selected) return [];
+
+  if (provider === 'apple') {
+    // CalDAV REPORT to fetch events in a range
+    const body = `<?xml version="1.0" encoding="utf-8" ?>
+      <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+        <d:prop><d:getetag /><c:calendar-data /></d:prop>
+        <c:filter>
+          <c:comp-filter name="VCALENDAR">
+            <c:comp-filter name="VEVENT">
+              <c:time-range start="${fromIso.replace(/[-:]/g, '').split('.')[0]}Z" end="${toIso.replace(/[-:]/g, '').split('.')[0]}Z"/>
+            </c:comp-filter>
+          </c:comp-filter>
+        </c:filter>
+      </c:calendar-query>`;
+
+    const resp = await providerApi(env, userId, provider, origin, selected.id, {
+      method: 'REPORT',
+      headers: { 'Content-Type': 'text/xml; charset=utf-8', Depth: '1' },
+      body,
+    });
+
+    if (!resp?.ok) return [];
+    const xml = await resp.text();
+    const events: any[] = [];
+    const responses = xml.split(/<response>/i).slice(1);
+
+    for (const r of responses) {
+      const dataMatch = r.match(/<calendar-data[^>]*>([\s\S]*?)<\/calendar-data>/i);
+      const hrefMatch = r.match(/<href[^>]*>(.*?)<\/href>/i);
+      if (dataMatch && hrefMatch) {
+        const ics = dataMatch[1].trim();
+        const summary = ics.match(/SUMMARY:(.*)/i)?.[1] || '(без заглавие)';
+        const start = ics.match(/DTSTART(?:;TZID=[^:]+)?:(\d{8}T\d{6})/i)?.[1];
+        const end = ics.match(/DTEND(?:;TZID=[^:]+)?:(\d{8}T\d{6})/i)?.[1];
+
+        const format = (s?: string) => {
+          if (!s) return null;
+          return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 11)}:${s.slice(11, 13)}:${s.slice(13, 15)}`;
+        };
+
+        events.push({
+          id: hrefMatch[1],
+          title: summary.trim(),
+          start: format(start),
+          end: format(end),
+        });
+      }
+    }
+    return events;
+  }
 
   if (provider === 'google') {
     const path = `/calendar/v3/calendars/${encodeURIComponent(selected.id)}/events?singleEvents=true&orderBy=startTime&timeMin=${encodeURIComponent(fromIso)}&timeMax=${encodeURIComponent(toIso)}`;
@@ -926,7 +1060,7 @@ export async function listExternalEvents(
 }
 
 export function normalizeProvider(value: string | null | undefined): CalendarProvider | null {
-  if (value === 'google' || value === 'microsoft') return value;
+  if (value === 'google' || value === 'microsoft' || value === 'apple') return value;
   return null;
 }
 
@@ -935,13 +1069,102 @@ export function requestOrigin(url: URL): string {
 }
 
 export function providerLabel(provider: CalendarProvider): string {
+  if (provider === 'apple') return 'Apple Calendar (iCloud)';
   return provider === 'google' ? 'Google Calendar' : 'Outlook Calendar';
 }
 
 export function calendarCapabilities() {
   return {
-    primary: ['google', 'microsoft'],
-    secondary: ['apple-caldav'],
+    primary: ['google', 'microsoft', 'apple-caldav'],
+    secondary: [],
     fallback: ['native-device', 'ics-webcal'],
   };
+}
+
+// --- Apple CalDAV Helpers ---
+
+async function fetchAppleCalendars(appleId: string, password: string): Promise<Array<{ id: string; name: string; primary: boolean; timezone?: string }>> {
+  const auth = btoa(`${appleId}:${password}`);
+
+  // 1. Discovery
+  const discResp = await fetch('https://caldav.icloud.com/', {
+    method: 'PROPFIND',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'text/xml; charset=utf-8',
+      Depth: '0',
+    },
+    body: `<?xml version="1.0" encoding="utf-8" ?>
+      <d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+        <d:prop><c:calendar-home-set /></d:prop>
+      </d:propfind>`,
+  });
+
+  if (!discResp.ok) throw new Error('Apple Discovery failed');
+  const discXml = await discResp.text();
+  const homeSetMatch = discXml.match(/<calendar-home-set[^>]*>\s*<href[^>]*>(.*?)<\/href>/i);
+  if (!homeSetMatch) throw new Error('Could not find Apple calendar home set');
+  const homeUrl = homeSetMatch[1];
+
+  // 2. List calendars
+  const listResp = await fetch(homeUrl, {
+    method: 'PROPFIND',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'text/xml; charset=utf-8',
+      Depth: '1',
+    },
+    body: `<?xml version="1.0" encoding="utf-8" ?>
+      <d:propfind xmlns:d="DAV:">
+        <d:prop><d:displayname /><d:resourcetype /></d:prop>
+      </d:propfind>`,
+  });
+
+  if (!listResp.ok) throw new Error('Apple Calendar list failed');
+  const listXml = await listResp.text();
+
+  // Simple XML parsing with regex for calendars
+  const calendars: Array<{ id: string; name: string; primary: boolean }> = [];
+  const responses = listXml.split(/<response>/i).slice(1);
+
+  for (const resp of responses) {
+    if (resp.includes('<calendar xmlns="urn:ietf:params:xml:ns:caldav"/>')) {
+      const hrefMatch = resp.match(/<href[^>]*>(.*?)<\/href>/i);
+      const nameMatch = resp.match(/<displayname[^>]*>(.*?)<\/displayname>/i);
+      if (hrefMatch) {
+        const href = hrefMatch[1];
+        calendars.push({
+          id: href.startsWith('http') ? href : new URL(href, homeUrl).toString(),
+          name: nameMatch ? nameMatch[1] : 'Apple Calendar',
+          primary: nameMatch?.[1]?.toLowerCase() === 'calendar',
+        });
+      }
+    }
+  }
+
+  return calendars;
+}
+
+export async function connectAppleAccount(
+  db: D1Database,
+  userId: string,
+  appleId: string,
+  appSpecificPassword: string,
+  origin: string
+): Promise<void> {
+  // Test connection and sync calendars
+  const calendars = await fetchAppleCalendars(appleId, appSpecificPassword);
+
+  await saveConnection(
+    db,
+    userId,
+    'apple',
+    appSpecificPassword, // stored as access_token
+    '', // refresh_token not used
+    expiryFromNow(365 * 24 * 3600), // Far future expiration
+    'caldav',
+    appleId // stored as provider_user_id
+  );
+
+  await upsertCalendars(db, userId, 'apple', calendars);
 }
