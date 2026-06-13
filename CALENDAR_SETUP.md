@@ -1,65 +1,67 @@
 # Интеграция с Календари (Google, Apple, Android Native)
 
-Този документ описва стъпките за активиране на интеграцията с календари в уеб версията и APK на AIVA.
+Този документ описва архитектурата и стъпките за активиране на пълна двупосочна синхронизация (четене и запис) с календари в уеб версията и APK на AIVA.
 
-## 1. Google Calendar (Уеб и APK)
-Интеграцията се извършва през Cloudflare Worker чрез OAuth 2.0.
+## Архитектурна матрица (Пълен достъп)
+
+| Екосистема | Уеб Версия (Бекенд: Cloudflare Worker) | Android APK (Локално устройство) |
+| --- | --- | --- |
+| **Google** | **OAuth 2.0 REST API** (активно) | **OAuth 2.0** (споделен токен с уеб) |
+| **Outlook** | **Microsoft Graph API** (активно) | **Microsoft Graph API** (споделен токен) |
+| **Apple (iCloud)** | **CalDAV клиент** (препоръчително) | **Native Capacitor Plugin** (директен достъп) |
+
+---
+
+## 1. Google и Microsoft Outlook (Облачна синхронизация)
+Синхронизацията минава изцяло през **Cloudflare Worker (Бекенд)**, което гарантира еднакво поведение в уеб и APK.
 
 ### Стъпки за конфигуриране:
-1.  **Google Cloud Console:**
-    *   Създайте нов проект или изберете съществуващ.
-    *   Активирайте **Google Calendar API**.
-    *   Отидете на **Credentials** -> **Create Credentials** -> **OAuth 2.0 Client ID** (тип: Web Application).
-    *   Добавете `https://aiva.radilov-k.workers.dev/settings.html` в **Authorized redirect URIs**.
+1.  **Регистрация на приложение:**
+    *   **Google:** В Google Cloud Console създайте OAuth 2.0 Client ID (Web Application). Добавете `https://aiva.radilov-k.workers.dev/settings.html` в Redirect URIs.
+    *   **Microsoft:** В Azure Portal (App Registrations) регистрирайте приложение с разрешения `Calendars.ReadWrite` и `offline_access`.
 2.  **Настройка на Secrets в Cloudflare:**
-    Изпълнете следните команди в терминала (в директория `workers`):
     ```bash
+    # Google
     wrangler secret put GOOGLE_CLIENT_ID
     wrangler secret put GOOGLE_CLIENT_SECRET
-    ```
-    Въведете съответните стойности от Google Cloud Console.
-3.  **Активиране в приложението:**
-    Отидете в **Настройки** -> **Календар**, натиснете **Свържи Google**, оторизирайте се и изберете календар.
-
-## 2. Microsoft Outlook Calendar
-Аналогично на Google, поддържа се интеграция чрез Azure AD.
-
-### Стъпки:
-1.  Регистрирайте приложение в **Azure Portal (App Registrations)**.
-2.  Добавете API разрешения за `Calendars.ReadWrite` и `offline_access`.
-3.  Задайте Secrets:
-    ```bash
+    # Microsoft
     wrangler secret put MICROSOFT_CLIENT_ID
     wrangler secret put MICROSOFT_CLIENT_SECRET
     ```
+3.  **Поток в приложението:**
+    Потребителят натиска "Свържи" -> Оторизира се -> Избира конкретен календар от списъка. Бекендът записва `refresh_token` и `calendarId` за автоматичен запис/четене от AI асистента.
 
-## 3. Apple Calendar (iOS и Уеб)
-Използва се метод на абонамент или директно споделяне на файлове.
+---
 
-### Метод А: Абонамент (Автоматичен)
-1.  В **Настройки** -> **Календар** изберете **"Автоматично — абонамент"**.
-2.  Натиснете бутона **Apple Calendar** или копирайте `webcal://` линка в приложението Calendar на iOS/macOS.
+## 2. Apple Calendar (iCloud)
+За пълен достъп (не само четене чрез ICS) се използват два подхода:
 
-### Метод Б: Ръчно споделяне
-*   В детайлите на задача натиснете **"Добави в календара"**. Приложението ще генерира `.ics` файл и ще отвори системното меню за споделяне.
+### А. В Уеб версията (CalDAV)
+Потребителят въвежда **Apple ID** и **App-Specific Password**. Worker-ът действа като CalDAV клиент:
+1. Извиква `PROPFIND` към `https://caldav.icloud.com/`.
+2. Извлича списъка с календари.
+3. Записва събития чрез `PUT` заявки по CalDAV протокола.
 
-## 4. Native Android Интеграция (APK)
-Асистентът може да пише директно в системния календар на Android.
-
-### Стъпки:
-1.  **Разрешения в AndroidManifest.xml:**
-    Проверете дали следните редове са налични:
+### Б. В APK версията (Native)
+Използва се Capacitor плъгин (напр. `AivaCalendar`), който изисква директен достъп до системния календар на Android.
+*   **Разрешения в AndroidManifest.xml:**
     ```xml
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     ```
-2.  **Настройка:**
-    В **Настройки** -> **Календар** изберете режим **"Директно в календара на телефона (Android APK)"** и свържете локален календар.
 
-## 5. Гласово управление
-След настройка, можете да използвате команди като:
-*   *"Какво имам в календара за утре?"*
-*   *"Промени часа на срещата в календара"*
-*   *"Изтрий събитието от календара"*
+---
 
-Асистентът използва инструментите `read_calendar_events`, `edit_calendar_event` и `delete_calendar_event` за тези операции.
+## 3. Текущо състояние на имплементацията
+*   ✅ **Google Calendar OAuth**: Напълно имплементирано (Бекенд + Фронтенд).
+*   ✅ **Microsoft Outlook OAuth**: Напълно имплементирано (Бекенд + Фронтенд).
+*   ✅ **Native Android Sync**: Имплементирано за APK версията.
+*   ⚠️ **Apple iCloud (CalDAV)**: В момента се поддържа чрез **ICS абонамент** (само четене) и **Manual Share** (запис чрез .ics файл). Пълната CalDAV интеграция за уеб е планирана за бъдещо разширение.
+
+---
+
+## 4. Гласово управление (AI Асистент)
+Асистентът е обучен да използва следните инструменти за управление на календара:
+*   `read_calendar_events`: Чете събития от избрания календар.
+*   `edit_calendar_event`: Редактира съществуващи събития.
+*   `delete_calendar_event`: Изтрива събития след потвърждение.
