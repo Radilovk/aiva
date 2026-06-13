@@ -1,6 +1,6 @@
 # Интеграция с Календари (Google, Apple, Android Native)
 
-Този документ описва архитектурата и стъпките за активиране на пълна двупосочна синхронизация (четене и запис) с календари в уеб версията и APK на AIVA.
+Този документ описва архитектурата и стъпките за активиране на **пълен двупосочен достъп (четене и запис)** с календари в уеб версията и APK на AIVA.
 
 ## Архитектурна матрица (Пълен достъп)
 
@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | **Google** | **OAuth 2.0 REST API** (активно) | **OAuth 2.0** (споделен токен с уеб) |
 | **Outlook** | **Microsoft Graph API** (активно) | **Microsoft Graph API** (споделен токен) |
-| **Apple (iCloud)** | **CalDAV клиент** (препоръчително) | **Native Capacitor Plugin** (директен достъп) |
+| **Apple (iCloud)** | **CalDAV клиент** (препоръчително за 100% покритие) | **CalDAV през Бекенд** (същият подход като уеб) |
 
 ---
 
@@ -21,47 +21,44 @@
     *   **Microsoft:** В Azure Portal (App Registrations) регистрирайте приложение с разрешения `Calendars.ReadWrite` и `offline_access`.
 2.  **Настройка на Secrets в Cloudflare:**
     ```bash
-    # Google
     wrangler secret put GOOGLE_CLIENT_ID
     wrangler secret put GOOGLE_CLIENT_SECRET
-    # Microsoft
     wrangler secret put MICROSOFT_CLIENT_ID
     wrangler secret put MICROSOFT_CLIENT_SECRET
     ```
 3.  **Поток в приложението:**
-    Потребителят натиска "Свържи" -> Оторизира се -> Избира конкретен календар от списъка. Бекендът записва `refresh_token` и `calendarId` за автоматичен запис/четене от AI асистента.
+    Потребителят натиска "Свържи" -> Оторизира се -> Избира конкретен календар. Бекендът записва `refresh_token` и `calendarId`.
 
 ---
 
-## 2. Apple Calendar (iCloud)
-За пълен достъп (не само четене чрез ICS) се използват два подхода:
+## 2. Apple Calendar (iCloud) — Пълен достъп чрез CalDAV
+Тъй като Apple няма OAuth REST API, единственият начин за двупосочен достъп (четене/запис) от уеб и Android APK е чрез **CalDAV** протокола, имплементиран в бекенда.
 
-### А. В Уеб версията (CalDAV)
-Потребителят въвежда **Apple ID** и **App-Specific Password**. Worker-ът действа като CalDAV клиент:
-1. Извиква `PROPFIND` към `https://caldav.icloud.com/`.
-2. Извлича списъка с календари.
-3. Записва събития чрез `PUT` заявки по CalDAV протокола.
+### А. UX Поток (Уеб и APK)
+1. Потребителят отива на `Настройки` -> `Свържи Apple Календар`.
+2. Въвежда:
+    *   **Apple ID** (напр. `user@icloud.com`)
+    *   **App-Specific Password** (генерирана от appleid.apple.com)
+3. Натиска "Свържи".
 
-### Б. В APK версията (Native)
-Използва се Capacitor плъгин (напр. `AivaCalendar`), който изисква директен достъп до системния календар на Android.
-*   **Разрешения в AndroidManifest.xml:**
-    ```xml
-    <uses-permission android:name="android.permission.READ_CALENDAR" />
-    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
-    ```
+### Б. Бекенд имплементация (Cloudflare Worker)
+Бекендът изпълнява следните стъпки чрез HTTP заявки:
+1.  **Discovery (PROPFIND):** Открива специфичния сървърен възел (home-set URL) на потребителя чрез `https://caldav.icloud.com/`.
+2.  **Listing (PROPFIND):** Извлича списък с календарите (Личен, Работа) и техните пътища (`href`).
+3.  **Sync (PUT/DELETE):** Записва събития чрез изпращане на `.ics` стрингове с `PUT` заявки директно към адреса на избрания календар.
+
+### В. Защо това решава проблема?
+Тъй като логиката е в Cloudflare Worker, тя работи идентично за уеб версията и за Android APK. Няма нужда от нативни плъгини, защото и двете платформи комуникират с iCloud през твоя бекенд.
 
 ---
 
 ## 3. Текущо състояние на имплементацията
 *   ✅ **Google Calendar OAuth**: Напълно имплементирано (Бекенд + Фронтенд).
 *   ✅ **Microsoft Outlook OAuth**: Напълно имплементирано (Бекенд + Фронтенд).
-*   ✅ **Native Android Sync**: Имплементирано за APK версията.
-*   ⚠️ **Apple iCloud (CalDAV)**: В момента се поддържа чрез **ICS абонамент** (само четене) и **Manual Share** (запис чрез .ics файл). Пълната CalDAV интеграция за уеб е планирана за бъдещо разширение.
+*   ✅ **Native Android Sync**: Поддържа се за локални Android календари в APK.
+*   ⚠️ **Apple iCloud (CalDAV)**: В момента се поддържа чрез **ICS абонамент** (само четене) и **Manual Share**. Пълната CalDAV интеграция е препоръчителният архитектурен път за двупосочен достъп.
 
 ---
 
 ## 4. Гласово управление (AI Асистент)
-Асистентът е обучен да използва следните инструменти за управление на календара:
-*   `read_calendar_events`: Чете събития от избрания календар.
-*   `edit_calendar_event`: Редактира съществуващи събития.
-*   `delete_calendar_event`: Изтрива събития след потвърждение.
+Асистентът използва инструментите `read_calendar_events`, `edit_calendar_event` и `delete_calendar_event`, за да управлява свързаните календари чрез бекенда.
