@@ -165,6 +165,24 @@
     }
     .saved-toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
 
+    .settings-footer {
+      margin-top: 40px;
+      padding: 20px 0;
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.8rem;
+      transition: color 0.2s;
+    }
+
+    .footer-link:hover {
+      color: var(--accent);
+    }
+
     @media (max-width: 480px) {
       .row-grid { grid-template-columns: 1fr; }
     }
@@ -468,6 +486,10 @@
       <button class="btn danger" id="resetBtn" type="button">Нулирай всичко</button>
       <button class="btn primary" id="saveBtn" type="button">Запази</button>
     </div>
+
+    <footer class="settings-footer">
+      <a href="privacy.html" class="footer-link">Декларация за поверителност (Privacy Policy)</a>
+    </footer>
   </div>
 
   <div class="saved-toast" id="savedToast">✓ Настройките са запазени</div>
