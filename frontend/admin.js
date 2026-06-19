@@ -49,6 +49,7 @@ function getModalities(settings) {
 
 function renderSettings(settings) {
   document.documentElement.style.setProperty('--accent', settings.appearance.accentColor);
+  window.AIVA_VOICES?.populateVoiceSelect?.(voiceField, settings.voiceName);
   promptField.value = settings.systemInstructions;
   modelField.value = settings.model;
   voiceField.value = settings.voiceName;

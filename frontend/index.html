@@ -269,6 +269,156 @@
       white-space: nowrap;
     }
 
+    /* App first-run onboarding */
+    .app-onboard {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(5, 5, 8, 0.92);
+      backdrop-filter: blur(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .app-onboard.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .app-onboard-card {
+      width: min(100%, 440px);
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: rgba(17, 17, 24, 0.95);
+      padding: 32px 28px 28px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+    }
+
+    .onboard-dots {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+
+    .onboard-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .onboard-dot.active {
+      background: var(--accent);
+      transform: scale(1.2);
+    }
+
+    .onboard-dot.done {
+      background: rgba(255, 59, 92, 0.45);
+    }
+
+    .onboard-step h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .onboard-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      line-height: 1.5;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .onboard-lang-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .onboard-lang-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 14px 12px;
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .onboard-lang-btn.selected {
+      border-color: var(--accent);
+      background: rgba(255, 59, 92, 0.12);
+      color: white;
+    }
+
+    .onboard-name-input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      font: inherit;
+      font-size: 1rem;
+      padding: 14px 16px;
+      margin-bottom: 24px;
+      outline: none;
+    }
+
+    .onboard-name-input:focus {
+      border-color: var(--accent);
+    }
+
+    .onboard-intro-body {
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      line-height: 1.65;
+      white-space: pre-line;
+      margin-bottom: 28px;
+    }
+
+    .onboard-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .onboard-primary {
+      width: 100%;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: white;
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 14px 20px;
+      cursor: pointer;
+    }
+
+    .onboard-skip {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 0.82rem;
+      padding: 8px;
+      cursor: pointer;
+    }
+
     .calendar-onboard {
       position: fixed;
       inset: 0;
@@ -1210,22 +1360,22 @@
     <header class="header">
       <div class="brand">
         <div class="logo">AIVA</div>
-        <div class="tagline">гласов асистент за задачи</div>
+        <div class="tagline" data-i18n="tagline">гласов асистент за задачи</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <button class="calendar-sync-chip" id="calendarSyncChip" type="button" hidden title="Календар">📅 Календар</button>
-        <a class="admin-link" href="./settings.html">⚙ Настройки</a>
+        <button class="calendar-sync-chip" id="calendarSyncChip" type="button" hidden title="Календар">📅 <span data-i18n="calendar">Календар</span></button>
+        <a class="admin-link" href="./settings.html" data-i18n="settings">⚙ Настройки</a>
       </div>
     </header>
 
     <div class="calendar-banner" id="calendarBanner" hidden>
-      <span>Свържи календара си — задачите ще се появяват автоматично с напомняния</span>
-      <button class="calendar-banner-btn" id="calendarBannerConnect" type="button">Свържи</button>
+      <span data-i18n="calendarBanner">Свържи календара си — задачите ще се появяват автоматично с напомняния</span>
+      <button class="calendar-banner-btn" id="calendarBannerConnect" type="button" data-i18n="connectCalendar">Свържи</button>
     </div>
 
     <section class="upcoming-strip" id="upcomingStrip" hidden>
       <div class="upcoming-strip-header">
-        <span>⏰ Предстоящи</span>
+        <span>⏰ <span data-i18n="upcoming">Предстоящи</span></span>
         <span id="upcomingCount">0</span>
       </div>
       <div class="upcoming-list" id="upcomingList"></div>
@@ -1233,7 +1383,7 @@
 
     <section class="voice-section">
       <div class="record-wrapper">
-        <button class="record-btn" id="recordBtn" aria-label="Запис">
+        <button class="record-btn" id="recordBtn" data-i18n-aria="record" aria-label="Запис">
           <svg viewBox="0 0 24 24">
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
@@ -1248,37 +1398,37 @@
         <span></span><span></span><span></span><span></span><span></span>
       </div>
 
-      <div class="status" id="status" role="status" aria-live="polite">Докоснете за запис</div>
+      <div class="status" id="status" role="status" aria-live="polite" data-i18n="tapToRecord">Докоснете за запис</div>
     </section>
 
     <section class="tasks-panel" id="tasksPanel">
       <div class="tasks-header">
         <div class="tasks-heading">
-          <span class="tasks-title">Календар</span>
+          <span class="tasks-title" data-i18n="tasksTitle">Календар</span>
           <span class="tasks-count" id="tasksCount">0</span>
         </div>
         <div class="tasks-actions">
-          <button class="ghost-btn primary-action" id="addTaskBtn" type="button">+ Задача</button>
+          <button class="ghost-btn primary-action" id="addTaskBtn" type="button" data-i18n="addTask">+ Задача</button>
         </div>
       </div>
 
       <div class="calendar-toolbar">
         <div class="range-control">
-          <button class="icon-btn" id="prevRange" type="button" aria-label="Предишен период">‹</button>
+          <button class="icon-btn" id="prevRange" type="button" data-i18n-aria="prevPeriod" aria-label="Предишен период">‹</button>
           <div class="range-label" id="rangeLabel">Днес</div>
-          <button class="icon-btn" id="nextRange" type="button" aria-label="Следващ период">›</button>
+          <button class="icon-btn" id="nextRange" type="button" data-i18n-aria="nextPeriod" aria-label="Следващ период">›</button>
         </div>
         <div class="view-tabs" role="tablist" aria-label="Календарни изгледи">
-          <button class="view-tab active" data-view="day" type="button" aria-pressed="true">Ден</button>
-          <button class="view-tab" data-view="three" type="button" aria-pressed="false">3 дни</button>
-          <button class="view-tab" data-view="week" type="button" aria-pressed="false">Календар</button>
-          <button class="view-tab" data-view="month" type="button" aria-pressed="false">Месец</button>
-          <button class="view-tab" id="todayBtn" type="button">Днес</button>
+          <button class="view-tab active" data-view="day" type="button" aria-pressed="true" data-i18n="viewDay">Ден</button>
+          <button class="view-tab" data-view="three" type="button" aria-pressed="false" data-i18n="viewThree">3 дни</button>
+          <button class="view-tab" data-view="week" type="button" aria-pressed="false" data-i18n="viewWeek">Календар</button>
+          <button class="view-tab" data-view="month" type="button" aria-pressed="false" data-i18n="viewMonth">Месец</button>
+          <button class="view-tab" id="todayBtn" type="button" data-i18n="today">Днес</button>
         </div>
       </div>
 
       <div id="tasksContainer">
-        <div class="empty-state">Все още няма задачи</div>
+        <div class="empty-state" data-i18n="emptyTasks">Все още няма задачи</div>
       </div>
     </section>
   </div>
@@ -1380,6 +1530,39 @@
   <!-- Error toast -->
   <div class="error-toast" id="errorToast"></div>
 
+  <!-- App first-run onboarding -->
+  <div class="app-onboard" id="appOnboard" aria-hidden="true">
+    <div class="app-onboard-card" role="dialog" aria-modal="true">
+      <div class="onboard-dots" aria-hidden="true">
+        <span class="onboard-dot active"></span>
+        <span class="onboard-dot"></span>
+        <span class="onboard-dot"></span>
+      </div>
+
+      <div class="onboard-step" id="onboardStepLang">
+        <h2 data-i18n="onboardingLangTitle">Изберете език</h2>
+        <p class="onboard-subtitle" data-i18n="onboardingLangSubtitle">Интерфейсът, асистентът и текстовото извеждане ще бъдат на този език.</p>
+        <div class="onboard-lang-grid" id="onboardLangGrid"></div>
+      </div>
+
+      <div class="onboard-step" id="onboardStepName" hidden>
+        <h2 data-i18n="onboardingNameTitle">Вашето име</h2>
+        <p class="onboard-subtitle" data-i18n="onboardingNameSubtitle">Как асистентът да се обръща към вас?</p>
+        <input class="onboard-name-input" id="onboardUserName" type="text" data-i18n-placeholder="onboardingNamePlaceholder" placeholder="напр. Иван" autocomplete="name">
+      </div>
+
+      <div class="onboard-step" id="onboardStepIntro" hidden>
+        <h2 data-i18n="onboardingIntroTitle">Добре дошли в AIVA</h2>
+        <p class="onboard-intro-body" data-i18n="onboardingIntroBody">AIVA е вашият личен гласов асистент за задачи и календар.</p>
+      </div>
+
+      <div class="onboard-actions">
+        <button class="onboard-primary" id="onboardNext" type="button" data-i18n="continue">Продължи</button>
+        <button class="onboard-skip" id="onboardSkip" type="button" data-i18n="skip">Пропусни</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Calendar onboarding -->
   <div class="calendar-onboard" id="calendarOnboard" aria-hidden="true">
     <div class="calendar-onboard-card" role="dialog" aria-modal="true" aria-labelledby="calendarOnboardTitle">
@@ -1398,6 +1581,8 @@
 
   <script src="config.js"></script>
   <script src="settings.js"></script>
+  <script src="lib/i18n.js"></script>
+  <script src="lib/voices.js"></script>
   <script src="lib/icsUtils.js"></script>
   <script src="local-scheduler.js"></script>
   <script src="lib/deviceCalendar.js"></script>
@@ -1405,6 +1590,7 @@
   <script src="lib/calendarCrud.js"></script>
   <script src="lib/calendarSync.js"></script>
   <script src="lib/calendarOnboarding.js"></script>
+  <script src="lib/appOnboarding.js"></script>
   <script src="lib/geminilive.js"></script>
   <script src="lib/haptics.js"></script>
   <script src="lib/mediaUtils.js"></script>
