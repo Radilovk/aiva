@@ -3,7 +3,11 @@
  */
 
 const { API_BASE, LIVE_MODEL } = window.AIVA_CONFIG;
-const { loadAssistantSettings } = window.AIVA_SETTINGS;
+const { loadAssistantSettings, buildSessionInstructions } = window.AIVA_SETTINGS;
+
+function t(key) {
+  return window.AIVA_I18N?.t?.(key) ?? key;
+}
 
 // --- User ID ---
 function getUserId() {
@@ -390,6 +394,11 @@ function applyPreferences() {
   assistantSettings = loadAssistantSettings();
   document.documentElement.style.setProperty('--accent', assistantSettings.appearance.accentColor);
   document.body.classList.toggle('compact-calendar', assistantSettings.appearance.compactCalendar);
+  window.AIVA_I18N?.initFromSettings?.(assistantSettings);
+  window.AIVA_I18N?.applyToDocument?.(document, assistantSettings.profile?.language);
+  if (!isSessionActive) {
+    setStatus(t('tapToRecord'));
+  }
 }
 
 function setStatus(text, active = false, mode = 'default') {
@@ -404,8 +413,8 @@ function setAssistantSpeech(text) {
   setStatus(trimmed, true, 'assistant');
 }
 
-const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още/i;
-const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|не\s+искам|не\s+е\s+нужно)\b/i;
+const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още|anything\s+else|need\s+anything|something\s+else|还需要|还需要其他|कुछ\s+और|algo\s+más|شيء\s+آخر|autre\s+chose|besoin\s+d.autre|noch\s+etwas|brauchen\s+sie\s+noch|ещё\s+что|нужно\s+ещё/i;
+const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|no|nope|nothing|that's all|done|enough|нет|没有|नहीं|नहीं\s+धन्यवाद|no\s+gracias|لا|non|nein|ничего|спасибо,\s*нет)\b/i;
 
 function detectClosingQuestion(text) {
   if (CLOSING_QUESTION_RE.test(String(text || '').toLowerCase())) {
@@ -1292,14 +1301,14 @@ function getTaskById(id) {
 async function handleGeminiMessage(message) {
   switch (message.type) {
     case MultimodalLiveResponseType.SETUP_COMPLETE:
-      setStatus('Слушам...', true);
+      setStatus(t('listening'), true);
       waveform.classList.add('active');
       try {
         if (!audioStreamer) audioStreamer = new AudioStreamer(client);
         await audioStreamer.start();
         isSessionActive = true;
         recordBtn.classList.add('recording');
-        recordBtn.setAttribute('aria-label', 'Спри записа');
+        recordBtn.setAttribute('aria-label', t('stopRecording'));
         window.AIVA_HAPTICS?.onListeningStart?.();
       } catch (e) {
         console.error('Audio start failed:', e);
@@ -1422,7 +1431,7 @@ async function connectSession() {
   if (isConnecting || isSessionActive) return;
   isConnecting = true;
   recordBtn.disabled = true;
-  setStatus('Свързване...', true);
+  setStatus(t('connecting'), true);
   applyPreferences();
 
   try {
@@ -1440,16 +1449,20 @@ async function connectSession() {
     awaitingCloseConfirmation = false;
     pendingUserTranscript = '';
     assistantTranscriptBuffer = '';
-    let instructions = assistantSettings.systemInstructions
-      + buildTasksContextForAssistant()
+    let extraContext = buildTasksContextForAssistant()
       + buildCalendarContextForAssistant(calendarEvents);
     if (voiceFocusTask) {
-      instructions += `\n\nФОКУС: Потребителят иска да обсъди или редактира задача ID ${voiceFocusTask.id}: "${voiceFocusTask.content}". Започни с кратко потвърждение и предложи помощ (редакция, съвет, изтриване, маркиране като готова).`;
+      extraContext += `\n\nФОКУС: Потребителят иска да обсъди или редактира задача ID ${voiceFocusTask.id}: "${voiceFocusTask.content}". Започни с кратко потвърждение и предложи помощ (редакция, съвет, изтриване, маркиране като готова).`;
       voiceFocusTask = null;
     }
+    const instructions = buildSessionInstructions(
+      assistantSettings.systemInstructions,
+      assistantSettings.profile,
+      extraContext
+    );
     client.systemInstructions = instructions;
-    client.inputAudioTranscription = assistantSettings.inputAudioTranscription;
-    client.outputAudioTranscription = assistantSettings.outputAudioTranscription;
+    client.inputAudioTranscription = assistantSettings.textOutputEnabled;
+    client.outputAudioTranscription = assistantSettings.textOutputEnabled;
     client.responseModalities = assistantSettings.responseModalities;
     client.voiceName = assistantSettings.voiceName;
     client.temperature = assistantSettings.temperature;
@@ -1468,7 +1481,7 @@ async function connectSession() {
     client.addFunction(new EndSessionTool());
 
     client.onReceiveResponse = handleGeminiMessage;
-    client.onOpen = () => setStatus('Свързване...', true);
+    client.onOpen = () => setStatus(t('connecting'), true);
     client.onClose = () => {
       if (isSessionActive) disconnectSession();
     };
@@ -1510,10 +1523,10 @@ function disconnectSession() {
   assistantTranscriptBuffer = '';
   recordBtn.classList.remove('recording');
   recordBtn.disabled = false;
-  recordBtn.setAttribute('aria-label', 'Запис');
   waveform.classList.remove('active');
   statusEl.classList.remove('assistant-speech');
-  setStatus('Докоснете за запис');
+  setStatus(t('tapToRecord'));
+  recordBtn.setAttribute('aria-label', t('record'));
   if (wasActive) {
     window.AIVA_HAPTICS?.onListeningStop?.();
   }
@@ -1680,6 +1693,10 @@ window.addEventListener('aiva:settings-updated', () => {
   renderCalendar();
   window.AIVA_CALENDAR_ONBOARD?.updateHeaderStatus?.();
   window.AIVA_CALENDAR_ONBOARD?.updateBanner?.(tasks.some((t) => t.due_date));
+});
+
+window.addEventListener('aiva:profile-updated', () => {
+  applyPreferences();
 });
 
 window.addEventListener('aiva:calendar-connected', () => {

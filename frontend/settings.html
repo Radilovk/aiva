@@ -191,8 +191,22 @@
 <body>
   <div class="settings-app">
     <div class="settings-header">
-      <h1>⚙ Настройки</h1>
-      <a class="back-link" href="./index.html">← Начало</a>
+      <h1>⚙ <span data-i18n="settingsTitle">Настройки</span></h1>
+      <a class="back-link" href="./index.html" data-i18n="backHome">← Начало</a>
+    </div>
+
+    <!-- Profile -->
+    <div class="section">
+      <div class="section-title" data-i18n="profile">👤 Профил</div>
+      <div class="field">
+        <span class="field-label" data-i18n="language">Език</span>
+        <select id="profileLanguage"></select>
+      </div>
+      <div class="field">
+        <span class="field-label" data-i18n="yourName">Вашето име</span>
+        <input type="text" id="profileUserName" data-i18n-placeholder="onboardingNamePlaceholder" placeholder="напр. Иван">
+        <div class="field-hint" data-i18n="yourNameHint">Как асистентът да се обръща към вас</div>
+      </div>
     </div>
 
     <!-- Notifications -->
@@ -337,39 +351,30 @@
 
     <!-- Voice Assistant -->
     <div class="section">
-      <div class="section-title">🎙 Гласов асистент</div>
+      <div class="section-title" data-i18n="voiceAssistant">🎙 Гласов асистент</div>
       <div class="field">
-        <span class="field-label">Модел</span>
+        <span class="field-label" data-i18n="model">Модел</span>
         <select id="model">
           <option value="gemini-3.1-flash-live-preview">Gemini 3.1 Flash (Live)</option>
         </select>
       </div>
       <div class="field">
-        <span class="field-label">Глас</span>
-        <select id="voiceName">
-          <option value="Kore">Kore</option>
-          <option value="Puck">Puck</option>
-          <option value="Charon">Charon</option>
-          <option value="Fenrir">Fenrir</option>
-          <option value="Aoede">Aoede</option>
-        </select>
+        <span class="field-label" data-i18n="voice">Глас</span>
+        <select id="voiceName"></select>
       </div>
       <div class="field">
-        <span class="field-label">Температура (креативност)</span>
+        <span class="field-label" data-i18n="temperature">Температура (креативност)</span>
         <input type="number" id="temperature" min="0" max="2" step="0.1">
       </div>
       <div class="toggle-row">
-        <span class="toggle-label">Google Grounding (интернет достъп)</span>
+        <span class="toggle-label" data-i18n="googleGrounding">Google Grounding (интернет достъп)</span>
         <div class="toggle" id="toggleGrounding"></div>
       </div>
       <div class="toggle-row">
-        <span class="toggle-label">Транскрипция на входа</span>
-        <div class="toggle" id="toggleInputTranscription"></div>
+        <span class="toggle-label" data-i18n="textOutput">Текстово извеждане</span>
+        <div class="toggle" id="toggleTextOutput"></div>
       </div>
-      <div class="field">
-        <span class="field-label">Системни инструкции</span>
-        <textarea id="systemInstructions"></textarea>
-      </div>
+      <div class="field-hint" data-i18n="textOutputHint">Показва разговора като текст на избрания език</div>
     </div>
 
     <!-- Calendar View -->
@@ -496,6 +501,8 @@
 
   <script src="config.js"></script>
   <script src="settings.js"></script>
+  <script src="lib/i18n.js"></script>
+  <script src="lib/voices.js"></script>
   <script src="lib/icsUtils.js"></script>
   <script src="local-scheduler.js"></script>
   <script src="lib/deviceCalendar.js"></script>
@@ -510,9 +517,22 @@
     const platform = window.Capacitor?.getPlatform?.() || 'web';
     const isAndroidPlatform = platform === 'android';
     let settings = loadAssistantSettings();
+    window.AIVA_I18N.initFromSettings(settings);
+    window.AIVA_I18N.populateLanguageSelect(document.getElementById('profileLanguage'), settings.profile?.language);
+    window.AIVA_VOICES.populateVoiceSelect(document.getElementById('voiceName'), settings.voiceName);
+    window.AIVA_I18N.applyToDocument(document);
+
+    function applySettingsLanguage(lang) {
+      window.AIVA_I18N.setLanguage(lang);
+      window.AIVA_I18N.applyToDocument(document, lang);
+    }
 
     // --- Populate UI from settings ---
     function populateUI() {
+      // Profile
+      document.getElementById('profileLanguage').value = settings.profile?.language || 'bg';
+      document.getElementById('profileUserName').value = settings.profile?.userName || '';
+
       // Notifications
       setToggle('toggleNotifications', settings.notifications?.enabled);
       document.getElementById('reminderMinutes').value = settings.notifications?.reminderMinutes || 15;
@@ -531,11 +551,10 @@
 
       // Voice
       document.getElementById('model').value = settings.model;
-      document.getElementById('voiceName').value = settings.voiceName;
+      window.AIVA_VOICES.populateVoiceSelect(document.getElementById('voiceName'), settings.voiceName);
       document.getElementById('temperature').value = settings.temperature;
       setToggle('toggleGrounding', settings.googleGrounding);
-      setToggle('toggleInputTranscription', settings.inputAudioTranscription);
-      document.getElementById('systemInstructions').value = settings.systemInstructions;
+      setToggle('toggleTextOutput', settings.textOutputEnabled);
 
       // Calendar
       document.getElementById('defaultView').value = settings.calendar.defaultView;
@@ -856,8 +875,12 @@
         voiceName: document.getElementById('voiceName').value,
         temperature: parseFloat(document.getElementById('temperature').value) || 1.0,
         googleGrounding: getToggle('toggleGrounding'),
-        inputAudioTranscription: getToggle('toggleInputTranscription'),
-        systemInstructions: document.getElementById('systemInstructions').value,
+        textOutputEnabled: getToggle('toggleTextOutput'),
+        profile: {
+          ...settings.profile,
+          language: document.getElementById('profileLanguage').value,
+          userName: document.getElementById('profileUserName').value.trim(),
+        },
         calendar: {
           defaultView: document.getElementById('defaultView').value,
           weekStartsOn: parseInt(document.getElementById('weekStartsOn').value, 10),
@@ -1036,8 +1059,13 @@
       alert(result.granted ? '✓ Достъпът до календара е разрешен' : 'Достъпът е отказан — опитайте от настройките на телефона');
     });
 
+    document.getElementById('profileLanguage').addEventListener('change', (e) => {
+      applySettingsLanguage(e.target.value);
+    });
+
     document.getElementById('saveBtn').addEventListener('click', async () => {
       settings = saveAssistantSettings(collectSettings());
+      applySettingsLanguage(settings.profile?.language || 'bg');
       if (getToggle('toggleNotifications')) {
         if (window.AIVA_NOTIFIER) {
           const granted = await window.AIVA_NOTIFIER.requestPermission();

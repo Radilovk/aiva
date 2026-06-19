@@ -1,13 +1,16 @@
 /**
  * AIVA Service Worker — offline caching + push notifications
  */
-const CACHE_NAME = 'aiva-v4';
+const CACHE_NAME = 'aiva-v5';
 const ASSETS = [
   '/index.html',
   '/settings.html',
   '/admin.html',
   '/config.js',
   '/settings.js',
+  '/lib/i18n.js',
+  '/lib/voices.js',
+  '/lib/appOnboarding.js',
   '/app.js',
   '/admin.js',
   '/local-scheduler.js',
