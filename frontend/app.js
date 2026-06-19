@@ -413,8 +413,8 @@ function setAssistantSpeech(text) {
   setStatus(trimmed, true, 'assistant');
 }
 
-const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още|anything\s+else|need\s+anything|something\s+else|还需要|还需要其他|कुछ\s+और|algo\s+más|شيء\s+آخر/i;
-const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|no|nope|nothing|that's all|done|enough|нет|没有|नहीं|नहीं\s+धन्यवाद|no\s+gracias|لا)\b/i;
+const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още|anything\s+else|need\s+anything|something\s+else|还需要|还需要其他|कुछ\s+और|algo\s+más|شيء\s+آخر|autre\s+chose|besoin\s+d.autre|noch\s+etwas|brauchen\s+sie\s+noch|ещё\s+что|нужно\s+ещё/i;
+const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|no|nope|nothing|that's all|done|enough|нет|没有|नहीं|नहीं\s+धन्यवाद|no\s+gracias|لا|non|nein|ничего|спасибо,\s*нет)\b/i;
 
 function detectClosingQuestion(text) {
   if (CLOSING_QUESTION_RE.test(String(text || '').toLowerCase())) {
