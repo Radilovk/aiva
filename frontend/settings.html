@@ -211,59 +211,59 @@
 
     <!-- Notifications -->
     <div class="section">
-      <div class="section-title">🔔 Нотификации</div>
+      <div class="section-title" data-i18n="notifications">🔔 Нотификации</div>
       <div class="toggle-row">
-        <span class="toggle-label">Напомняния за задачи</span>
+        <span class="toggle-label" data-i18n="notifTaskReminders">Напомняния за задачи</span>
         <div class="toggle" id="toggleNotifications"></div>
       </div>
       <div class="field">
-        <span class="field-label">Напомняне преди (минути)</span>
+        <span class="field-label" data-i18n="reminderBeforeMins">Напомняне преди (минути)</span>
         <select id="reminderMinutes">
-          <option value="5">5 минути</option>
-          <option value="10">10 минути</option>
-          <option value="15">15 минути</option>
-          <option value="30">30 минути</option>
-          <option value="60">1 час</option>
+          <option value="5" data-i18n="min5">5 минути</option>
+          <option value="10" data-i18n="min10">10 минути</option>
+          <option value="15" data-i18n="min15">15 минути</option>
+          <option value="30" data-i18n="min30">30 минути</option>
+          <option value="60" data-i18n="hour1">1 час</option>
         </select>
       </div>
       <div class="row-grid">
         <div class="field">
-          <span class="field-label">Тихи часове — от</span>
+          <span class="field-label" data-i18n="quietFrom">Тихи часове — от</span>
           <input type="time" id="quietStart">
         </div>
         <div class="field">
-          <span class="field-label">Тихи часове — до</span>
+          <span class="field-label" data-i18n="quietTo">Тихи часове — до</span>
           <input type="time" id="quietEnd">
         </div>
       </div>
       <div class="toggle-row">
-        <span class="toggle-label">Звук при нотификация</span>
+        <span class="toggle-label" data-i18n="notifSound">Звук при нотификация</span>
         <div class="toggle" id="toggleSound"></div>
       </div>
       <div class="toggle-row">
-        <span class="toggle-label">Напомняне в момента на събитието</span>
+        <span class="toggle-label" data-i18n="remindAtEvent">Напомняне в момента на събитието</span>
         <div class="toggle" id="toggleRemindAtStart"></div>
       </div>
       <div class="toggle-row">
-        <span class="toggle-label">Показвай лента „Предстоящи"</span>
+        <span class="toggle-label" data-i18n="showUpcomingBar">Показвай лента „Предстоящи"</span>
         <div class="toggle" id="toggleUpcomingStrip"></div>
       </div>
-      <p class="sync-note">На Android APK напомнянията работят дори когато приложението е затворено. На iOS и уеб — включете календарния абонамент за напомняния от системния календар.</p>
+      <p class="sync-note" data-i18n="notifPlatformNote">На Android APK напомнянията работят дори когато приложението е затворено. На iOS и уеб — включете календарния абонамент за напомняния от системния календар.</p>
     </div>
 
     <!-- Calendar Sync -->
     <div class="section" id="calendar-sync">
-      <div class="section-title">📅 Календар</div>
+      <div class="section-title" data-i18n="calSyncTitle">📅 Календар</div>
       <div class="field" data-calendar-platform="web">
-        <span class="field-label">Свържи облачен календар (основен режим)</span>
+        <span class="field-label" data-i18n="connectCloud">Свържи облачен календар (основен режим)</span>
         <div class="subscribe-actions">
-          <button class="btn primary" type="button" id="connectGoogleBtn">Свържи Google</button>
-          <button class="btn primary" type="button" id="connectMicrosoftBtn">Свържи Outlook</button>
+          <button class="btn primary" type="button" id="connectGoogleBtn" data-i18n="connectGoogle">Свържи Google</button>
+          <button class="btn primary" type="button" id="connectMicrosoftBtn" data-i18n="connectOutlook">Свържи Outlook</button>
         </div>
-        <p class="sync-note" id="cloudStatusText">Не е свързан облачен календар.</p>
+        <p class="sync-note" id="cloudStatusText" data-i18n="cloudDisconnected">Не е свързан облачен календар.</p>
       </div>
       <div class="field" data-calendar-platform="web">
-        <span class="field-label">Избери календар след свързване</span>
+        <span class="field-label" data-i18n="pickCalAfterConnect">Избери календар след свързване</span>
         <div class="row-grid">
           <select id="cloudProviderSelect">
             <option value="google">Google</option>
@@ -271,56 +271,56 @@
             <option value="apple">Apple (iCloud)</option>
           </select>
           <select id="cloudCalendarSelect">
-            <option value="">Няма заредени календари</option>
+            <option value="" data-i18n="noCalendarsLoaded">Няма заредени календари</option>
           </select>
         </div>
         <div class="subscribe-actions" style="margin-top:10px">
-          <button class="btn" type="button" id="refreshCloudCalendarsBtn">Обнови календари</button>
-          <button class="btn" type="button" id="saveCloudCalendarBtn">Запази избор</button>
-          <button class="btn danger" type="button" id="disconnectCloudBtn">Разкачи провайдъра</button>
+          <button class="btn" type="button" id="refreshCloudCalendarsBtn" data-i18n="refreshCals">Обнови календари</button>
+          <button class="btn" type="button" id="saveCloudCalendarBtn" data-i18n="savePick">Запази избор</button>
+          <button class="btn danger" type="button" id="disconnectCloudBtn" data-i18n="disconnectProv">Разкачи провайдъра</button>
         </div>
       </div>
       <div class="field" data-calendar-platform="web">
-        <span class="field-label">Apple / iCloud (Пълен достъп)</span>
+        <span class="field-label" data-i18n="appleIcloudFull">Apple / iCloud (Пълен достъп)</span>
         <div id="appleConnectForm" style="display:none; margin-top:10px; border:1px solid var(--border); padding:15px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.02);">
           <div class="field">
-            <span class="field-label">Apple ID (email)</span>
+            <span class="field-label" data-i18n="appleIdLabel">Apple ID (email)</span>
             <input type="text" id="appleId" placeholder="user@icloud.com">
           </div>
           <div class="field">
-            <span class="field-label">App-Specific Password</span>
+            <span class="field-label" data-i18n="appPassword">App-Specific Password</span>
             <input type="text" id="applePassword" placeholder="xxxx-xxxx-xxxx-xxxx">
-            <p class="field-hint">Генерирайте парола на <a href="https://appleid.apple.com" target="_blank" style="color:var(--accent)">appleid.apple.com</a></p>
+            <p class="field-hint" data-i18n="appPasswordHint">Генерирайте парола на appleid.apple.com</p>
           </div>
-          <button class="btn primary" type="button" id="submitAppleBtn">Свържи iCloud</button>
+          <button class="btn primary" type="button" id="submitAppleBtn" data-i18n="connectIcloudBtn">Свържи iCloud</button>
         </div>
-        <button class="btn" type="button" id="showAppleFormBtn">Свържи Apple Календар</button>
-        <p class="sync-note">Използва се CalDAV за двупосочна синхронизация (четене и запис).</p>
+        <button class="btn" type="button" id="showAppleFormBtn" data-i18n="showAppleCal">Свържи Apple Календар</button>
+        <p class="sync-note" data-i18n="appleCalDAVDesc">Използва се CalDAV за двупосочна синхронизация (четене и запис).</p>
       </div>
       <div class="field" id="androidLocalCalendarSection" data-calendar-platform="android" style="display:none">
-        <span class="field-label">Свържи локален календар</span>
-        <button class="btn primary" type="button" id="connectLocalCalendarBtn">Свържи локален календар</button>
+        <span class="field-label" data-i18n="connectLocal">Свържи локален календар</span>
+        <button class="btn primary" type="button" id="connectLocalCalendarBtn" data-i18n="connectLocal">Свържи локален календар</button>
         <div class="row-grid" id="localCalendarPicker" style="margin-top:10px;display:none">
           <select id="localCalendarSelect">
-            <option value="">Няма намерени локални календари</option>
+            <option value="" data-i18n="noLocalCalsFound">Няма намерени локални календари</option>
           </select>
-          <button class="btn" type="button" id="saveLocalCalendarBtn">Запази</button>
+          <button class="btn" type="button" id="saveLocalCalendarBtn" data-i18n="save">Запази</button>
         </div>
-        <p class="sync-note" id="localCalendarStatusText">Не е избран локален календар.</p>
+        <p class="sync-note" id="localCalendarStatusText" data-i18n="localCalNotSelected">Не е избран локален календар.</p>
       </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
       <div class="field">
-        <span class="field-label">Fallback синхронизация (резервен режим)</span>
+        <span class="field-label" data-i18n="fallbackTitle">Fallback синхронизация (резервен режим)</span>
         <select id="calendarProvider">
-          <option value="none">Изключено</option>
-          <option value="subscribe">Автоматично — абонамент (препоръчано за iOS/уеб)</option>
-          <option value="native">Директно в календара на телефона (Android APK)</option>
-          <option value="manual">При всяка нова задача</option>
+          <option value="none" data-i18n="provNone">Изключено</option>
+          <option value="subscribe" data-i18n="provSubscribe">Автоматично — абонамент (препоръчано за iOS/уеб)</option>
+          <option value="native" data-i18n="provNative">Директно в календара на телефона (Android APK)</option>
+          <option value="manual" data-i18n="provManual">При всяка нова задача</option>
         </select>
-        <div class="field-hint">Абонаментът синхронизира всички задачи в Google / Apple / Samsung / Outlook календар. На Android APK директният режим записва събития в системния календар с напомняния.</div>
+        <div class="field-hint" data-i18n="fallbackHint">Абонаментът синхронизира всички задачи в Google / Apple / Samsung / Outlook календар. На Android APK директният режим записва събития в системния календар с напомняния.</div>
       </div>
       <div class="field" id="subscribeSection" style="display:none">
-        <span class="field-label">Абонирай се (избери календар)</span>
+        <span class="field-label" data-i18n="subPickCal">Абонирай се (избери календар)</span>
         <div class="subscribe-actions">
           <button class="btn primary" type="button" id="subscribeGoogleBtn">Google Calendar</button>
           <button class="btn" type="button" id="subscribeAppleBtn">Apple Calendar</button>
@@ -329,23 +329,23 @@
         </div>
         <div class="ics-url" style="margin-top:12px">
           <input type="text" id="icsUrl" readonly>
-          <button class="btn" type="button" id="copyIcsBtn">Копирай</button>
+          <button class="btn" type="button" id="copyIcsBtn" data-i18n="copyBtn">Копирай</button>
         </div>
         <div class="subscribe-actions">
-          <button class="btn" type="button" id="exportAllIcsBtn">Импортирай всички задачи (.ics)</button>
+          <button class="btn" type="button" id="exportAllIcsBtn" data-i18n="importAllIcs">Импортирай всички задачи (.ics)</button>
         </div>
-        <p class="sync-note">След абониране календарът обновява задачите автоматично (обикновено на 15–60 мин). При промяна в AIVA събитието се актуализира в календара.</p>
+        <p class="sync-note" data-i18n="subscribeHint">След абониране календарът обновява задачите автоматично (обикновено на 15–60 мин). При промяна в AIVA събитието се актуализира в календара.</p>
       </div>
       <div class="field" id="manualSection" style="display:none">
         <div class="toggle-row">
-          <span class="toggle-label">Предлагай календар при нова задача</span>
+          <span class="toggle-label" data-i18n="offerCalOnNew">Предлагай календар при нова задача</span>
           <div class="toggle" id="toggleAutoExport"></div>
         </div>
-        <p class="sync-note">При всяка нова задача с дата ще се отвори споделяне към календарното приложение на устройството — изберете кой календар да ползвате.</p>
+        <p class="sync-note" data-i18n="manualHint">При всяка нова задача с дата ще се отвори споделяне към календарното приложение на устройството — изберете кой календар да ползвате.</p>
       </div>
       <div class="field" id="nativeSection" style="display:none">
-        <p class="sync-note">Директен режим за Android APK — задачите се записват в системния календар с напомняния. Изисква разрешение за календар при първо ползване.</p>
-        <button class="btn primary" type="button" id="requestCalendarPermBtn">Разреши достъп до календара</button>
+        <p class="sync-note" data-i18n="nativeHint">Директен режим за Android APK — задачите се записват в системния календар с напомняния. Изисква разрешение за календар при първо ползване.</p>
+        <button class="btn primary" type="button" id="requestCalendarPermBtn" data-i18n="grantCalPerm">Разреши достъп до календара</button>
       </div>
     </div>
 
@@ -379,68 +379,68 @@
 
     <!-- Calendar View -->
     <div class="section">
-      <div class="section-title">📆 Календар</div>
+      <div class="section-title" data-i18n="calViewTitle">📆 Календар</div>
       <div class="row-grid">
         <div class="field">
-          <span class="field-label">Изглед по подразбиране</span>
+          <span class="field-label" data-i18n="defaultViewLabel">Изглед по подразбиране</span>
           <select id="defaultView">
-            <option value="day">Ден</option>
-            <option value="three">3 дни</option>
-            <option value="week">Седмица</option>
-            <option value="month">Месец</option>
+            <option value="day" data-i18n="viewDay">Ден</option>
+            <option value="three" data-i18n="viewThree">3 дни</option>
+            <option value="week" data-i18n="viewWeek">Седмица</option>
+            <option value="month" data-i18n="viewMonth">Месец</option>
           </select>
         </div>
         <div class="field">
-          <span class="field-label">Седмицата започва от</span>
+          <span class="field-label" data-i18n="weekStartLabel">Седмицата започва от</span>
           <select id="weekStartsOn">
-            <option value="1">Понеделник</option>
-            <option value="0">Неделя</option>
+            <option value="1" data-i18n="monday">Понеделник</option>
+            <option value="0" data-i18n="sunday">Неделя</option>
           </select>
         </div>
         <div class="field">
-          <span class="field-label">Работен ден — от</span>
+          <span class="field-label" data-i18n="workDayFrom">Работен ден — от</span>
           <input type="time" id="workingDayStart">
         </div>
         <div class="field">
-          <span class="field-label">Работен ден — до</span>
+          <span class="field-label" data-i18n="workDayTo">Работен ден — до</span>
           <input type="time" id="workingDayEnd">
         </div>
       </div>
       <div class="toggle-row">
-        <span class="toggle-label">Показвай задачи без дата</span>
+        <span class="toggle-label" data-i18n="showNoDateTasks">Показвай задачи без дата</span>
         <div class="toggle" id="toggleShowUnscheduled"></div>
       </div>
     </div>
 
     <!-- Defaults -->
     <div class="section">
-      <div class="section-title">📋 Стойности по подразбиране</div>
+      <div class="section-title" data-i18n="defaultsTitle">📋 Стойности по подразбиране</div>
       <div class="row-grid">
         <div class="field">
-          <span class="field-label">Приоритет</span>
+          <span class="field-label" data-i18n="defPriority">Приоритет</span>
           <select id="defaultPriority">
-            <option value="1">П1 — висок</option>
-            <option value="2">П2</option>
-            <option value="3">П3</option>
-            <option value="4">П4</option>
-            <option value="5">П5 — нисък</option>
+            <option value="1" data-i18n="priorityP1">П1 — висок</option>
+            <option value="2" data-i18n="priorityP2">П2</option>
+            <option value="3" data-i18n="priorityP3">П3</option>
+            <option value="4" data-i18n="priorityP4">П4</option>
+            <option value="5" data-i18n="priorityP5">П5 — нисък</option>
           </select>
         </div>
         <div class="field">
-          <span class="field-label">Продължителност (мин)</span>
+          <span class="field-label" data-i18n="defDuration">Продължителност (мин)</span>
           <input type="number" id="defaultMinutes" min="0" max="480">
         </div>
         <div class="field">
-          <span class="field-label">Час по подразбиране</span>
+          <span class="field-label" data-i18n="defTime">Час по подразбиране</span>
           <input type="time" id="defaultDueTime">
         </div>
         <div class="field">
-          <span class="field-label">Емоция</span>
+          <span class="field-label" data-i18n="defEmotion">Емоция</span>
           <select id="defaultEmotion">
-            <option value="neutral">neutral</option>
-            <option value="urgent">urgent</option>
-            <option value="stress">stress</option>
-            <option value="tired">tired</option>
+            <option value="neutral" data-i18n="emotionNeutralLabel">neutral</option>
+            <option value="urgent" data-i18n="emotionUrgentLabel">urgent</option>
+            <option value="stress" data-i18n="emotionStressLabel">stress</option>
+            <option value="tired" data-i18n="emotionTiredLabel">tired</option>
           </select>
         </div>
       </div>
@@ -448,60 +448,61 @@
 
     <!-- Safety -->
     <div class="section">
-      <div class="section-title">🛡 Безопасност</div>
+      <div class="section-title" data-i18n="safetyTitle">🛡 Безопасност</div>
       <div class="toggle-row">
-        <span class="toggle-label">Питай преди изтриване</span>
+        <span class="toggle-label" data-i18n="askDelete">Питай преди изтриване</span>
         <div class="toggle" id="toggleAskDelete"></div>
       </div>
       <div class="toggle-row">
-        <span class="toggle-label">Показвай завършени задачи</span>
+        <span class="toggle-label" data-i18n="showCompleted">Показвай завършени задачи</span>
         <div class="toggle" id="toggleShowCompleted"></div>
       </div>
       <div class="field">
-        <span class="field-label">Максимални дати за мултиплициране</span>
+        <span class="field-label" data-i18n="maxDupDates">Максимални дати за мултиплициране</span>
         <input type="number" id="maxDuplicateDays" min="1" max="365">
       </div>
     </div>
 
     <!-- Appearance -->
     <div class="section">
-      <div class="section-title">🎨 Външен вид</div>
+      <div class="section-title" data-i18n="appearanceTitle">🎨 Външен вид</div>
       <div class="field">
-        <span class="field-label">Акцентен цвят</span>
+        <span class="field-label" data-i18n="accentLabel">Акцентен цвят</span>
         <input type="color" id="accentColor">
       </div>
       <div class="toggle-row">
-        <span class="toggle-label">Компактен календар</span>
+        <span class="toggle-label" data-i18n="compactCal">Компактен календар</span>
         <div class="toggle" id="toggleCompactCalendar"></div>
       </div>
     </div>
 
     <!-- Data -->
     <div class="section">
-      <div class="section-title">💾 Данни</div>
+      <div class="section-title" data-i18n="dataTitle">💾 Данни</div>
       <div class="btn-group">
-        <button class="btn" id="exportBtn" type="button">Експорт (JSON)</button>
-        <button class="btn" id="importBtn" type="button">Импорт</button>
+        <button class="btn" id="exportBtn" type="button" data-i18n="exportBtn">Експорт (JSON)</button>
+        <button class="btn" id="importBtn" type="button" data-i18n="importBtnLabel">Импорт</button>
       </div>
       <input type="file" id="importFile" accept=".json" style="display:none">
     </div>
 
     <!-- Actions -->
     <div class="btn-group">
-      <button class="btn danger" id="resetBtn" type="button">Нулирай всичко</button>
-      <button class="btn primary" id="saveBtn" type="button">Запази</button>
+      <button class="btn danger" id="resetBtn" type="button" data-i18n="resetAllBtn">Нулирай всичко</button>
+      <button class="btn primary" id="saveBtn" type="button" data-i18n="save">Запази</button>
     </div>
 
     <footer class="settings-footer">
-      <a href="privacy.html" class="footer-link">Декларация за поверителност (Privacy Policy)</a>
+      <a href="privacy.html" class="footer-link" data-i18n="privacyLink">Декларация за поверителност (Privacy Policy)</a>
     </footer>
   </div>
 
-  <div class="saved-toast" id="savedToast">✓ Настройките са запазени</div>
+  <div class="saved-toast" id="savedToast" data-i18n="settingsSaved">✓ Настройките са запазени</div>
 
   <script src="config.js"></script>
   <script src="settings.js"></script>
   <script src="lib/i18n.js"></script>
+  <script src="lib/i18n-extended.js"></script>
   <script src="lib/voices.js"></script>
   <script src="lib/icsUtils.js"></script>
   <script src="local-scheduler.js"></script>
@@ -516,6 +517,8 @@
     const calendarCrud = window.AIVA_CALENDAR_CRUD;
     const platform = window.Capacitor?.getPlatform?.() || 'web';
     const isAndroidPlatform = platform === 'android';
+    function t(key) { return window.AIVA_I18N?.t?.(key) ?? key; }
+    function tf(key, vars) { return window.AIVA_I18N?.tf?.(key, vars) ?? t(key); }
     let settings = loadAssistantSettings();
     window.AIVA_I18N.initFromSettings(settings);
     window.AIVA_I18N.populateLanguageSelect(document.getElementById('profileLanguage'), settings.profile?.language);
@@ -609,12 +612,12 @@
 
     async function connectLocalCalendar() {
       if (!calendarCrud?.isAndroid?.()) {
-        alert('Локалният календар е наличен само на Android APK');
+        alert(t('errLocalCalAndroid'));
         return;
       }
       const permissions = await calendarCrud.requestPermissions();
       if (!permissions.granted) {
-        alert('Достъпът до календара е отказан');
+        alert(t('errCalDenied'));
         return;
       }
 
@@ -622,14 +625,14 @@
       const select = document.getElementById('localCalendarSelect');
       select.innerHTML = '';
       if (!calendars.length) {
-        select.innerHTML = '<option value=\"\">Няма налични локални календари</option>';
+        select.innerHTML = `<option value="">${t('noLocalCalsAvail')}</option>`;
       } else {
         let primaryId = '';
         for (const cal of calendars) {
           const opt = document.createElement('option');
           opt.value = cal.id;
           const isPrimary = cal.isPrimary === true;
-          opt.textContent = isPrimary ? `${cal.name} (основен)` : cal.name;
+          opt.textContent = isPrimary ? `${cal.name} ${t('primarySuffix')}` : cal.name;
           select.appendChild(opt);
           if (isPrimary) primaryId = cal.id;
         }
@@ -657,14 +660,14 @@
       const status = document.getElementById('localCalendarStatusText');
       const selectedId = calendarCrud?.getSelectedCalendarId?.() || '';
       status.textContent = selectedId
-        ? `Свързан локален календар: ${selectedId}`
-        : 'Не е избран локален календар.';
+        ? tf('localCalConnected', { id: selectedId })
+        : t('localCalNotSelected');
     }
 
     function saveSelectedLocalCalendar() {
       const selectedId = document.getElementById('localCalendarSelect').value;
       if (!selectedId) {
-        alert('Избери локален календар');
+        alert(t('pickLocalCal'));
         return;
       }
       calendarCrud.setSelectedCalendarId(selectedId);
@@ -697,18 +700,18 @@
       const current = statuses.find((s) => s.provider === provider);
 
       if (!current) {
-        statusEl.textContent = 'Не е свързан облачен календар.';
+        statusEl.textContent = t('cloudDisconnected');
         return;
       }
 
       if (!current.configured) {
-        statusEl.textContent = `${provider === 'google' ? 'Google' : 'Outlook'} не е конфигуриран в сървъра.`;
+        statusEl.textContent = tf('cloudNotConfigured', { provider: provider === 'google' ? 'Google' : 'Outlook' });
         return;
       }
 
       statusEl.textContent = current.connected
-        ? `Свързан: ${provider === 'google' ? 'Google' : 'Outlook'}${current.selectedCalendarName ? ` · ${current.selectedCalendarName}` : ''}`
-        : `Не е свързан ${provider === 'google' ? 'Google' : 'Outlook'} календар.`;
+        ? tf('cloudConnected', { provider: provider === 'google' ? 'Google' : 'Outlook', name: current.selectedCalendarName ? ` · ${current.selectedCalendarName}` : '' })
+        : tf('cloudNotConnectedProvider', { provider: provider === 'google' ? 'Google' : 'Outlook' });
     }
 
     async function loadCloudCalendars() {
@@ -716,16 +719,16 @@
       const userId = getUserId();
       const provider = document.getElementById('cloudProviderSelect').value;
       const select = document.getElementById('cloudCalendarSelect');
-      select.innerHTML = '<option value=\"\">Зареждане...</option>';
+      select.innerHTML = `<option value="">${t('loading')}</option>`;
 
       if (!userId) {
-        select.innerHTML = '<option value=\"\">Липсва user_id</option>';
+        select.innerHTML = `<option value="">${t('noUserId')}</option>`;
         return;
       }
 
       const res = await fetch(`${getApiBase()}/api/calendar/calendars?user_id=${encodeURIComponent(userId)}&provider=${encodeURIComponent(provider)}`);
       if (!res.ok) {
-        select.innerHTML = '<option value=\"\">Няма връзка с провайдъра</option>';
+        select.innerHTML = `<option value="">${t('noProviderLink')}</option>`;
         await renderCloudStatus();
         return;
       }
@@ -733,7 +736,7 @@
       const data = await res.json();
       const calendars = data.calendars || [];
       if (!calendars.length) {
-        select.innerHTML = '<option value=\"\">Няма налични календари</option>';
+        select.innerHTML = `<option value="">${t('noCalendars')}</option>`;
         await renderCloudStatus();
         return;
       }
@@ -742,7 +745,7 @@
       for (const cal of calendars) {
         const opt = document.createElement('option');
         opt.value = cal.id;
-        opt.textContent = `${cal.name}${cal.primary ? ' (основен)' : ''}`;
+        opt.textContent = `${cal.name}${cal.primary ? ` ${t('primarySuffix')}` : ''}`;
         if (cal.selected) opt.selected = true;
         select.appendChild(opt);
       }
@@ -753,7 +756,7 @@
       if (isAndroidPlatform) return;
       const userId = getUserId();
       if (!userId) {
-        alert('Липсва потребителски ID');
+        alert(t('errNoUserId'));
         return;
       }
 
@@ -768,7 +771,7 @@
       });
       const data = await res.json();
       if (!res.ok || !data.url) {
-        alert(data.error || 'Неуспешно стартиране на OAuth');
+        alert(data.error || t('errOAuthStart'));
         return;
       }
 
@@ -799,7 +802,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || 'Неуспешно свързване на календара');
+        alert(data.error || t('errCalConnect'));
       }
 
       localStorage.removeItem('aiva_cloud_pending_provider');
@@ -812,7 +815,7 @@
       const provider = document.getElementById('cloudProviderSelect').value;
       const calendarId = document.getElementById('cloudCalendarSelect').value;
       if (!userId || !calendarId) {
-        alert('Избери календар');
+        alert(t('pickCalendar'));
         return;
       }
 
@@ -823,7 +826,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || 'Неуспешно запазване');
+        alert(data.error || t('errSaveFailed'));
         return;
       }
       await renderCloudStatus();
@@ -835,7 +838,7 @@
       const userId = getUserId();
       const provider = document.getElementById('cloudProviderSelect').value;
       if (!userId) return;
-      if (!confirm('Сигурни ли сте, че искате да разкачите провайдъра?')) return;
+      if (!confirm(t('confirmDisconnect'))) return;
 
       await fetch(`${getApiBase()}/api/calendar/connect`, {
         method: 'DELETE',
@@ -979,13 +982,13 @@
         const appleId = document.getElementById('appleId').value.trim();
         const password = document.getElementById('applePassword').value.trim();
         if (!appleId || !password) {
-          alert('Моля въведете Apple ID и парола');
+          alert(t('enterAppleCreds'));
           return;
         }
 
         const btn = document.getElementById('submitAppleBtn');
         btn.disabled = true;
-        btn.textContent = 'Свързване...';
+        btn.textContent = t('connecting');
 
         try {
           const res = await fetch(`${getApiBase()}/api/calendar/connect/apple`, {
@@ -994,7 +997,7 @@
             body: JSON.stringify({ user_id: getUserId(), apple_id: appleId, password: password }),
           });
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Грешка при свързване');
+          if (!res.ok) throw new Error(data.error || t('errConnectGeneric'));
 
           document.getElementById('appleConnectForm').style.display = 'none';
           document.getElementById('cloudProviderSelect').value = 'apple';
@@ -1004,7 +1007,7 @@
           alert(e.message);
         } finally {
           btn.disabled = false;
-          btn.textContent = 'Свържи iCloud';
+          btn.textContent = t('connectIcloudBtn');
         }
       });
     }
@@ -1013,7 +1016,7 @@
       try {
         await connectLocalCalendar();
       } catch (e) {
-        alert(e.message || 'Грешка при свързване на локален календар');
+        alert(e.message || t('errLocalConnect'));
       }
     });
     document.getElementById('saveLocalCalendarBtn')?.addEventListener('click', saveSelectedLocalCalendar);
@@ -1023,7 +1026,7 @@
       const text = calendarSync.getWebcalUrl() || input.value;
       navigator.clipboard.writeText(text).then(() => {
         document.getElementById('copyIcsBtn').textContent = '✓';
-        setTimeout(() => { document.getElementById('copyIcsBtn').textContent = 'Копирай'; }, 1500);
+        setTimeout(() => { document.getElementById('copyIcsBtn').textContent = t('copyBtn'); }, 1500);
       });
     });
 
@@ -1046,17 +1049,17 @@
         const data = await res.json();
         await calendarSync.exportAllToDevice(data.tasks || []);
       } catch (e) {
-        alert(e.message || 'Грешка при експорт');
+        alert(e.message || t('errExport'));
       }
     });
 
     document.getElementById('requestCalendarPermBtn')?.addEventListener('click', async () => {
       if (!calendarCrud?.isAndroid?.()) {
-        alert('Нативният календар е наличен само в Android APK');
+        alert(t('errNativeAndroid'));
         return;
       }
       const result = await calendarCrud.requestPermissions();
-      alert(result.granted ? '✓ Достъпът до календара е разрешен' : 'Достъпът е отказан — опитайте от настройките на телефона');
+      alert(result.granted ? t('calPermGranted') : t('calPermDenied'));
     });
 
     document.getElementById('profileLanguage').addEventListener('change', (e) => {
@@ -1082,7 +1085,7 @@
     });
 
     document.getElementById('resetBtn').addEventListener('click', () => {
-      if (!confirm('Сигурни ли сте, че искате да нулирате всички настройки?')) return;
+      if (!confirm(t('confirmReset'))) return;
       settings = resetAssistantSettings();
       populateUI();
       showSavedToast();
@@ -1100,7 +1103,7 @@
         a.click();
         URL.revokeObjectURL(a.href);
       } catch (e) {
-        alert('Грешка при експорт: ' + e.message);
+        alert(tf('errExportFail', { msg: e.message }));
       }
     });
 
@@ -1130,7 +1133,7 @@
         }
         showSavedToast();
       } catch (err) {
-        alert('Грешка при импорт: ' + err.message);
+        alert(tf('errImportFail', { msg: err.message }));
       }
       e.target.value = '';
     });

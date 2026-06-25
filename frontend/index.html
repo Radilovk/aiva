@@ -1418,7 +1418,7 @@
           <div class="range-label" id="rangeLabel">Днес</div>
           <button class="icon-btn" id="nextRange" type="button" data-i18n-aria="nextPeriod" aria-label="Следващ период">›</button>
         </div>
-        <div class="view-tabs" role="tablist" aria-label="Календарни изгледи">
+        <div class="view-tabs" role="tablist" data-i18n-aria="calendarViewsAria" aria-label="Календарни изгледи">
           <button class="view-tab active" data-view="day" type="button" aria-pressed="true" data-i18n="viewDay">Ден</button>
           <button class="view-tab" data-view="three" type="button" aria-pressed="false" data-i18n="viewThree">3 дни</button>
           <button class="view-tab" data-view="week" type="button" aria-pressed="false" data-i18n="viewWeek">Календар</button>
@@ -1437,81 +1437,81 @@
   <div class="task-modal" id="taskModal" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
-        <div class="modal-title" id="modalTitle">Детайли за задачата</div>
-        <button class="modal-close" id="closeTaskModal" type="button" aria-label="Затвори">×</button>
+        <div class="modal-title" id="modalTitle" data-i18n="taskDetails">Детайли за задачата</div>
+        <button class="modal-close" id="closeTaskModal" type="button" data-i18n-aria="close" aria-label="Затвори">×</button>
       </div>
 
       <form id="taskForm">
         <input id="taskId" name="id" type="hidden">
         <div class="form-grid">
           <label class="full-field">
-            Задача / ангажимент
-            <input name="content" required placeholder="Напр. Обади се на клиента">
+            <span data-i18n="taskContentLabel">Задача / ангажимент</span>
+            <input name="content" required data-i18n-placeholder="placeholderTask" placeholder="Напр. Обади се на клиента">
           </label>
 
           <label>
-            Дата
+            <span data-i18n="date">Дата</span>
             <input name="due_date" type="date">
           </label>
           <label>
-            Час
+            <span data-i18n="time">Час</span>
             <input name="due_time" type="time">
           </label>
           <label>
-            Приоритет
+            <span data-i18n="priority">Приоритет</span>
             <select name="priority">
-              <option value="1">П1 - висок</option>
-              <option value="2">П2</option>
-              <option value="3">П3</option>
-              <option value="4">П4</option>
-              <option value="5">П5 - нисък</option>
+              <option value="1" data-i18n="priorityP1">П1 - висок</option>
+              <option value="2" data-i18n="priorityP2">П2</option>
+              <option value="3" data-i18n="priorityP3">П3</option>
+              <option value="4" data-i18n="priorityP4">П4</option>
+              <option value="5" data-i18n="priorityP5">П5 - нисък</option>
             </select>
           </label>
           <label>
-            Емоция / контекст
+            <span data-i18n="emotionContext">Емоция / контекст</span>
             <select name="emotion">
-              <option value="neutral">neutral</option>
-              <option value="urgent">urgent</option>
-              <option value="stress">stress</option>
-              <option value="tired">tired</option>
+              <option value="neutral" data-i18n="emotionNeutralLabel">neutral</option>
+              <option value="urgent" data-i18n="emotionUrgentLabel">urgent</option>
+              <option value="stress" data-i18n="emotionStressLabel">stress</option>
+              <option value="tired" data-i18n="emotionTiredLabel">tired</option>
             </select>
           </label>
           <label>
-            Продължителност (мин)
+            <span data-i18n="durationMin">Продължителност (мин)</span>
             <input name="estimated_minutes" type="number" min="0" max="1440">
           </label>
           <label>
-            Локация
-            <input name="location" placeholder="Офис, онлайн, адрес...">
+            <span data-i18n="locationLabel">Локация</span>
+            <input name="location" data-i18n-placeholder="placeholderLocation" placeholder="Офис, онлайн, адрес...">
           </label>
           <label>
-            Тагове
-            <input name="tags" placeholder="работа, лично, важни">
+            <span data-i18n="tagsLabel">Тагове</span>
+            <input name="tags" data-i18n-placeholder="placeholderTags" placeholder="работа, лично, важни">
           </label>
           <label>
-            Повторяемост
-            <input name="repeat_rule" placeholder="всеки понеделник, месечно...">
+            <span data-i18n="repeatRule">Повторяемост</span>
+            <input name="repeat_rule" data-i18n-placeholder="placeholderRepeat" placeholder="всеки понеделник, месечно...">
           </label>
           <label class="full-field">
-            Допълнителна информация
-            <textarea name="notes" placeholder="Контекст, линкове, подзадачи, инструкции..."></textarea>
+            <span data-i18n="additionalInfo">Допълнителна информация</span>
+            <textarea name="notes" data-i18n-placeholder="placeholderNotes" placeholder="Контекст, линкове, подзадачи, инструкции..."></textarea>
           </label>
 
           <div class="duplicate-panel">
-            <p><strong>Мултиплициране:</strong> въведи по един ред във формат <code>YYYY-MM-DD HH:MM</code>, например <code>2026-06-08 09:30</code>.</p>
+            <p data-i18n="duplicateHelp"><strong>Мултиплициране:</strong> въведи по един ред във формат <code>YYYY-MM-DD HH:MM</code>, например <code>2026-06-08 09:30</code>.</p>
             <label class="full-field">
-              Дни и часове за копия
+              <span data-i18n="duplicateRowsLabel">Дни и часове за копия</span>
               <textarea id="duplicateRows" placeholder="2026-06-08 09:30&#10;2026-06-10 14:00"></textarea>
             </label>
           </div>
         </div>
 
         <div class="modal-actions">
-          <button class="ghost-btn danger-btn" id="deleteTaskBtn" type="button">Изтрий</button>
-          <button class="ghost-btn" id="duplicateTaskBtn" type="button">Мултиплицирай</button>
-          <button class="ghost-btn" id="addToCalendarBtn" type="button">📅 Календар</button>
-          <button class="ghost-btn" id="discussTaskBtn" type="button">🎙 Говори</button>
-          <button class="ghost-btn save-btn" type="submit">Запази</button>
+          <button class="ghost-btn danger-btn" id="deleteTaskBtn" type="button" data-i18n="deleteBtn">Изтрий</button>
+          <button class="ghost-btn" id="duplicateTaskBtn" type="button" data-i18n="duplicateBtn">Мултиплицирай</button>
+          <button class="ghost-btn" id="addToCalendarBtn" type="button" data-i18n="addToCalendarBtn">📅 Календар</button>
+          <button class="ghost-btn" id="discussTaskBtn" type="button" data-i18n="discussBtn">🎙 Говори</button>
+          <button class="ghost-btn save-btn" type="submit" data-i18n="save">Запази</button>
         </div>
       </form>
     </div>
@@ -1521,7 +1521,7 @@
   <div class="toast" id="toast">
     <div class="toast-header">
       <div class="toast-dot"></div>
-      <div class="toast-title">Запазена</div>
+      <div class="toast-title" data-i18n="saved">Запазена</div>
     </div>
     <div class="toast-content" id="toastContent"></div>
     <div class="toast-meta" id="toastMeta"></div>
@@ -1567,14 +1567,14 @@
   <div class="calendar-onboard" id="calendarOnboard" aria-hidden="true">
     <div class="calendar-onboard-card" role="dialog" aria-modal="true" aria-labelledby="calendarOnboardTitle">
       <div class="calendar-onboard-top">
-        <div class="calendar-onboard-title" id="calendarOnboardTitle">📅 Календар</div>
-        <button class="calendar-onboard-ghost" id="calendarOnboardClose" type="button" aria-label="Затвори">×</button>
+        <div class="calendar-onboard-title" id="calendarOnboardTitle" data-i18n="calOnboardTitle">📅 Календар</div>
+        <button class="calendar-onboard-ghost" id="calendarOnboardClose" type="button" data-i18n-aria="close" aria-label="Затвори">×</button>
       </div>
-      <p class="calendar-onboard-text" id="calendarOnboardText">Задачите с дата могат да се появяват автоматично в календара ти.</p>
+      <p class="calendar-onboard-text" id="calendarOnboardText" data-i18n="calOnboardDefault">Задачите с дата могат да се появяват автоматично в календара ти.</p>
       <div class="calendar-onboard-actions">
-        <button class="calendar-onboard-primary" id="calendarOnboardPrimary" type="button">Свържи календара</button>
-        <button class="calendar-onboard-secondary" id="calendarOnboardDevice" type="button">Само тази задача в календара</button>
-        <button class="calendar-onboard-ghost" id="calendarOnboardLater" type="button">Не сега</button>
+        <button class="calendar-onboard-primary" id="calendarOnboardPrimary" type="button" data-i18n="connectCalendar">Свържи календара</button>
+        <button class="calendar-onboard-secondary" id="calendarOnboardDevice" type="button" data-i18n="onlyThisTask">Само тази задача в календара</button>
+        <button class="calendar-onboard-ghost" id="calendarOnboardLater" type="button" data-i18n="notNowBtn">Не сега</button>
       </div>
     </div>
   </div>
@@ -1582,6 +1582,7 @@
   <script src="config.js"></script>
   <script src="settings.js"></script>
   <script src="lib/i18n.js"></script>
+  <script src="lib/i18n-extended.js"></script>
   <script src="lib/voices.js"></script>
   <script src="lib/icsUtils.js"></script>
   <script src="local-scheduler.js"></script>

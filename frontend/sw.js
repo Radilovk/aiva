@@ -1,7 +1,7 @@
 /**
  * AIVA Service Worker — offline caching + push notifications
  */
-const CACHE_NAME = 'aiva-v5';
+const CACHE_NAME = 'aiva-v6';
 const ASSETS = [
   '/index.html',
   '/settings.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   '/config.js',
   '/settings.js',
   '/lib/i18n.js',
+  '/lib/i18n-extended.js',
   '/lib/voices.js',
   '/lib/appOnboarding.js',
   '/app.js',
@@ -67,7 +68,7 @@ self.addEventListener('fetch', (event) => {
 
 // Push notification handler
 self.addEventListener('push', (event) => {
-  let data = { title: 'AIVA', body: 'Имате напомняне', tag: 'aiva-reminder' };
+  let data = { title: 'AIVA', body: 'You have a reminder', tag: 'aiva-reminder' };
   try {
     if (event.data) data = Object.assign(data, event.data.json());
   } catch (_e) {
@@ -83,8 +84,8 @@ self.addEventListener('push', (event) => {
       data: data,
       vibrate: [200, 100, 200],
       actions: [
-        { action: 'open', title: 'Отвори' },
-        { action: 'done', title: 'Готово ✓' },
+        { action: 'open', title: 'Open' },
+        { action: 'done', title: 'Done ✓' },
       ],
     })
   );

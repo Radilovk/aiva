@@ -473,7 +473,7 @@
       nextPeriod: 'Следващ период',
       viewDay: 'Ден',
       viewThree: '3 дни',
-      viewWeek: 'Календар',
+      viewWeek: 'Седмица',
       viewMonth: 'Месец',
       today: 'Днес',
       emptyTasks: 'Все още няма задачи',
@@ -544,7 +544,25 @@
 
   function t(key, lang) {
     const l = lang || currentLang;
-    return STRINGS[l]?.[key] ?? STRINGS.bg[key] ?? key;
+    return STRINGS[l]?.[key] ?? STRINGS.bg[key] ?? STRINGS.en?.[key] ?? key;
+  }
+
+  function tf(key, vars, lang) {
+    let text = t(key, lang);
+    if (vars && typeof vars === 'object') {
+      for (const [name, value] of Object.entries(vars)) {
+        text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value ?? ''));
+      }
+    }
+    return text;
+  }
+
+  function getBcp47(lang) {
+    return getLanguageMeta(lang || currentLang).bcp47;
+  }
+
+  function getLocale(lang) {
+    return getLanguageMeta(lang || currentLang).bcp47;
   }
 
   function applyToDocument(root, lang) {
@@ -567,6 +585,12 @@
     });
     scope.querySelectorAll('[data-i18n-aria]').forEach((el) => {
       el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'), l));
+    });
+    scope.querySelectorAll('[data-i18n-title]').forEach((el) => {
+      el.setAttribute('title', t(el.getAttribute('data-i18n-title'), l));
+    });
+    scope.querySelectorAll('option[data-i18n]').forEach((el) => {
+      el.textContent = t(el.getAttribute('data-i18n'), l);
     });
   }
 
@@ -592,6 +616,14 @@
     return lang;
   }
 
+  function mergeStrings(extra) {
+    if (!extra || typeof extra !== 'object') return;
+    for (const [lang, keys] of Object.entries(extra)) {
+      if (!STRINGS[lang]) STRINGS[lang] = {};
+      Object.assign(STRINGS[lang], keys);
+    }
+  }
+
   window.AIVA_I18N = {
     SUPPORTED_LANGUAGES,
     STRINGS,
@@ -599,7 +631,11 @@
     getLanguage,
     setLanguage,
     getLanguageMeta,
+    getBcp47,
+    getLocale,
     t,
+    tf,
+    mergeStrings,
     applyToDocument,
     populateLanguageSelect,
     getLanguageInstruction,

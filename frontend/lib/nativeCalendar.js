@@ -77,7 +77,7 @@
     if (!plugin?.addEvent) return null;
 
     const parsed = window.AIVA_ICS?.parseTaskDateTime(task);
-    if (!parsed) throw new Error('Задачата няма дата');
+    if (!parsed) throw new Error(window.AIVA_I18N?.t?.('errNoDate') || 'Task has no date');
 
     const opts = getReminderOptions();
     const result = await plugin.addEvent({
@@ -150,7 +150,7 @@
 
   async function openGoogleCalendar(task) {
     const url = window.AIVA_ICS?.getGoogleCalendarUrl(task);
-    if (!url) throw new Error('Задачата няма дата');
+    if (!url) throw new Error(window.AIVA_I18N?.t?.('errNoDate') || 'Task has no date');
     window.open(url, '_blank', 'noopener,noreferrer');
     return 'google';
   }
@@ -160,7 +160,7 @@
    */
   async function addToDeviceCalendar(task, options = {}) {
     if (!task?.due_date) {
-      throw new Error('Задачата няма дата — не може да се добави в календара');
+      throw new Error(window.AIVA_I18N?.t?.('errNoDateAdd') || 'Task has no date — cannot add to calendar');
     }
 
     const platform = getPlatform();
