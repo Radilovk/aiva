@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#050508">
-  <title>AIVA — Декларация за поверителност</title>
+  <title>AIVA — Privacy Policy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -41,6 +41,7 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 40px;
+      gap: 12px;
     }
 
     h1 { font-size: 1.5rem; font-weight: 700; }
@@ -58,6 +59,7 @@
       border-radius: 999px;
       padding: 8px 16px;
       transition: background 0.2s;
+      flex-shrink: 0;
     }
     .back-link:hover { background: var(--surface-hover); }
 
@@ -74,55 +76,68 @@
       font-size: 0.8rem;
       color: var(--text-secondary);
     }
+
+    [dir="rtl"] ul { padding-left: 0; padding-right: 20px; }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>Декларация за поверителност</h1>
-      <a class="back-link" href="settings.html">Назад</a>
+      <h1 data-i18n="privacyPageTitle">Privacy Policy</h1>
+      <a class="back-link" href="settings.html" data-i18n="privacyBack">Back</a>
     </header>
 
     <div class="card">
-      <p>Последна актуализация: 23 май 2024 г.</p>
+      <p data-i18n="privacyUpdated">Last updated: May 23, 2024</p>
 
-      <h2>1. Обща информация</h2>
-      <p>AIVA ("приложението", "ние") е личен гласов асистент за управление на задачи. Вашата поверителност е наш основен приоритет. Тази декларация обяснява как събираме, използваме и защитаваме вашата информация.</p>
+      <h2 data-i18n="privacySec1Title">1. General Information</h2>
+      <p data-i18n="privacySec1Body">AIVA is a personal voice assistant for task management.</p>
 
-      <h2>2. Събирани данни</h2>
+      <h2 data-i18n="privacySec2Title">2. Data Collected</h2>
       <ul>
-        <li><strong>Задачи и календарни събития:</strong> Съхраняваме съдържанието на задачите, които създавате, за да можем да ги показваме и управляваме.</li>
-        <li><strong>Гласови данни:</strong> Когато използвате гласовия асистент, вашето аудио се изпраща за транскрипция и обработка към AI моделите на Google Gemini. Ние не съхраняваме дългосрочно вашите аудио записи.</li>
-        <li><strong>Технически данни:</strong> Използваме локално хранилище (localStorage) на вашето устройство, за да запазим вашите лични настройки.</li>
+        <li data-i18n-html="privacySec2Li1"></li>
+        <li data-i18n-html="privacySec2Li2"></li>
+        <li data-i18n-html="privacySec2Li3"></li>
       </ul>
 
-      <h2>3. Използване на Google OAuth и данни от Google</h2>
-      <p>AIVA предлага интеграция с Google Calendar. Когато изберете да свържете вашия Google акаунт:</p>
+      <h2 data-i18n="privacySec3Title">3. Google OAuth and Google Data</h2>
+      <p data-i18n="privacySec3Intro">AIVA offers Google Calendar integration.</p>
       <ul>
-        <li><strong>Достъп:</strong> Приложението ще поиска разрешение за четене и запис във вашия Google Календар (<code>https://www.googleapis.com/auth/calendar.events</code>).</li>
-        <li><strong>Цел:</strong> Използваме този достъп единствено за да синхронизираме вашите задачи с вашия календар – да четем съществуващи събития (за да не се дублират ангажименти) и да създаваме нови събития въз основа на задачите, които поставяте в AIVA.</li>
-        <li><strong>Ограничена употреба (Limited Use):</strong> Използването и трансферът на информация, получена от API на Google, от страна на AIVA към всяко друго приложение, ще се придържа към <a href="https://developers.google.com/terms/api-services-user-data-policy#additional_requirements_for_specific_api_scopes" target="_blank" style="color:var(--accent)">Политиката за потребителски данни на услугите на Google API</a>, включително изискванията за ограничена употреба.</li>
-        <li><strong>Споделяне:</strong> Вашите данни от Google не се споделят с трети страни, освен ако това не е изрично необходимо за предоставяне на функциите на приложението (напр. изпращане на текст към AI модела за анализ).</li>
+        <li data-i18n-html="privacySec3Li1"></li>
+        <li data-i18n-html="privacySec3Li2"></li>
+        <li data-i18n-html="privacySec3Li3"></li>
+        <li data-i18n-html="privacySec3Li4"></li>
       </ul>
 
-      <h2>4. Съхранение на данни</h2>
-      <p>Вашите данни се съхраняват сигурно чрез платформите на Cloudflare (D1 и KV) и се криптират по време на трансфер (SSL/TLS).</p>
+      <h2 data-i18n="privacySec4Title">4. Data Storage</h2>
+      <p data-i18n="privacySec4Body">Your data is stored securely.</p>
 
-      <h2>5. Вашите права</h2>
-      <p>Вие имате пълен контрол над вашите данни. Можете по всяко време да:</p>
+      <h2 data-i18n="privacySec5Title">5. Your Rights</h2>
+      <p data-i18n="privacySec5Intro">You have full control over your data.</p>
       <ul>
-        <li>Изтриете всички ваши задачи от настройките на приложението.</li>
-        <li>Разкачите вашия Google акаунт от менюто "Настройки".</li>
-        <li>Експортирате вашите данни в JSON формат.</li>
+        <li data-i18n="privacySec5Li1"></li>
+        <li data-i18n="privacySec5Li2"></li>
+        <li data-i18n="privacySec5Li3"></li>
       </ul>
 
-      <h2>6. Контакт</h2>
-      <p>Ако имате въпроси относно тази декларация, можете да се свържете с нас чрез GitHub страницата на проекта.</p>
+      <h2 data-i18n="privacySec6Title">6. Contact</h2>
+      <p data-i18n="privacySec6Body">Contact us via the project GitHub page.</p>
     </div>
 
-    <footer>
-      &copy; 2024 AIVA Assistant
-    </footer>
+    <footer data-i18n="privacyFooter">&copy; 2024 AIVA Assistant</footer>
   </div>
+
+  <script src="settings.js"></script>
+  <script src="lib/i18n.js"></script>
+  <script src="lib/i18n-privacy.js"></script>
+  <script>
+    (function () {
+      const settings = window.AIVA_SETTINGS?.loadAssistantSettings?.() || {};
+      const lang = settings.profile?.language || 'bg';
+      window.AIVA_I18N.initFromSettings(settings);
+      window.AIVA_I18N.applyToDocument(document, lang);
+      document.title = 'AIVA — ' + window.AIVA_I18N.t('privacyPageTitle', lang);
+    })();
+  </script>
 </body>
 </html>

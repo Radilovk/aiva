@@ -592,6 +592,9 @@
     scope.querySelectorAll('option[data-i18n]').forEach((el) => {
       el.textContent = t(el.getAttribute('data-i18n'), l);
     });
+    scope.querySelectorAll('[data-i18n-html]').forEach((el) => {
+      el.innerHTML = t(el.getAttribute('data-i18n-html'), l);
+    });
   }
 
   function populateLanguageSelect(selectEl, selectedCode) {
