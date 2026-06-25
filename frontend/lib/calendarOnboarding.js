@@ -5,6 +5,14 @@
   const DISMISS_KEY = 'aiva_calendar_dismissed_until';
   const DISMISS_DAYS = 14;
 
+  function t(key) {
+    return window.AIVA_I18N?.t?.(key) ?? key;
+  }
+
+  function tf(key, vars) {
+    return window.AIVA_I18N?.tf?.(key, vars) ?? t(key);
+  }
+
   function isNative() {
     return !!window.Capacitor?.isNativePlatform?.();
   }
@@ -41,7 +49,7 @@
       samsung: 'Samsung Calendar',
       outlook: 'Outlook',
     };
-    return labels[provider] || 'календара';
+    return labels[provider] || t('calendar');
   }
 
   function isDismissed() {
@@ -96,16 +104,16 @@
 
     if (sync.setupComplete && sync.provider === 'subscribe') {
       chip.hidden = false;
-      chip.textContent = '📅 Синхрон';
-      chip.title = 'Задачите се синхронизират автоматично с календара';
+      chip.textContent = t('chipSync');
+      chip.title = t('tipSync');
     } else if (sync.setupComplete && sync.provider === 'native') {
       chip.hidden = false;
-      chip.textContent = '📅 Устройство';
-      chip.title = 'Задачите се записват директно в календара на телефона';
+      chip.textContent = t('chipDevice');
+      chip.title = t('tipDevice');
     } else if (sync.setupComplete && sync.provider === 'manual') {
       chip.hidden = false;
-      chip.textContent = '📅 Ръчен';
-      chip.title = 'Новите задачи се предлагат за календар';
+      chip.textContent = t('chipManual');
+      chip.title = t('tipManual');
     } else {
       chip.hidden = true;
     }
@@ -135,16 +143,16 @@
 
     if (text) {
       text.textContent = task?.content
-        ? `„${task.content}" има дата. Да я добавим в ${platformLabel} и да включим напомняния?`
-        : `Задачите с дата могат да се появяват в ${platformLabel} с автоматични напомняния на телефона.`;
+        ? tf('calOnboardWithTask', { task: task.content, calendar: platformLabel })
+        : t('calOnboardDefault');
     }
 
     if (primaryBtn) {
       if (mode === 'native') {
-        primaryBtn.textContent = '📅 Добави в календара на телефона';
+        primaryBtn.textContent = t('addPhoneCal');
         primaryBtn.dataset.mode = 'native';
       } else {
-        primaryBtn.textContent = `Свържи с ${getProviderLabel(provider)}`;
+        primaryBtn.textContent = tf('connectProvider', { provider: getProviderLabel(provider) });
         primaryBtn.dataset.mode = 'subscribe';
         primaryBtn.dataset.provider = provider;
       }
@@ -152,8 +160,8 @@
 
     if (deviceBtn) {
       deviceBtn.textContent = mode === 'native'
-        ? 'Само тази задача (.ics)'
-        : 'Само тази задача в календара';
+        ? t('onlyThisIcs')
+        : t('onlyThisTask');
     }
 
     modal._pendingTask = task || null;

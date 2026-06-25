@@ -186,9 +186,11 @@
       || 'Respond in the user\'s selected language.';
 
     let instructions = (baseInstructions || '').trim();
-    instructions += `\n\nЕЗИК И ОБРЪЩЕНИЕ:\n- ${langInstruction}`;
+    instructions += `\n\n${window.AIVA_I18N?.t?.('langSectionTitle') || 'LANGUAGE:'}\n- ${langInstruction}`;
     if (userName) {
-      instructions += `\n- Обръщай се към потребителя с име: ${userName}`;
+      const addr = window.AIVA_I18N?.tf?.('addressUserAs', { name: userName })
+        || `Address the user by name: ${userName}`;
+      instructions += `\n- ${addr}`;
     }
     if (extraContext) {
       instructions += extraContext;

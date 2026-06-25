@@ -9,6 +9,14 @@ function t(key) {
   return window.AIVA_I18N?.t?.(key) ?? key;
 }
 
+function tf(key, vars) {
+  return window.AIVA_I18N?.tf?.(key, vars) ?? t(key);
+}
+
+function getLocale() {
+  return window.AIVA_I18N?.getLocale?.() ?? 'bg-BG';
+}
+
 // --- User ID ---
 function getUserId() {
   let id = localStorage.getItem('aiva_user_id');
@@ -366,15 +374,32 @@ function sameDay(a, b) {
 }
 
 function formatDateShort(date) {
-  return new Intl.DateTimeFormat('bg-BG', { day: 'numeric', month: 'short' }).format(date);
+  return new Intl.DateTimeFormat(getLocale(), { day: 'numeric', month: 'short' }).format(date);
 }
 
 function formatDateLong(date) {
-  return new Intl.DateTimeFormat('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+  return new Intl.DateTimeFormat(getLocale(), { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
 }
 
 function formatMonth(date) {
-  return new Intl.DateTimeFormat('bg-BG', { month: 'long', year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric' }).format(date);
+}
+
+function formatWeekdayShort(date) {
+  return new Intl.DateTimeFormat(getLocale(), { weekday: 'short' }).format(date);
+}
+
+function getWeekdayHeaders() {
+  const weekStartsOn = assistantSettings.calendar.weekStartsOn ?? 1;
+  const ref = new Date(2024, 0, 7);
+  const headers = [];
+  for (let i = 0; i < 7; i++) {
+    const dayIndex = (weekStartsOn + i) % 7;
+    const d = new Date(ref);
+    d.setDate(ref.getDate() + dayIndex);
+    headers.push(formatWeekdayShort(d));
+  }
+  return headers;
 }
 
 function sortedTasks(items) {
@@ -453,7 +478,7 @@ function showError(msg) {
 
 window.showCalendarSyncToast = function showCalendarSyncToast(task) {
   showToast({
-    content: task?.content ? `${task.content} → календар` : 'Добавена в календара',
+    content: task?.content ? tf('toastCalendarArrow', { content: task.content }) : t('toastAddedCalendar'),
     emotion: 'neutral',
     priority: 3,
   });
@@ -464,7 +489,7 @@ function showToast(task) {
   const emotionMap = { stress: '😰', tired: '😴', urgent: '⚡', neutral: '😊' };
   toastMeta.innerHTML = `
     <span>${emotionMap[task.emotion] || '😊'} ${escapeHtml(task.emotion || 'neutral')}</span>
-    <span>⚡ ${escapeHtml(`П${task.priority}`)}</span>
+    <span>⚡ ${escapeHtml(`P${task.priority}`)}</span>
     ${task.due_date ? `<span>📅 ${escapeHtml(task.due_date)}</span>` : ''}
     ${task.due_time ? `<span>🕘 ${escapeHtml(task.due_time)}</span>` : ''}
   `;
@@ -529,8 +554,8 @@ function renderUpcomingStrip() {
           <div class="upcoming-countdown">${escapeHtml(countdown)}</div>
         </div>
         <div class="upcoming-actions">
-          <button class="upcoming-action-btn" data-action="snooze" data-id="${task.id}" type="button" title="Отложи 10 мин">⏰</button>
-          <button class="upcoming-action-btn" data-action="done" data-id="${task.id}" type="button" title="Готово">✓</button>
+          <button class="upcoming-action-btn" data-action="snooze" data-id="${task.id}" type="button" title="${escapeHtml(t('snooze10'))}">⏰</button>
+          <button class="upcoming-action-btn" data-action="done" data-id="${task.id}" type="button" title="${escapeHtml(t('doneAction'))}">✓</button>
         </div>
       </div>
     `;
@@ -540,7 +565,7 @@ function renderUpcomingStrip() {
 function taskMeta(task) {
   const meta = [];
   if (task.due_time) meta.push(task.due_time);
-  if (task.estimated_minutes) meta.push(`${task.estimated_minutes} мин`);
+  if (task.estimated_minutes) meta.push(`${task.estimated_minutes} ${t('minsShort')}`);
   if (task.location) meta.push(task.location);
   if (task.tags) meta.push(task.tags);
   return meta;
@@ -550,18 +575,20 @@ function renderTaskCard(task, mode = 'agenda') {
   const meta = taskMeta(task);
   const overdue = isTaskOverdue(task);
   const countdown = getTaskCountdown(task);
+  const taskDt = getTaskDateTime(task);
+  const msUntil = taskDt ? taskDt.getTime() - Date.now() : Infinity;
   const synced = window.AIVA_NATIVE_CALENDAR?.isTaskSynced?.(task.id);
-  const statusClass = overdue ? 'is-overdue' : (countdown.startsWith('след') && countdown.includes('мин') && parseInt(countdown.match(/\d+/)?.[0] || '999', 10) <= 60 ? 'is-upcoming' : '');
+  const statusClass = overdue ? 'is-overdue' : (msUntil > 0 && msUntil <= 3600000 ? 'is-upcoming' : '');
 
   return `
     <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')} ${statusClass}${task.isExternal ? ' external-event' : ''}" data-id="${task.id}"${task.isExternal ? ' data-external="true"' : ''} tabindex="0">
-      <button class="task-check" data-id="${task.id}" aria-label="Маркирай като готова" type="button">
+      <button class="task-check" data-id="${task.id}" aria-label="${escapeHtml(t('markComplete'))}" type="button">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
       <div class="task-body">
         <div class="task-row">
           <div class="task-text">${escapeHtml(task.content)}</div>
-          <span class="priority-pill">П${escapeHtml(task.priority || 3)}</span>
+          <span class="priority-pill">P${escapeHtml(task.priority || 3)}</span>
           ${synced ? '<span class="calendar-badge">📅</span>' : ''}
         </div>
         <div class="task-info">
@@ -597,11 +624,11 @@ function setActiveViewButton() {
 
 function updateRangeLabel(dates) {
   if (calendarView === 'day') {
-    rangeLabel.textContent = sameDay(currentDate, new Date()) ? `Днес · ${formatDateLong(currentDate)}` : formatDateLong(currentDate);
+    rangeLabel.textContent = sameDay(currentDate, new Date()) ? `${t('todayPrefix')} · ${formatDateLong(currentDate)}` : formatDateLong(currentDate);
   } else if (calendarView === 'three') {
     rangeLabel.textContent = `${formatDateShort(dates[0])} - ${formatDateShort(dates[2])}`;
   } else if (calendarView === 'week') {
-    rangeLabel.textContent = `Седмица · ${formatDateShort(dates[0])} - ${formatDateShort(dates[6])}`;
+    rangeLabel.textContent = `${t('weekPrefix')} · ${formatDateShort(dates[0])} - ${formatDateShort(dates[6])}`;
   } else {
     rangeLabel.textContent = formatMonth(currentDate);
   }
@@ -616,13 +643,13 @@ function renderAgendaView(dates) {
         <section class="calendar-day ${sameDay(date, new Date()) ? 'is-today' : ''}">
           <div class="day-header">
             <div>
-              <span class="day-name">${escapeHtml(new Intl.DateTimeFormat('bg-BG', { weekday: 'short' }).format(date))}</span>
+              <span class="day-name">${escapeHtml(formatWeekdayShort(date))}</span>
               <strong>${escapeHtml(formatDateShort(date))}</strong>
             </div>
             <span class="day-count">${dayTasks.length}</span>
           </div>
           <div class="day-stack">
-            ${dayTasks.length ? dayTasks.map((task) => renderTaskCard(task)).join('') : '<div class="empty-state small">Няма задачи за този ден</div>'}
+            ${dayTasks.length ? dayTasks.map((task) => renderTaskCard(task)).join('') : `<div class="empty-state small">${escapeHtml(t('noTasksThisDay'))}</div>`}
           </div>
         </section>
       `;
@@ -637,7 +664,7 @@ function renderAgendaView(dates) {
     ${
       unscheduled.length
         ? `<section class="unscheduled-block">
-            <div class="day-header"><strong>Без дата</strong><span class="day-count">${unscheduled.length}</span></div>
+            <div class="day-header"><strong>${escapeHtml(t('unscheduled'))}</strong><span class="day-count">${unscheduled.length}</span></div>
             <div class="day-stack">${unscheduled.map((task) => renderTaskCard(task)).join('')}</div>
           </section>`
         : ''
@@ -653,7 +680,7 @@ function renderMonthView() {
 
   tasksContainer.innerHTML = `
     <div class="month-grid">
-      ${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].map((day) => `<div class="month-weekday">${day}</div>`).join('')}
+      ${getWeekdayHeaders().map((day) => `<div class="month-weekday">${escapeHtml(day)}</div>`).join('')}
       ${days
         .map((date) => {
           const dayTasks = tasksForDate(date);
@@ -679,7 +706,7 @@ function renderMonthView() {
         ${
           tasksForDate(currentDate).length
             ? tasksForDate(currentDate).map((task) => renderTaskCard(task, 'month')).join('')
-            : '<div class="empty-state small">Избери ден със задачи или добави нова.</div>'
+            : `<div class="empty-state small">${escapeHtml(t('pickDayOrAdd'))}</div>`
         }
       </div>
     </section>
@@ -724,8 +751,8 @@ async function parseJsonResponse(res, fallbackMessage) {
     const preview = (await res.text()).trim().slice(0, 80);
     throw new Error(
       preview.startsWith('<!')
-        ? 'API връща HTML вместо JSON. Проверете API адреса (config.js).'
-        : fallbackMessage || `Невалиден отговор от сървъра (${res.status})`
+        ? t('errApiHtml')
+        : fallbackMessage || tf('errInvalidResponse', { status: res.status })
     );
   }
   return res.json();
@@ -1155,7 +1182,7 @@ async function persistTask(args) {
     }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Грешка при запис');
+  if (!res.ok) throw new Error(data.error || t('errSave'));
   showToast(data.task);
   await loadTasks();
   if (window.AIVA_CALENDAR_SYNC) {
@@ -1182,7 +1209,7 @@ async function saveTaskFromForm() {
   };
 
   if (!payload.content) {
-    showError('Добавете име/описание на задачата');
+    showError(t('errTaskName'));
     return null;
   }
 
@@ -1193,7 +1220,7 @@ async function saveTaskFromForm() {
     body: JSON.stringify(id ? payload : { ...payload, task: payload.content }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Грешка при запис');
+  if (!res.ok) throw new Error(data.error || t('errSave'));
   await loadTasks();
   showToast(data.task);
   if (window.AIVA_CALENDAR_SYNC) {
@@ -1209,7 +1236,7 @@ async function removeTask(taskId) {
     body: JSON.stringify({ user_id: userId }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Грешка при изтриване');
+  if (!res.ok) throw new Error(data.error || t('errDelete'));
   if (window.AIVA_CALENDAR_SYNC?.onTaskRemoved) {
     await window.AIVA_CALENDAR_SYNC.onTaskRemoved(taskId);
   }
@@ -1231,11 +1258,11 @@ function parseDuplicateRows(value) {
 async function duplicateTaskToRows(taskId) {
   const rows = parseDuplicateRows(duplicateRowsField.value);
   if (!rows.length) {
-    showError('Добавете поне една дата във формат YYYY-MM-DD HH:MM');
+    showError(t('errDupFormat'));
     return;
   }
   if (rows.length > assistantSettings.safety.maxDuplicateDays) {
-    showError(`Максимумът за мултиплициране е ${assistantSettings.safety.maxDuplicateDays} дати.`);
+    showError(tf('errDupMax', { max: assistantSettings.safety.maxDuplicateDays }));
     return;
   }
 
@@ -1252,12 +1279,12 @@ async function duplicateTaskToRows(taskId) {
       }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Грешка при мултиплициране');
+    if (!res.ok) throw new Error(data.error || t('errDup'));
   }
 
   await loadTasks();
   duplicateRowsField.value = '';
-  showToast({ content: `Създадени копия: ${rows.length}`, emotion: 'neutral', priority: 3 });
+  showToast({ content: tf('toastCopies', { count: rows.length }), emotion: 'neutral', priority: 3 });
 }
 
 // --- Task modal ---
@@ -1278,7 +1305,7 @@ function fillTaskForm(task) {
 }
 
 function openTaskModal(task = null) {
-  modalTitle.textContent = task ? 'Детайли за задачата' : 'Нова задача';
+  modalTitle.textContent = task ? t('taskDetails') : t('newTask');
   deleteTaskBtn.hidden = !task;
   duplicateTaskBtn.hidden = !task;
   discussTaskBtn.hidden = !task;
@@ -1312,7 +1339,7 @@ async function handleGeminiMessage(message) {
         window.AIVA_HAPTICS?.onListeningStart?.();
       } catch (e) {
         console.error('Audio start failed:', e);
-        showError('Няма достъп до микрофона');
+        showError(t('errMicrophone'));
         disconnectSession();
       }
       break;
@@ -1407,7 +1434,7 @@ async function handleGeminiMessage(message) {
       break;
 
     case MultimodalLiveResponseType.ERROR:
-      showError(typeof message.data === 'string' ? message.data : 'Грешка от Gemini');
+      showError(typeof message.data === 'string' ? message.data : t('errGemini'));
       break;
 
     default:
@@ -1422,8 +1449,8 @@ async function fetchToken() {
     body: JSON.stringify({ user_id: userId }),
   });
   const data = await parseJsonResponse(res, 'Грешка при заявка за токен');
-  if (!res.ok) throw new Error(data.error || `Грешка ${res.status}`);
-  if (!data.token) throw new Error('Невалиден токен');
+  if (!res.ok) throw new Error(data.error || tf('errInvalidResponse', { status: res.status }));
+  if (!data.token) throw new Error(t('errToken'));
   return data.token;
 }
 
@@ -1436,7 +1463,7 @@ async function connectSession() {
 
   try {
     if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('Микрофонът не се поддържа в този браузър');
+      throw new Error(t('errMicUnsupported'));
     }
 
     await loadTasks();
@@ -1486,7 +1513,7 @@ async function connectSession() {
       if (isSessionActive) disconnectSession();
     };
     client.onError = (msg) => {
-      showError(msg || 'Грешка при свързване с Gemini');
+      showError(msg || t('errConnect'));
       disconnectSession();
     };
 
@@ -1498,7 +1525,7 @@ async function connectSession() {
     client.connect();
   } catch (e) {
     console.error('connectSession:', e);
-    showError(e.message || 'Грешка при свързване');
+    showError(e.message || t('errConnect'));
     disconnectSession();
   } finally {
     isConnecting = false;
@@ -1611,19 +1638,19 @@ taskForm.addEventListener('submit', async (e) => {
     await saveTaskFromForm();
     closeTaskModal();
   } catch (error) {
-    showError(error.message || 'Грешка при запис');
+    showError(error.message || t('errSave'));
   }
 });
 
 deleteTaskBtn.addEventListener('click', async () => {
   const id = taskIdField.value;
   if (!id) return;
-  if (assistantSettings.safety.askBeforeDelete && !confirm('Да изтрия ли тази задача?')) return;
+  if (assistantSettings.safety.askBeforeDelete && !confirm(t('confirmDelete'))) return;
   try {
     await removeTask(id);
     closeTaskModal();
   } catch (error) {
-    showError(error.message || 'Грешка при изтриване');
+    showError(error.message || t('errDelete'));
   }
 });
 
@@ -1633,7 +1660,7 @@ duplicateTaskBtn.addEventListener('click', async () => {
   try {
     await duplicateTaskToRows(id);
   } catch (error) {
-    showError(error.message || 'Грешка при мултиплициране');
+    showError(error.message || t('errDup'));
   }
 });
 
@@ -1659,7 +1686,7 @@ addToCalendarBtn.addEventListener('click', async () => {
     notes: taskForm.elements.notes.value || null,
   };
   if (!task.content) {
-    showError('Въведи задача преди да я добавиш в календара');
+    showError(t('errTaskCalendar'));
     return;
   }
   try {
@@ -1673,10 +1700,10 @@ addToCalendarBtn.addEventListener('click', async () => {
         : await window.AIVA_CALENDAR.addToDevice(task);
     }
     if (result?.method !== 'aborted' && result !== 'aborted') {
-      showToast({ content: 'Добавено в календара на устройството', emotion: 'neutral', priority: 3 });
+      showToast({ content: t('toastCalendarAdd'), emotion: 'neutral', priority: 3 });
     }
   } catch (error) {
-    showError(error.message || 'Грешка при добавяне в календара');
+    showError(error.message || t('errCalendar'));
   }
 });
 
@@ -1700,7 +1727,7 @@ window.addEventListener('aiva:profile-updated', () => {
 });
 
 window.addEventListener('aiva:calendar-connected', () => {
-  showToast({ content: 'Календарът е свързан', emotion: 'neutral', priority: 3 });
+  showToast({ content: t('toastCalendarSync'), emotion: 'neutral', priority: 3 });
 });
 
 window.addEventListener('aiva:task-done-from-notif', () => {
@@ -1723,7 +1750,7 @@ if (upcomingList) {
         await markDone(taskId);
       } else if (action === 'snooze' && task && window.AIVA_NOTIFIER) {
         await window.AIVA_NOTIFIER.snoozeTask(taskId, task.content, 10);
-        showToast({ content: 'Напомнянето е отложено с 10 мин', emotion: 'neutral', priority: 3 });
+        showToast({ content: t('toastSnooze10'), emotion: 'neutral', priority: 3 });
       }
       return;
     }
@@ -1760,7 +1787,7 @@ if ('serviceWorker' in navigator) {
       const task = getTaskById(event.data.taskId);
       if (task) {
         await window.AIVA_NOTIFIER.snoozeTask(event.data.taskId, task.content, event.data.minutes || 10);
-        showToast({ content: 'Напомнянето е отложено', emotion: 'neutral', priority: 3 });
+        showToast({ content: t('toastSnooze'), emotion: 'neutral', priority: 3 });
       }
     }
   });

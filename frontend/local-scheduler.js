@@ -4,23 +4,35 @@
  * Supports quiet hours, advance + at-time reminders, snooze, and action buttons.
  */
 (function () {
-  const NOTIFICATION_CHANNEL = {
-    id: 'aiva_tasks',
-    name: 'AIVA Задачи',
-    description: 'Напомняния за задачи',
-    importance: 4,
-    visibility: 1,
-    vibration: true,
-  };
+  function t(key) {
+    return window.AIVA_I18N?.t?.(key) ?? key;
+  }
 
-  const SNOOZE_CHANNEL = {
-    id: 'aiva_snooze',
-    name: 'AIVA Отложени',
-    description: 'Отложени напомняния',
-    importance: 4,
-    visibility: 1,
-    vibration: true,
-  };
+  function tf(key, vars) {
+    return window.AIVA_I18N?.tf?.(key, vars) ?? t(key);
+  }
+
+  function getNotificationChannel() {
+    return {
+      id: 'aiva_tasks',
+      name: t('channelTasks'),
+      description: t('channelTasksDesc'),
+      importance: 4,
+      visibility: 1,
+      vibration: true,
+    };
+  }
+
+  function getSnoozeChannel() {
+    return {
+      id: 'aiva_snooze',
+      name: t('channelSnooze'),
+      description: t('channelSnoozeDesc'),
+      importance: 4,
+      visibility: 1,
+      vibration: true,
+    };
+  }
 
   let isCapacitor = false;
   let LocalNotifications = null;
@@ -78,8 +90,8 @@
           window.Capacitor.registerPlugin('LocalNotifications');
         const perm = await LocalNotifications.requestPermissions();
         if (perm.display === 'granted') {
-          await LocalNotifications.createChannel(NOTIFICATION_CHANNEL);
-          await LocalNotifications.createChannel(SNOOZE_CHANNEL);
+          await LocalNotifications.createChannel(getNotificationChannel());
+          await LocalNotifications.createChannel(getSnoozeChannel());
           isCapacitor = true;
           bindCapacitorListeners();
           await processPendingAndroidActions();
@@ -110,7 +122,7 @@
       if (action === 'done') {
         await markTaskDone(taskId);
       } else if (action === 'snooze') {
-        await snoozeTask(taskId, event.notification?.extra?.content || 'Задача');
+        await snoozeTask(taskId, event.notification?.extra?.content || t('defaultTaskLabel'));
       } else if (action === 'open') {
         window.location.href = './index.html';
       }
@@ -168,14 +180,14 @@
           title,
           body,
           schedule: { at, allowWhileIdle: true },
-          channelId: channelId || NOTIFICATION_CHANNEL.id,
+          channelId: channelId || getNotificationChannel().id,
           actionTypeId: 'aiva_task_reminder',
           extra: { task_id: taskId, content: body, type },
           sound: getSettings().sound !== false ? 'default' : undefined,
           actions: [
-            { id: 'open', title: 'Отвори' },
-            { id: 'snooze', title: '⏰ +10 мин' },
-            { id: 'done', title: 'Готово ✓' },
+            { id: 'open', title: t('notifOpen') },
+            { id: 'snooze', title: t('notifSnoozeAction') },
+            { id: 'done', title: t('notifDone') },
           ],
         }],
       });
@@ -209,8 +221,8 @@
     if (advanceMin > 0) {
       await scheduleNotification({
         id: notifId(task.id, 'advance'),
-        title: '⏰ Предстои задача',
-        body: `${task.content} след ${advanceMin} мин`,
+        title: t('notifUpcomingTitle'),
+        body: tf('notifAdvanceBody', { content: task.content, mins: advanceMin }),
         at: advanceAt,
         taskId: task.id,
         type: 'advance',
@@ -220,7 +232,7 @@
     if (remindAtStart && task.due_time) {
       await scheduleNotification({
         id: notifId(task.id, 'start'),
-        title: '▶️ Започва сега',
+        title: t('notifStartingTitle'),
         body: task.content,
         at: taskDate,
         taskId: task.id,
@@ -234,12 +246,12 @@
     const at = new Date(Date.now() + minutes * 60000);
     await scheduleNotification({
       id: notifId(taskId, 'snooze'),
-      title: '⏰ Напомняне',
+      title: t('notifSnoozeTitle'),
       body: content,
       at,
       taskId,
       type: 'snooze',
-      channelId: SNOOZE_CHANNEL.id,
+      channelId: getSnoozeChannel().id,
     });
   }
 
@@ -304,9 +316,9 @@
             data: { task_id: entry.task_id },
             vibrate: [200, 100, 200],
             actions: [
-              { action: 'open', title: 'Отвори' },
-              { action: 'snooze', title: '⏰ +10 мин' },
-              { action: 'done', title: 'Готово ✓' },
+              { action: 'open', title: t('notifOpen') },
+              { action: 'snooze', title: t('notifSnoozeAction') },
+              { action: 'done', title: t('notifDone') },
             ],
           });
         });
@@ -349,16 +361,16 @@
     if (ms < 0) {
       const abs = Math.abs(ms);
       const mins = Math.floor(abs / 60000);
-      if (mins < 60) return `закъснява ${mins} мин`;
+      if (mins < 60) return tf('countLateMin', { mins });
       const hrs = Math.floor(mins / 60);
-      return `закъснява ${hrs} ч`;
+      return tf('countLateHour', { hrs });
     }
     const mins = Math.floor(ms / 60000);
-    if (mins < 1) return 'сега';
-    if (mins < 60) return `след ${mins} мин`;
+    if (mins < 1) return t('countNow');
+    if (mins < 60) return tf('countInMin', { mins });
     const hrs = Math.floor(mins / 60);
     const rem = mins % 60;
-    return rem ? `след ${hrs}ч ${rem}мин` : `след ${hrs} ч`;
+    return rem ? tf('countInHourMin', { hrs, mins: rem }) : tf('countInHour', { hrs });
   }
 
   window.AIVA_NOTIFIER = {
