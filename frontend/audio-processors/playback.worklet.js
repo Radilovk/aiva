@@ -8,16 +8,27 @@ class PCMProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.audioQueue = [];
-    this.currentOffset = 0; // Track position in current buffer (avoids slice())
+    this.currentOffset = 0;
+    this.queuedSamples = 0;
+    // ~100ms at 24kHz — absorb network jitter before starting playback
+    this.minBufferSamples = 2400;
+    this.buffering = true;
+    this.wasPlaying = false;
 
     this.port.onmessage = (event) => {
       if (event.data === "interrupt") {
-        // Clear the queue on interrupt
         this.audioQueue = [];
         this.currentOffset = 0;
+        this.queuedSamples = 0;
+        this.buffering = true;
+        this.wasPlaying = false;
+        this.port.postMessage({ type: "drained" });
       } else if (event.data instanceof Float32Array) {
-        // Add audio data to the queue
         this.audioQueue.push(event.data);
+        this.queuedSamples += event.data.length;
+        if (this.buffering && this.queuedSamples >= this.minBufferSamples) {
+          this.buffering = false;
+        }
       }
     };
   }
@@ -29,7 +40,15 @@ class PCMProcessor extends AudioWorkletProcessor {
     const channel = output[0];
     let outputIndex = 0;
 
+    if (this.buffering) {
+      while (outputIndex < channel.length) {
+        channel[outputIndex++] = 0;
+      }
+      return true;
+    }
+
     // Fill the output buffer from the queue
+    let samplesCopied = 0;
     while (outputIndex < channel.length && this.audioQueue.length > 0) {
       const currentBuffer = this.audioQueue[0];
 
@@ -43,22 +62,29 @@ class PCMProcessor extends AudioWorkletProcessor {
       const remainingBuffer = currentBuffer.length - this.currentOffset;
       const copyLength = Math.min(remainingOutput, remainingBuffer);
 
-      // Copy audio data to output using offset (no slice allocation)
       for (let i = 0; i < copyLength; i++) {
         channel[outputIndex++] = currentBuffer[this.currentOffset++];
       }
+      samplesCopied += copyLength;
 
-      // If we've consumed the entire buffer, move to the next one
       if (this.currentOffset >= currentBuffer.length) {
         this.audioQueue.shift();
         this.currentOffset = 0;
       }
     }
 
-    // Fill remaining output with silence
     while (outputIndex < channel.length) {
       channel[outputIndex++] = 0;
     }
+
+    this.queuedSamples = Math.max(0, this.queuedSamples - samplesCopied);
+
+    const isPlaying = this.queuedSamples > 0;
+    if (this.wasPlaying && !isPlaying) {
+      this.buffering = true;
+      this.port.postMessage({ type: "drained" });
+    }
+    this.wasPlaying = isPlaying;
 
     return true;
   }
