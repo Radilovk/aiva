@@ -70,6 +70,7 @@ let tasks = [];
 let externalEvents = [];
 let currentDate = new Date();
 let calendarView = assistantSettings.calendar.defaultView || 'day';
+let weekFocusDate = new Date();
 let touchStartX = null;
 let voiceFocusTask = null;
 let cachedCalendarEvents = [];
@@ -641,7 +642,76 @@ function setActiveViewButton() {
     const active = button.dataset.view === calendarView;
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
+    button.setAttribute('aria-selected', String(active));
   });
+}
+
+function updateTodayChipVisibility() {
+  if (!todayBtn) return;
+  const showTodayChip = !(calendarView === 'day' && sameDay(currentDate, new Date()));
+  todayBtn.classList.toggle('is-hidden', !showTodayChip);
+}
+
+function renderDaySection(date) {
+  const dayTasks = tasksForDate(date);
+  const isToday = sameDay(date, new Date());
+
+  return `
+    <section class="calendar-day ${isToday ? 'is-today' : ''}">
+      <div class="day-header">
+        <div class="day-header-main">
+          <span class="day-name">${escapeHtml(formatWeekdayShort(date))}</span>
+          <strong class="day-date">${escapeHtml(formatDateShort(date))}</strong>
+        </div>
+        <span class="day-count" aria-label="${dayTasks.length}">${dayTasks.length}</span>
+      </div>
+      <div class="day-stack">
+        ${dayTasks.length ? dayTasks.map((task) => renderTaskCard(task)).join('') : `<div class="empty-state small">${escapeHtml(t('noTasksThisDay'))}</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderUnscheduledBlock() {
+  const unscheduled = assistantSettings.calendar.showUnscheduled ? unscheduledTasks() : [];
+  if (!unscheduled.length) return '';
+
+  return `
+    <section class="unscheduled-block">
+      <div class="day-header">
+        <strong>${escapeHtml(t('unscheduled'))}</strong>
+        <span class="day-count">${unscheduled.length}</span>
+      </div>
+      <div class="day-stack">${unscheduled.map((task) => renderTaskCard(task)).join('')}</div>
+    </section>
+  `;
+}
+
+function renderWeekStrip(days) {
+  return `
+    <div class="week-strip" role="tablist" aria-label="${escapeHtml(t('calendarViewsAria'))}">
+      ${days
+        .map((date) => {
+          const dayTasks = tasksForDate(date);
+          const selected = sameDay(date, weekFocusDate);
+          const isToday = sameDay(date, new Date());
+          return `
+            <button
+              class="week-day-btn ${selected ? 'is-selected' : ''} ${isToday ? 'is-today' : ''}"
+              data-date="${toISODate(date)}"
+              type="button"
+              role="tab"
+              aria-selected="${selected}"
+            >
+              <span class="week-day-name">${escapeHtml(formatWeekdayShort(date))}</span>
+              <span class="week-day-num">${date.getDate()}</span>
+              ${dayTasks.length ? '<span class="week-day-dot" aria-hidden="true"></span>' : ''}
+            </button>
+          `;
+        })
+        .join('')}
+    </div>
+  `;
 }
 
 function updateRangeLabel(dates) {
@@ -658,39 +728,40 @@ function updateRangeLabel(dates) {
 
 function renderAgendaView(dates) {
   updateRangeLabel(dates);
-  const dayHtml = dates
-    .map((date) => {
-      const dayTasks = tasksForDate(date);
-      return `
-        <section class="calendar-day ${sameDay(date, new Date()) ? 'is-today' : ''}">
-          <div class="day-header">
-            <div>
-              <span class="day-name">${escapeHtml(formatWeekdayShort(date))}</span>
-              <strong>${escapeHtml(formatDateShort(date))}</strong>
-            </div>
-            <span class="day-count">${dayTasks.length}</span>
-          </div>
-          <div class="day-stack">
-            ${dayTasks.length ? dayTasks.map((task) => renderTaskCard(task)).join('') : `<div class="empty-state small">${escapeHtml(t('noTasksThisDay'))}</div>`}
-          </div>
-        </section>
-      `;
-    })
-    .join('');
+  updateTodayChipVisibility();
 
-  const unscheduled = assistantSettings.calendar.showUnscheduled ? unscheduledTasks() : [];
   tasksContainer.innerHTML = `
     <div class="agenda-grid view-${calendarView}">
-      ${dayHtml}
+      ${dates.map((date) => renderDaySection(date)).join('')}
     </div>
-    ${
-      unscheduled.length
-        ? `<section class="unscheduled-block">
-            <div class="day-header"><strong>${escapeHtml(t('unscheduled'))}</strong><span class="day-count">${unscheduled.length}</span></div>
-            <div class="day-stack">${unscheduled.map((task) => renderTaskCard(task)).join('')}</div>
-          </section>`
-        : ''
-    }
+    ${renderUnscheduledBlock()}
+  `;
+}
+
+function renderWeekView(days) {
+  if (!days.some((date) => sameDay(date, weekFocusDate))) {
+    weekFocusDate = days.find((date) => sameDay(date, new Date())) || days[0];
+  }
+
+  updateRangeLabel(days);
+  updateTodayChipVisibility();
+
+  const focusTasks = tasksForDate(weekFocusDate);
+  tasksContainer.innerHTML = `
+    ${renderWeekStrip(days)}
+    <section class="calendar-day week-focus-day ${sameDay(weekFocusDate, new Date()) ? 'is-today' : ''}">
+      <div class="day-header">
+        <div class="day-header-main">
+          <span class="day-name">${escapeHtml(formatWeekdayShort(weekFocusDate))}</span>
+          <strong class="day-date">${escapeHtml(formatDateLong(weekFocusDate))}</strong>
+        </div>
+        <span class="day-count">${focusTasks.length}</span>
+      </div>
+      <div class="day-stack">
+        ${focusTasks.length ? focusTasks.map((task) => renderTaskCard(task)).join('') : `<div class="empty-state small">${escapeHtml(t('noTasksThisDay'))}</div>`}
+      </div>
+    </section>
+    ${renderUnscheduledBlock()}
   `;
 }
 
@@ -699,39 +770,53 @@ function renderMonthView() {
   const gridStart = startOfWeek(firstOfMonth);
   const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
   updateRangeLabel(days);
+  updateTodayChipVisibility();
 
+  const selectedTasks = tasksForDate(currentDate);
   tasksContainer.innerHTML = `
-    <div class="month-grid">
-      ${getWeekdayHeaders().map((day) => `<div class="month-weekday">${escapeHtml(day)}</div>`).join('')}
-      ${days
-        .map((date) => {
-          const dayTasks = tasksForDate(date);
-          const inMonth = date.getMonth() === currentDate.getMonth();
-          return `
-            <button class="month-cell ${inMonth ? '' : 'muted'} ${sameDay(date, new Date()) ? 'is-today' : ''}" data-date="${toISODate(date)}" type="button">
-              <span class="month-date">${date.getDate()}</span>
-              <span class="month-dots">
-                ${dayTasks.slice(0, 4).map((task) => `<i class="dot priority-${escapeHtml(task.priority || 3)}"></i>`).join('')}
-              </span>
-              ${dayTasks.length ? `<span class="month-count">${dayTasks.length}</span>` : ''}
-            </button>
-          `;
-        })
-        .join('')}
+    <div class="month-shell">
+      <div class="month-grid">
+        ${getWeekdayHeaders().map((day) => `<div class="month-weekday">${escapeHtml(day)}</div>`).join('')}
+        ${days
+          .map((date) => {
+            const dayTasks = tasksForDate(date);
+            const inMonth = date.getMonth() === currentDate.getMonth();
+            const isToday = sameDay(date, new Date());
+            const isSelected = sameDay(date, currentDate);
+            return `
+              <button
+                class="month-cell ${inMonth ? '' : 'muted'} ${isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}"
+                data-date="${toISODate(date)}"
+                type="button"
+                aria-pressed="${isSelected}"
+              >
+                <span class="month-date">${date.getDate()}</span>
+                <span class="month-dots">
+                  ${dayTasks.slice(0, 4).map((task) => `<i class="dot priority-${escapeHtml(task.priority || 3)}"></i>`).join('')}
+                </span>
+                ${dayTasks.length ? `<span class="month-count">${dayTasks.length}</span>` : ''}
+              </button>
+            `;
+          })
+          .join('')}
+      </div>
+      <section class="month-agenda">
+        <div class="day-header">
+          <div class="day-header-main">
+            <span class="day-name">${escapeHtml(formatWeekdayShort(currentDate))}</span>
+            <strong class="day-date">${escapeHtml(formatDateLong(currentDate))}</strong>
+          </div>
+          <span class="day-count">${selectedTasks.length}</span>
+        </div>
+        <div class="day-stack">
+          ${
+            selectedTasks.length
+              ? selectedTasks.map((task) => renderTaskCard(task, 'month')).join('')
+              : `<div class="empty-state small">${escapeHtml(t('pickDayOrAdd'))}</div>`
+          }
+        </div>
+      </section>
     </div>
-    <section class="month-agenda">
-      <div class="day-header">
-        <strong>${escapeHtml(formatDateLong(currentDate))}</strong>
-        <span class="day-count">${tasksForDate(currentDate).length}</span>
-      </div>
-      <div class="day-stack">
-        ${
-          tasksForDate(currentDate).length
-            ? tasksForDate(currentDate).map((task) => renderTaskCard(task, 'month')).join('')
-            : `<div class="empty-state small">${escapeHtml(t('pickDayOrAdd'))}</div>`
-        }
-      </div>
-    </section>
   `;
 }
 
@@ -746,7 +831,7 @@ function renderCalendar() {
     renderAgendaView([currentDate, addDays(currentDate, 1), addDays(currentDate, 2)]);
   } else if (calendarView === 'week') {
     const start = startOfWeek(currentDate);
-    renderAgendaView(Array.from({ length: 7 }, (_, index) => addDays(start, index)));
+    renderWeekView(Array.from({ length: 7 }, (_, index) => addDays(start, index)));
   } else {
     renderMonthView();
   }
@@ -759,6 +844,7 @@ function moveCalendar(direction) {
     currentDate = addDays(currentDate, direction * 3);
   } else if (calendarView === 'week') {
     currentDate = addDays(currentDate, direction * 7);
+    weekFocusDate = addDays(weekFocusDate, direction * 7);
   } else {
     currentDate = addMonths(currentDate, direction);
   }
@@ -1605,6 +1691,9 @@ recordBtn.addEventListener('click', () => {
 viewButtons.forEach((button) => {
   button.addEventListener('click', () => {
     calendarView = button.dataset.view;
+    if (calendarView === 'week') {
+      weekFocusDate = new Date(currentDate);
+    }
     renderCalendar();
     refreshExternalEvents();
   });
@@ -1614,6 +1703,7 @@ prevRangeBtn.addEventListener('click', () => moveCalendar(-1));
 nextRangeBtn.addEventListener('click', () => moveCalendar(1));
 todayBtn.addEventListener('click', () => {
   currentDate = new Date();
+  weekFocusDate = new Date();
   renderCalendar();
   refreshExternalEvents();
 });
@@ -1630,6 +1720,13 @@ tasksContainer.addEventListener('click', (e) => {
       item.style.transition = 'all 0.3s ease';
     }
     setTimeout(() => markDone(check.dataset.id), 300);
+    return;
+  }
+
+  const weekDayBtn = e.target.closest('.week-day-btn');
+  if (weekDayBtn) {
+    weekFocusDate = parseISODate(weekDayBtn.dataset.date) || weekFocusDate;
+    renderCalendar();
     return;
   }
 
