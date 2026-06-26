@@ -1,7 +1,7 @@
 /**
  * AIVA Service Worker — offline caching + push notifications
  */
-const CACHE_NAME = 'aiva-v7';
+const CACHE_NAME = 'aiva-v8';
 const ASSETS = [
   '/index.html',
   '/settings.html',
@@ -20,6 +20,8 @@ const ASSETS = [
   '/lib/icsUtils.js',
   '/lib/geminilive.js',
   '/lib/mediaUtils.js',
+  '/audio-processors/capture.worklet.js',
+  '/audio-processors/playback.worklet.js',
   '/lib/deviceCalendar.js',
   '/lib/nativeCalendar.js',
   '/lib/calendarCrud.js',

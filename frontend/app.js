@@ -76,6 +76,24 @@ let cachedCalendarEvents = [];
 let awaitingCloseConfirmation = false;
 let pendingUserTranscript = '';
 let assistantTranscriptBuffer = '';
+let assistantTurnComplete = false;
+
+function setMicUplinkMuted(muted) {
+  audioStreamer?.setUplinkMuted(muted);
+}
+
+async function tryUnmuteMicAfterAssistant() {
+  if (!assistantTurnComplete || audioPlayer?.isPlaying) return;
+  setMicUplinkMuted(false);
+}
+
+function onAssistantPlaybackStateChange(isPlaying) {
+  if (isPlaying) {
+    setMicUplinkMuted(true);
+    return;
+  }
+  tryUnmuteMicAfterAssistant();
+}
 
 // --- save_task tool (Gemini function declaration format) ---
 class SaveTaskTool extends FunctionCallDefinition {
@@ -456,7 +474,11 @@ function isNegativeCloseResponse(text) {
 function scheduleSessionEnd(delayMs = 700) {
   awaitingCloseConfirmation = false;
   pendingUserTranscript = '';
-  setTimeout(() => {
+  setTimeout(async () => {
+    if (!isSessionActive) return;
+    if (audioPlayer) {
+      await audioPlayer.waitForDrain(8000);
+    }
     if (isSessionActive) disconnectSession();
   }, delayMs);
 }
@@ -1345,6 +1367,7 @@ async function handleGeminiMessage(message) {
       break;
 
     case MultimodalLiveResponseType.AUDIO:
+      assistantTurnComplete = false;
       if (audioPlayer) await audioPlayer.play(message.data);
       break;
 
@@ -1426,11 +1449,17 @@ async function handleGeminiMessage(message) {
     case MultimodalLiveResponseType.TURN_COMPLETE:
       assistantTranscriptBuffer = '';
       pendingUserTranscript = '';
+      assistantTurnComplete = true;
+      tryUnmuteMicAfterAssistant();
       break;
 
     case MultimodalLiveResponseType.INTERRUPTED:
+      // Ignore spurious interrupts caused by speaker echo while mic uplink is muted
+      if (audioStreamer?.uplinkMuted) break;
       if (audioPlayer) audioPlayer.interrupt();
       assistantTranscriptBuffer = '';
+      assistantTurnComplete = false;
+      setMicUplinkMuted(false);
       break;
 
     case MultimodalLiveResponseType.ERROR:
@@ -1476,6 +1505,7 @@ async function connectSession() {
     awaitingCloseConfirmation = false;
     pendingUserTranscript = '';
     assistantTranscriptBuffer = '';
+    assistantTurnComplete = false;
     let extraContext = buildTasksContextForAssistant()
       + buildCalendarContextForAssistant(calendarEvents);
     if (voiceFocusTask) {
@@ -1519,7 +1549,10 @@ async function connectSession() {
 
     if (!audioPlayer) {
       audioPlayer = new AudioPlayer();
+      audioPlayer.onPlaybackStateChange = onAssistantPlaybackStateChange;
       await audioPlayer.init();
+    } else {
+      audioPlayer.onPlaybackStateChange = onAssistantPlaybackStateChange;
     }
 
     client.connect();
@@ -1548,6 +1581,7 @@ function disconnectSession() {
   awaitingCloseConfirmation = false;
   pendingUserTranscript = '';
   assistantTranscriptBuffer = '';
+  assistantTurnComplete = false;
   recordBtn.classList.remove('recording');
   recordBtn.disabled = false;
   waveform.classList.remove('active');
@@ -1792,3 +1826,13 @@ if ('serviceWorker' in navigator) {
     }
   });
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (audioPlayer?.audioContext?.state === 'suspended') {
+    audioPlayer.audioContext.resume().catch(() => {});
+  }
+  if (audioStreamer?.audioContext?.state === 'suspended') {
+    audioStreamer.audioContext.resume().catch(() => {});
+  }
+});

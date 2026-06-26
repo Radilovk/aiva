@@ -13,7 +13,16 @@ class AudioStreamer {
     this.audioWorklet = null;
     this.mediaStream = null;
     this.isStreaming = false;
+    this.uplinkMuted = false;
     this.sampleRate = 16000; // Gemini requires 16kHz
+  }
+
+  /**
+   * Pause sending mic audio to Gemini (e.g. while assistant speaks).
+   * Prevents speaker echo from triggering false barge-in interrupts.
+   */
+  setUplinkMuted(muted) {
+    this.uplinkMuted = !!muted;
   }
 
   /**
@@ -59,7 +68,7 @@ class AudioStreamer {
 
       // Set up message handling from the worklet
       this.audioWorklet.port.onmessage = (event) => {
-        if (!this.isStreaming) return;
+        if (!this.isStreaming || this.uplinkMuted) return;
 
         if (event.data.type === "audio") {
           const inputData = event.data.data;
@@ -406,6 +415,10 @@ class AudioPlayer {
     this.isInitialized = false;
     this.volume = 1.0;
     this.sampleRate = 24000; // Gemini outputs at 24kHz
+    this._playChain = Promise.resolve();
+    this._isPlaying = false;
+    this._drainResolvers = [];
+    this.onPlaybackStateChange = null;
   }
 
   /**
@@ -432,6 +445,14 @@ class AudioPlayer {
         "pcm-processor"
       );
 
+      this.workletNode.port.onmessage = (event) => {
+        if (event.data?.type === "drained") {
+          this._setPlaying(false);
+          const resolvers = this._drainResolvers.splice(0);
+          for (const resolve of resolvers) resolve();
+        }
+      };
+
       // Create gain node for volume control
       this.gainNode = this.audioContext.createGain();
       this.gainNode.gain.value = this.volume;
@@ -448,41 +469,67 @@ class AudioPlayer {
     }
   }
 
+  _setPlaying(playing) {
+    if (this._isPlaying === playing) return;
+    this._isPlaying = playing;
+    this.onPlaybackStateChange?.(playing);
+  }
+
+  get isPlaying() {
+    return this._isPlaying;
+  }
+
   /**
-   * Play audio chunk from base64 PCM
+   * Play audio chunk from base64 PCM (serialized to preserve chunk order).
    */
   async play(base64Audio) {
+    this._playChain = this._playChain
+      .then(() => this._playChunk(base64Audio))
+      .catch((error) => {
+        console.error("Error playing audio chunk:", error);
+      });
+    return this._playChain;
+  }
+
+  async _playChunk(base64Audio) {
     if (!this.isInitialized) {
       await this.init();
     }
 
-    try {
-      // Resume audio context if suspended
-      if (this.audioContext.state === "suspended") {
-        await this.audioContext.resume();
-      }
-
-      // Efficient base64 → binary decode
-      const binaryString = atob(base64Audio);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      // Convert PCM16 LE to Float32
-      const inputArray = new Int16Array(bytes.buffer);
-      const float32Data = new Float32Array(inputArray.length);
-      for (let i = 0; i < inputArray.length; i++) {
-        float32Data[i] = inputArray[i] / 32768;
-      }
-
-      // Send to worklet for playback
-      this.workletNode.port.postMessage(float32Data);
-    } catch (error) {
-      console.error("Error playing audio chunk:", error);
-      throw error;
+    // Resume audio context if suspended
+    if (this.audioContext.state === "suspended") {
+      await this.audioContext.resume();
     }
+
+    const binaryString = atob(base64Audio);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const inputArray = new Int16Array(bytes.buffer);
+    const float32Data = new Float32Array(inputArray.length);
+    for (let i = 0; i < inputArray.length; i++) {
+      float32Data[i] = inputArray[i] / 32768;
+    }
+
+    this._setPlaying(true);
+    this.workletNode.port.postMessage(float32Data);
+  }
+
+  /**
+   * Wait until the playback queue has fully drained.
+   */
+  waitForDrain(timeoutMs = 15000) {
+    if (!this._isPlaying) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, timeoutMs);
+      this._drainResolvers.push(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
   }
 
   /**
@@ -492,6 +539,9 @@ class AudioPlayer {
     if (this.workletNode) {
       this.workletNode.port.postMessage("interrupt");
     }
+    this._setPlaying(false);
+    const resolvers = this._drainResolvers.splice(0);
+    for (const resolve of resolvers) resolve();
   }
 
   /**
