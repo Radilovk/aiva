@@ -1785,7 +1785,9 @@
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('SW registration failed:', e));
+      const swUrl = window.AIVA_CONFIG?.appUrl?.('sw.js') || 'sw.js';
+      const scope = window.AIVA_CONFIG?.APP_BASE || './';
+      navigator.serviceWorker.register(swUrl, { scope }).catch((e) => console.warn('SW registration failed:', e));
     }
   </script>
 </body>

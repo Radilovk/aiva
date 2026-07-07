@@ -1,21 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="KAYA">
   <defs>
-    <radialGradient id="glow" cx="50%" cy="28%" r="55%">
-      <stop offset="0%" stop-color="#ff3b5c" stop-opacity="0.18"/>
+    <radialGradient id="bg" cx="50%" cy="34%" r="72%">
+      <stop offset="0%" stop-color="#14101a"/>
+      <stop offset="55%" stop-color="#0b0b12"/>
+      <stop offset="100%" stop-color="#050508"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="52%" cy="46%" r="34%">
+      <stop offset="0%" stop-color="#ff3b5c" stop-opacity="0.22"/>
       <stop offset="100%" stop-color="#ff3b5c" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="card" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#12121c"/>
+      <stop offset="100%" stop-color="#09090f"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff9db0"/>
+      <stop offset="45%" stop-color="#ff7a93"/>
+      <stop offset="100%" stop-color="#ff3b5c"/>
+    </linearGradient>
+    <radialGradient id="dot" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#ff7a93"/>
+      <stop offset="100%" stop-color="#ff3b5c"/>
+    </radialGradient>
   </defs>
-  <rect width="512" height="512" fill="#050508"/>
+  <rect width="512" height="512" fill="url(#bg)"/>
   <rect width="512" height="512" fill="url(#glow)"/>
-  <rect x="56" y="56" width="400" height="400" rx="88" fill="#0c0c12" stroke="#1a1a24" stroke-width="3"/>
-  <g stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M184 138 L184 374" stroke="#f0f0f2" stroke-width="38"/>
-    <path d="M184 256 L296 138" stroke="#f0f0f2" stroke-width="38"/>
-    <path d="M184 256 L296 374" stroke="#f0f0f2" stroke-width="38"/>
-    <path d="M338 206 A72 102 0 0 1 338 306" stroke="#ff3b5c" stroke-width="14"/>
-    <path d="M352 188 A108 154 0 0 1 352 324" stroke="#ff3b5c" stroke-width="12" opacity="0.75"/>
-    <path d="M366 172 A144 206 0 0 1 366 340" stroke="#ff3b5c" stroke-width="10" opacity="0.5"/>
-  </g>
-  <circle cx="376" cy="256" r="14" fill="#ff3b5c"/>
+  <rect x="56" y="56" width="400" height="400" rx="112" fill="url(#card)" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <circle cx="256" cy="266" r="126" fill="none" stroke="#ff3b5c" stroke-opacity="0.16" stroke-width="2"/>
+  <circle cx="256" cy="266" r="98" fill="none" stroke="#ff3b5c" stroke-opacity="0.28" stroke-width="2"/>
+  <circle cx="256" cy="266" r="70" fill="none" stroke="#ff3b5c" stroke-opacity="0.42" stroke-width="2"/>
+  <rect x="188" y="236" width="18" height="60" rx="9" fill="url(#bar)"/>
+  <rect x="214" y="214" width="18" height="104" rx="9" fill="url(#bar)"/>
+  <rect x="240" y="198" width="18" height="136" rx="9" fill="url(#bar)"/>
+  <rect x="266" y="214" width="18" height="104" rx="9" fill="url(#bar)"/>
+  <rect x="292" y="236" width="18" height="60" rx="9" fill="url(#bar)"/>
+  <circle cx="256" cy="266" r="18" fill="url(#dot)"/>
 </svg>
