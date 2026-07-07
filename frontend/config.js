@@ -6,20 +6,13 @@
 (function () {
   const WORKER_ORIGIN = 'https://aiva.radilov-k.workers.dev';
 
-  /** Base path for static assets (GitHub Pages project sites use /repo-name/). */
+  /** Directory of the current page — works on Workers, GitHub Pages (/aiva/frontend/), and local dev. */
   function resolveAppBasePath() {
     if (window.Capacitor?.isNativePlatform?.()) return '/';
 
-    const { hostname, pathname } = location;
-    if (hostname.endsWith('.github.io')) {
-      const segment = pathname.split('/').filter(Boolean)[0];
-      if (segment && !segment.includes('.')) {
-        return `/${segment}/`;
-      }
-    }
-
-    const slash = pathname.lastIndexOf('/');
-    return slash >= 0 ? pathname.slice(0, slash + 1) : '/';
+    const path = location.pathname;
+    const slash = path.lastIndexOf('/');
+    return slash >= 0 ? path.slice(0, slash + 1) : '/';
   }
 
   function appUrl(relativePath) {
