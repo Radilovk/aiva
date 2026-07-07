@@ -2,12 +2,12 @@
  * Platform-aware native calendar integration for iOS, Android (APK) and web.
  *
  * Strategy:
- *   Android APK  → AivaCalendar Capacitor plugin (CalendarContract) when available
+ *   Android APK  → KayaCalendar Capacitor plugin (CalendarContract) when available
  *   iOS / mobile → ICS share sheet + webcal subscribe
  *   Web          → Google Calendar deep link + ICS download
  */
 (function () {
-  const SYNC_MAP_KEY = 'aiva_native_calendar_map';
+  const SYNC_MAP_KEY = 'kaya_native_calendar_map';
 
   function isNative() {
     return !!window.Capacitor?.isNativePlatform?.();
@@ -31,7 +31,7 @@
   }
 
   function getReminderOptions() {
-    const settings = window.AIVA_SETTINGS?.loadAssistantSettings?.() || {};
+    const settings = window.KAYA_SETTINGS?.loadAssistantSettings?.() || {};
     return {
       reminderMinutes: settings.notifications?.reminderMinutes ?? 15,
       remindAtStart: settings.notifications?.remindAtStart !== false,
@@ -53,8 +53,8 @@
   function getNativePlugin() {
     if (!isNative()) return null;
     try {
-      return window.Capacitor?.Plugins?.AivaCalendar ||
-        window.Capacitor?.registerPlugin?.('AivaCalendar');
+      return window.Capacitor?.Plugins?.KayaCalendar ||
+        window.Capacitor?.registerPlugin?.('KayaCalendar');
     } catch {
       return null;
     }
@@ -76,8 +76,8 @@
     const plugin = getNativePlugin();
     if (!plugin?.addEvent) return null;
 
-    const parsed = window.AIVA_ICS?.parseTaskDateTime(task);
-    if (!parsed) throw new Error(window.AIVA_I18N?.t?.('errNoDate') || 'Task has no date');
+    const parsed = window.KAYA_ICS?.parseTaskDateTime(task);
+    if (!parsed) throw new Error(window.KAYA_I18N?.t?.('errNoDate') || 'Task has no date');
 
     const opts = getReminderOptions();
     const result = await plugin.addEvent({
@@ -108,7 +108,7 @@
     const entry = map[String(task.id)];
     if (!entry?.eventId) return null;
 
-    const parsed = window.AIVA_ICS?.parseTaskDateTime(task);
+    const parsed = window.KAYA_ICS?.parseTaskDateTime(task);
     if (!parsed) return null;
 
     const opts = getReminderOptions();
@@ -142,15 +142,15 @@
   }
 
   async function shareICS(task) {
-    if (!window.AIVA_CALENDAR?.addToDevice) {
+    if (!window.KAYA_CALENDAR?.addToDevice) {
       throw new Error('ICS модулът не е зареден');
     }
-    return window.AIVA_CALENDAR.addToDevice(task);
+    return window.KAYA_CALENDAR.addToDevice(task);
   }
 
   async function openGoogleCalendar(task) {
-    const url = window.AIVA_ICS?.getGoogleCalendarUrl(task);
-    if (!url) throw new Error(window.AIVA_I18N?.t?.('errNoDate') || 'Task has no date');
+    const url = window.KAYA_ICS?.getGoogleCalendarUrl(task);
+    if (!url) throw new Error(window.KAYA_I18N?.t?.('errNoDate') || 'Task has no date');
     window.open(url, '_blank', 'noopener,noreferrer');
     return 'google';
   }
@@ -160,7 +160,7 @@
    */
   async function addToDeviceCalendar(task, options = {}) {
     if (!task?.due_date) {
-      throw new Error(window.AIVA_I18N?.t?.('errNoDateAdd') || 'Task has no date — cannot add to calendar');
+      throw new Error(window.KAYA_I18N?.t?.('errNoDateAdd') || 'Task has no date — cannot add to calendar');
     }
 
     const platform = getPlatform();
@@ -250,7 +250,7 @@
     return labels[getPlatform()] || 'календар';
   }
 
-  window.AIVA_NATIVE_CALENDAR = {
+  window.KAYA_NATIVE_CALENDAR = {
     isNative,
     isIOS,
     isAndroid,

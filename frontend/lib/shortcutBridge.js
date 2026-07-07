@@ -2,7 +2,7 @@
  * Android hardware shortcut bridge — volume button patterns to start listening.
  */
 (function () {
-  const PLUGIN_NAME = 'AivaShortcut';
+  const PLUGIN_NAME = 'KayaShortcut';
 
   function getPlugin() {
     return window.Capacitor?.Plugins?.[PLUGIN_NAME] || null;
@@ -44,7 +44,7 @@
     if (!plugin?.addListener) return () => {};
 
     const handle = plugin.addListener('shortcutTriggered', () => {
-      window.dispatchEvent(new CustomEvent('aiva:shortcut-triggered'));
+      window.dispatchEvent(new CustomEvent('kaya:shortcut-triggered'));
       callback?.();
     });
 
@@ -65,7 +65,7 @@
     return Promise.resolve();
   }
 
-  window.AIVA_SHORTCUT = {
+  window.KAYA_SHORTCUT = {
     isAndroid,
     applyShortcutConfig,
     openAccessibilitySettings,

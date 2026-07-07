@@ -1,5 +1,5 @@
 /**
- * AIVA Device Calendar
+ * KAYA Device Calendar
  * Saves a task as an event into the calendar app used on the device itself.
  *
  * Strategy:
@@ -9,7 +9,7 @@
  */
 (function () {
   function getReminderOptions() {
-    const settings = window.AIVA_SETTINGS?.loadAssistantSettings?.() || {};
+    const settings = window.KAYA_SETTINGS?.loadAssistantSettings?.() || {};
     return {
       reminderMinutes: settings.notifications?.reminderMinutes ?? 15,
       remindAtStart: settings.notifications?.remindAtStart !== false,
@@ -17,7 +17,7 @@
   }
 
   function buildICS(task, options = {}) {
-    const ics = window.AIVA_ICS;
+    const ics = window.KAYA_ICS;
     if (!ics) {
       throw new Error('ICS utilities not loaded');
     }
@@ -30,7 +30,7 @@
     try {
       const file = new File([blob], fileName, { type: 'text/calendar' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: task.content || 'AIVA задача' });
+        await navigator.share({ files: [file], title: task.content || 'KAYA задача' });
         return 'shared';
       }
     } catch (e) {
@@ -54,9 +54,9 @@
       throw new Error('Задачата няма дата — не може да се добави в календара');
     }
 
-    const fileName = `aiva-${task.id || 'task'}.ics`;
+    const fileName = `kaya-${task.id || 'task'}.ics`;
     return shareOrDownloadICS(task, ics, fileName);
   }
 
-  window.AIVA_CALENDAR = { addToDevice, buildICS, shareOrDownloadICS };
+  window.KAYA_CALENDAR = { addToDevice, buildICS, shareOrDownloadICS };
 })();

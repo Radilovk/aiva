@@ -1,6 +1,6 @@
 {
-  "name": "AIVA — Гласов Асистент",
-  "short_name": "AIVA",
+  "name": "KAYA — Гласов Асистент",
+  "short_name": "KAYA",
   "description": "Гласов асистент за задачи с календар",
   "start_url": "/index.html",
   "display": "standalone",

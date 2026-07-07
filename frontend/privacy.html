@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#050508">
-  <title>AIVA — Privacy Policy</title>
+  <title>KAYA — Privacy Policy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -91,7 +91,7 @@
       <p data-i18n="privacyUpdated">Last updated: May 23, 2024</p>
 
       <h2 data-i18n="privacySec1Title">1. General Information</h2>
-      <p data-i18n="privacySec1Body">AIVA is a personal voice assistant for task management.</p>
+      <p data-i18n="privacySec1Body">KAYA is a personal voice assistant for task management.</p>
 
       <h2 data-i18n="privacySec2Title">2. Data Collected</h2>
       <ul>
@@ -101,7 +101,7 @@
       </ul>
 
       <h2 data-i18n="privacySec3Title">3. Google OAuth and Google Data</h2>
-      <p data-i18n="privacySec3Intro">AIVA offers Google Calendar integration.</p>
+      <p data-i18n="privacySec3Intro">KAYA offers Google Calendar integration.</p>
       <ul>
         <li data-i18n-html="privacySec3Li1"></li>
         <li data-i18n-html="privacySec3Li2"></li>
@@ -124,7 +124,7 @@
       <p data-i18n="privacySec6Body">Contact us via the project GitHub page.</p>
     </div>
 
-    <footer data-i18n="privacyFooter">&copy; 2024 AIVA Assistant</footer>
+    <footer data-i18n="privacyFooter">&copy; 2024 KAYA Assistant</footer>
   </div>
 
   <script src="settings.js"></script>
@@ -132,11 +132,11 @@
   <script src="lib/i18n-privacy.js"></script>
   <script>
     (function () {
-      const settings = window.AIVA_SETTINGS?.loadAssistantSettings?.() || {};
+      const settings = window.KAYA_SETTINGS?.loadAssistantSettings?.() || {};
       const lang = settings.profile?.language || 'bg';
-      window.AIVA_I18N.initFromSettings(settings);
-      window.AIVA_I18N.applyToDocument(document, lang);
-      document.title = 'AIVA — ' + window.AIVA_I18N.t('privacyPageTitle', lang);
+      window.KAYA_I18N.initFromSettings(settings);
+      window.KAYA_I18N.applyToDocument(document, lang);
+      document.title = 'KAYA — ' + window.KAYA_I18N.t('privacyPageTitle', lang);
     })();
   </script>
 </body>

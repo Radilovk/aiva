@@ -1,4 +1,4 @@
-# AIVA — Гласов мениджър на задачи (Bulgarian Voice Task Manager)
+# KAYA — Гласов мениджър на задачи (Bulgarian Voice Task Manager)
 
 AI-powered voice task manager that listens in Bulgarian, detects emotion from voice tone, and saves tasks intelligently.
 
@@ -45,7 +45,7 @@ npm install
 ### 2. Create D1 database
 
 ```bash
-wrangler d1 create aiva-db
+wrangler d1 create kaya-db
 ```
 
 Update `wrangler.toml` with the generated database ID.
@@ -83,7 +83,7 @@ npm run deploy
 All UI lives in **`frontend/`** only (served as Worker static assets via `wrangler.jsonc`).  
 Do not use duplicate HTML/JS at the repo root — they were removed to avoid drift.
 
-- Production: `https://aiva.radilov-k.workers.dev`
+- Production: `https://kaya.radilov-k.workers.dev`
 - GitHub Pages (`*.github.io`) uses the same UI but calls the Worker API for `/api/*` (see `frontend/config.js`).
 
 ## API Endpoints

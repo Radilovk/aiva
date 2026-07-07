@@ -1,6 +1,6 @@
 {
-  "appId": "com.aiva.assistant",
-  "appName": "AIVA",
+  "appId": "com.kaya.assistant",
+  "appName": "KAYA",
   "webDir": "capacitor-shell",
   "server": {
     "androidScheme": "https",
@@ -8,7 +8,7 @@
   },
   "plugins": {
     "LocalNotifications": {
-      "smallIcon": "ic_stat_aiva",
+      "smallIcon": "ic_stat_kaya",
       "iconColor": "#ff3b5c"
     }
   },

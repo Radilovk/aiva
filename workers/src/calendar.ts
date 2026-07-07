@@ -494,9 +494,9 @@ function buildAppleEventICS(task: Task): string | null {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//AIVA//Apple CalDAV//BG',
+    'PRODID:-//KAYA//Apple CalDAV//BG',
     'BEGIN:VEVENT',
-    `UID:aiva-task-${task.id}`,
+    `UID:kaya-task-${task.id}`,
     `DTSTAMP:${now}`,
     `DTSTART;TZID=Europe/Sofia:${dtStart.replace('Z', '')}`,
     `DTEND;TZID=Europe/Sofia:${dtEnd.replace('Z', '')}`,
@@ -849,7 +849,7 @@ export async function syncTaskToCloudCalendars(env: CalendarEnv, task: Task, ori
         const ics = buildAppleEventICS(task);
         if (!ics) continue;
 
-        const eventPath = existing?.external_event_id || `${selected.id}aiva-task-${task.id}.ics`;
+        const eventPath = existing?.external_event_id || `${selected.id}kaya-task-${task.id}.ics`;
         const resp = await providerApi(env, task.user_id, 'apple', origin, eventPath, {
           method: 'PUT',
           headers: { 'Content-Type': 'text/calendar; charset=utf-8' },

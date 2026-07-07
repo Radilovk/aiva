@@ -1,6 +1,6 @@
 (function () {
-  const LOCAL_CALENDAR_ID_KEY = 'aiva_local_calendar_id';
-  const EVENT_MAP_KEY = 'aiva_local_calendar_event_map';
+  const LOCAL_CALENDAR_ID_KEY = 'kaya_local_calendar_id';
+  const EVENT_MAP_KEY = 'kaya_local_calendar_event_map';
 
   function getPlatform() {
     return window.Capacitor?.getPlatform?.() || 'web';
@@ -12,8 +12,8 @@
 
   function getCalendarPlugin() {
     try {
-      return window.Capacitor?.Plugins?.AivaCalendar ||
-        window.Capacitor?.registerPlugin?.('AivaCalendar') ||
+      return window.Capacitor?.Plugins?.KayaCalendar ||
+        window.Capacitor?.registerPlugin?.('KayaCalendar') ||
         null;
     } catch {
       return null;
@@ -59,7 +59,7 @@
   }
 
   function parseTaskDateTime(task) {
-    const parsed = window.AIVA_ICS?.parseTaskDateTime?.(task);
+    const parsed = window.KAYA_ICS?.parseTaskDateTime?.(task);
     if (parsed?.start && parsed?.end) return parsed;
     if (!task?.due_date) return null;
     const startIso = `${task.due_date}T${task.due_time || '09:00'}:00`;
@@ -84,7 +84,7 @@
     if (!isAndroid()) return { granted: false, platform: getPlatform() };
     const calendar = getCalendarPlugin();
     if (!calendar?.requestPermissions) {
-      throw new Error('AivaCalendar plugin не е наличен');
+      throw new Error('KayaCalendar plugin не е наличен');
     }
     const result = await calendar.requestPermissions();
     const granted = result?.granted === true ||
@@ -100,7 +100,7 @@
     const calendar = getCalendarPlugin();
     const reader = calendar?.getCalendars || calendar?.listCalendars;
     if (!reader) {
-      throw new Error('AivaCalendar.getCalendars() не е наличен');
+      throw new Error('KayaCalendar.getCalendars() не е наличен');
     }
     const result = await reader.call(calendar);
     return normalizeCalendars(result);
@@ -111,7 +111,7 @@
     if (!parsed) throw new Error('Задачата няма валидна дата');
     return {
       calendarId,
-      title: task.content || 'AIVA задача',
+      title: task.content || 'KAYA задача',
       description: task.notes || '',
       location: task.location || '',
       startDate: parsed.start.toISOString(),
@@ -122,7 +122,7 @@
     };
   }
 
-  async function createAivaEvent(eventData, webOperation) {
+  async function createKayaEvent(eventData, webOperation) {
     if (!isAndroid()) {
       if (typeof webOperation === 'function') return webOperation();
       return { branch: 'web', skipped: true };
@@ -132,7 +132,7 @@
     const calendar = getCalendarPlugin();
     const createEvent = calendar?.createEvent || calendar?.addEvent;
     if (!createEvent) {
-      throw new Error('AivaCalendar.createEvent() не е наличен');
+      throw new Error('KayaCalendar.createEvent() не е наличен');
     }
     const payload = buildAndroidPayload(eventData, calendarId);
     const result = await createEvent.call(calendar, payload);
@@ -145,7 +145,7 @@
     return { branch: 'android', result };
   }
 
-  async function updateAivaEvent(eventData, webOperation) {
+  async function updateKayaEvent(eventData, webOperation) {
     if (!isAndroid()) {
       if (typeof webOperation === 'function') return webOperation();
       return { branch: 'web', skipped: true };
@@ -154,14 +154,14 @@
     const eventId = getMappedEventId(eventData?.id);
     const updateEvent = calendar?.updateEvent || calendar?.editEvent;
     if (!eventId || !updateEvent) {
-      return createAivaEvent(eventData, webOperation);
+      return createKayaEvent(eventData, webOperation);
     }
     const payload = buildAndroidPayload(eventData, getSelectedCalendarId());
     const result = await updateEvent.call(calendar, { ...payload, eventId, id: eventId });
     return { branch: 'android', result };
   }
 
-  async function deleteAivaEvent(taskId, webOperation) {
+  async function deleteKayaEvent(taskId, webOperation) {
     if (!isAndroid()) {
       if (typeof webOperation === 'function') return webOperation();
       return { branch: 'web', skipped: true };
@@ -210,7 +210,7 @@
     }
     const calendar = getCalendarPlugin();
     const updateEvent = calendar?.updateEvent || calendar?.editEvent;
-    if (!updateEvent) throw new Error('AivaCalendar.updateEvent() не е наличен');
+    if (!updateEvent) throw new Error('KayaCalendar.updateEvent() не е наличен');
     const payload = buildExternalEventPayload(fields);
     const result = await updateEvent.call(calendar, {
       ...payload,
@@ -228,7 +228,7 @@
     }
     const calendar = getCalendarPlugin();
     const removeEvent = calendar?.deleteEvent || calendar?.removeEvent;
-    if (!removeEvent) throw new Error('AivaCalendar.deleteEvent() не е наличен');
+    if (!removeEvent) throw new Error('KayaCalendar.deleteEvent() не е наличен');
     const result = await removeEvent.call(calendar, {
       eventId: String(eventId),
       id: String(eventId),
@@ -237,7 +237,7 @@
     return { branch: 'android', result };
   }
 
-  async function readAivaEvents(params = {}, webOperation) {
+  async function readKayaEvents(params = {}, webOperation) {
     if (isAndroid()) {
       const calendar = getCalendarPlugin();
       const reader = calendar?.getEvents || calendar?.listEvents;
@@ -247,7 +247,7 @@
     }
     if (typeof webOperation === 'function') return webOperation();
     if (!params.userId || !params.provider) return { branch: 'web', events: [] };
-    const base = window.AIVA_CONFIG?.API_BASE || window.AIVA_CONFIG?.WORKER_ORIGIN || location.origin;
+    const base = window.KAYA_CONFIG?.API_BASE || window.KAYA_CONFIG?.WORKER_ORIGIN || location.origin;
     const query = new URLSearchParams({
       user_id: params.userId,
       provider: params.provider,
@@ -260,7 +260,7 @@
     return { branch: 'web', events: data.events || [] };
   }
 
-  window.AIVA_CALENDAR_CRUD = {
+  window.KAYA_CALENDAR_CRUD = {
     getPlatform,
     isAndroid,
     requestPermissions,
@@ -269,10 +269,10 @@
     setSelectedCalendarId,
     hasLocalEvent,
     getLocalEventIds,
-    createAivaEvent,
-    updateAivaEvent,
-    deleteAivaEvent,
-    readAivaEvents,
+    createKayaEvent,
+    updateKayaEvent,
+    deleteKayaEvent,
+    readKayaEvents,
     updateExternalEvent,
     deleteExternalEvent,
   };

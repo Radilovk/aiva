@@ -67,7 +67,7 @@
     await Promise.all([playTone(620, 0.11), vibrateOnce()]);
   }
 
-  window.AIVA_HAPTICS = {
+  window.KAYA_HAPTICS = {
     onListeningStart,
     onListeningStop,
   };

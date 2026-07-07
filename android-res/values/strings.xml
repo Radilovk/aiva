@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="aiva_shortcut_accessibility_desc">Позволява на AIVA да засича натискания на бутоните за сила на звука, дори когато приложението е във фонов режим, за бързо стартиране на гласов режим.</string>
+    <string name="kaya_shortcut_accessibility_desc">Позволява на KAYA да засича натискания на бутоните за сила на звука, дори когато приложението е във фонов режим, за бързо стартиране на гласов режим.</string>
 </resources>
