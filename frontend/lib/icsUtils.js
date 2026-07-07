@@ -1,5 +1,5 @@
 /**
- * Shared ICS (iCalendar) utilities for AIVA.
+ * Shared ICS (iCalendar) utilities for KAYA.
  * Uses Europe/Sofia timezone consistently across web, PWA and APK.
  */
 (function () {
@@ -75,7 +75,7 @@
   }
 
   function getTaskUid(task) {
-    return `aiva-task-${task.id || Date.now()}@aiva`;
+    return `kaya-task-${task.id || Date.now()}@kaya`;
   }
 
   function buildValarms(task, options = {}) {
@@ -128,7 +128,7 @@
     if (task.location) lines.push(`LOCATION:${escapeICS(task.location)}`);
     if (task.priority) lines.push(`PRIORITY:${Math.min(9, (task.priority || 3) * 2)}`);
     if (task.tags) lines.push(`CATEGORIES:${escapeICS(task.tags)}`);
-    if (task.repeat_rule) lines.push(`X-AIVA-REPEAT:${escapeICS(task.repeat_rule)}`);
+    if (task.repeat_rule) lines.push(`X-KAYA-REPEAT:${escapeICS(task.repeat_rule)}`);
 
     lines.push(...buildValarms(task, options));
     lines.push('END:VEVENT');
@@ -143,7 +143,7 @@
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//AIVA//Task Calendar//BG',
+      'PRODID:-//KAYA//Task Calendar//BG',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
     ];
@@ -171,10 +171,10 @@
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//AIVA//Task Calendar//BG',
+      'PRODID:-//KAYA//Task Calendar//BG',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      `X-WR-CALNAME:${escapeICS(options.calendarName || 'AIVA Задачи')}`,
+      `X-WR-CALNAME:${escapeICS(options.calendarName || 'KAYA Задачи')}`,
     ];
 
     if (options.includeRefresh) {
@@ -211,7 +211,7 @@
 
     const params = new URLSearchParams({
       action: 'TEMPLATE',
-      text: task.content || 'AIVA задача',
+      text: task.content || 'KAYA задача',
       dates: `${fmt(parsed.start)}/${fmt(parsed.end)}`,
       ctz: 'Europe/Sofia',
     });
@@ -221,7 +221,7 @@
     return `https://calendar.google.com/calendar/render?${params.toString()}`;
   }
 
-  window.AIVA_ICS = {
+  window.KAYA_ICS = {
     SOFIA_TZ,
     escapeICS,
     stampUTC,

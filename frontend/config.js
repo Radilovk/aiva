@@ -4,7 +4,7 @@
  * - GitHub Pages / local file: must call the deployed Worker explicitly
  */
 (function () {
-  const WORKER_ORIGIN = 'https://aiva.radilov-k.workers.dev';
+  const WORKER_ORIGIN = 'https://kaya.radilov-k.workers.dev';
 
   function resolveApiBase() {
     const host = location.hostname;
@@ -23,7 +23,7 @@
     return location.origin;
   }
 
-  window.AIVA_CONFIG = {
+  window.KAYA_CONFIG = {
     API_BASE: resolveApiBase(),
     LIVE_MODEL: 'gemini-3.1-flash-live-preview',
     WORKER_ORIGIN,

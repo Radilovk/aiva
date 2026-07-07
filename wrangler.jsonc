@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "aiva",
+  "name": "kaya",
   "main": "workers/src/index.ts",
   "compatibility_date": "2026-06-02",
   "observability": {
@@ -19,7 +19,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "aiva-db",
+      "database_name": "kaya-db",
       "database_id": "3e660ebf-11b1-47c3-b2c8-752d039dd7dc"
     }
   ],

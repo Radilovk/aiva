@@ -104,7 +104,7 @@ const KEYS = {
   subPickCal: ['Subscribe (pick calendar)', 'Абонирай се (избери календар)'],
   copyBtn: ['Copy', 'Копирай'],
   importAllIcs: ['Import all tasks (.ics)', 'Импортирай всички задачи (.ics)'],
-  subscribeHint: ['After subscribing the calendar updates automatically (usually every 15–60 min). Changes in AIVA update the calendar event.', 'След абониране календарът обновява задачите автоматично (обикновено на 15–60 мин). При промяна в AIVA събитието се актуализира в календара.'],
+  subscribeHint: ['After subscribing the calendar updates automatically (usually every 15–60 min). Changes in KAYA update the calendar event.', 'След абониране календарът обновява задачите автоматично (обикновено на 15–60 мин). При промяна в KAYA събитието се актуализира в календара.'],
   offerCalOnNew: ['Offer calendar on new task', 'Предлагай календар при нова задача'],
   manualHint: ['Each new dated task opens share to your device calendar app — pick which calendar to use.', 'При всяка нова задача с дата ще се отвори споделяне към календарното приложение на устройството — изберете кой календар да ползвате.'],
   nativeHint: ['Direct mode for Android APK — tasks are written to the system calendar with reminders. Requires calendar permission on first use.', 'Директен режим за Android APK — задачите се записват в системния календар с напомняния. Изисква разрешение за календар при първо ползване.'],
@@ -189,8 +189,8 @@ const KEYS = {
   countInHour: ['in {hrs} h', 'след {hrs} ч'],
   countLateMin: ['{mins} min late', 'закъснява {mins} мин'],
   countLateHour: ['{hrs} h late', 'закъснява {hrs} ч'],
-  channelTasks: ['AIVA Tasks', 'AIVA Задачи'],
-  channelSnooze: ['AIVA Snoozed', 'AIVA Отложени'],
+  channelTasks: ['KAYA Tasks', 'KAYA Задачи'],
+  channelSnooze: ['KAYA Snoozed', 'KAYA Отложени'],
   channelTasksDesc: ['Task reminders', 'Напомняния за задачи'],
   channelSnoozeDesc: ['Snoozed reminders', 'Отложени напомняния'],
   defaultTaskLabel: ['Task', 'Задача'],
@@ -268,12 +268,12 @@ const EXT = {};
 for (const lang of LANGS) EXT[lang] = buildLang(lang);
 
 const out = `/**
- * Extended UI strings — merged into AIVA_I18N at load time.
+ * Extended UI strings — merged into KAYA_I18N at load time.
  */
 (function () {
   const EXT = ${JSON.stringify(EXT, null, 2)};
-  if (window.AIVA_I18N) {
-    window.AIVA_I18N.mergeStrings(EXT);
+  if (window.KAYA_I18N) {
+    window.KAYA_I18N.mergeStrings(EXT);
   }
 })();
 `;

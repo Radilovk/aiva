@@ -1,11 +1,11 @@
 {
-  "name": "aiva-worker",
+  "name": "kaya-worker",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:migrate": "wrangler d1 execute aiva-db --file=../schema.sql"
+    "db:migrate": "wrangler d1 execute kaya-db --file=../schema.sql"
   },
   "dependencies": {
     "hono": "^4.4.0"

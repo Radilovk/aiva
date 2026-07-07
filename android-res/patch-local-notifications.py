@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Patch AndroidManifest.xml and MainActivity for AIVA calendar + notification support.
+Patch AndroidManifest.xml and MainActivity for KAYA calendar + notification support.
 Run from repo root after `npx cap add android && npx cap sync android`.
 """
 import os
@@ -8,7 +8,7 @@ import re
 import sys
 
 MANIFEST = 'android/app/src/main/AndroidManifest.xml'
-MAIN_ACTIVITY = 'android/app/src/main/java/com/aiva/assistant/MainActivity.java'
+MAIN_ACTIVITY = 'android/app/src/main/java/com/kaya/assistant/MainActivity.java'
 
 if not os.path.exists(MANIFEST):
     print(f'ERROR: {MANIFEST} not found. Run `npx cap add android` first.')
@@ -55,21 +55,21 @@ if 'RECORD_AUDIO' not in content:
     print('✅ Added microphone permissions')
 
 RECEIVER = """
-        <receiver android:name="com.capacitorjs.plugins.localnotifications.AivaNotificationReceiver"
+        <receiver android:name="com.capacitorjs.plugins.localnotifications.KayaNotificationReceiver"
                   android:exported="false">
             <intent-filter>
-                <action android:name="com.aiva.assistant.NOTIFICATION_ACTION" />
+                <action android:name="com.kaya.assistant.NOTIFICATION_ACTION" />
             </intent-filter>
         </receiver>
 """
 
-if 'AivaNotificationReceiver' not in content:
+if 'KayaNotificationReceiver' not in content:
     content = content.replace('</application>', RECEIVER + '\n    </application>', 1)
-    print('✅ Added AivaNotificationReceiver')
+    print('✅ Added KayaNotificationReceiver')
 
 ACCESSIBILITY_SERVICE = """
         <service
-            android:name="com.aiva.assistant.AivaShortcutAccessibilityService"
+            android:name="com.kaya.assistant.KayaShortcutAccessibilityService"
             android:exported="false"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
@@ -77,19 +77,19 @@ ACCESSIBILITY_SERVICE = """
             </intent-filter>
             <meta-data
                 android:name="android.accessibilityservice"
-                android:resource="@xml/aiva_shortcut_service_config" />
+                android:resource="@xml/kaya_shortcut_service_config" />
         </service>
 """
 
-if 'AivaShortcutAccessibilityService' not in content:
+if 'KayaShortcutAccessibilityService' not in content:
     content = content.replace('</application>', ACCESSIBILITY_SERVICE + '\n    </application>', 1)
-    print('✅ Added AivaShortcutAccessibilityService')
+    print('✅ Added KayaShortcutAccessibilityService')
 
 with open(MANIFEST, 'w') as f:
     f.write(content)
 
 # Copy patched MainActivity (registers plugins + volume shortcut handling)
-PATCHED_MAIN = 'android-res/java/com/aiva/assistant/MainActivity.java'
+PATCHED_MAIN = 'android-res/java/com/kaya/assistant/MainActivity.java'
 if os.path.exists(PATCHED_MAIN):
     import shutil
     os.makedirs(os.path.dirname(MAIN_ACTIVITY), exist_ok=True)
@@ -101,8 +101,8 @@ else:
     print(f'⚠ MainActivity not found at {MAIN_ACTIVITY} — plugin registration skipped')
 
 # Copy accessibility XML + strings
-XML_SRC = 'android-res/xml/aiva_shortcut_service_config.xml'
-XML_DST = 'android/app/src/main/res/xml/aiva_shortcut_service_config.xml'
+XML_SRC = 'android-res/xml/kaya_shortcut_service_config.xml'
+XML_DST = 'android/app/src/main/res/xml/kaya_shortcut_service_config.xml'
 if os.path.exists(XML_SRC):
     os.makedirs(os.path.dirname(XML_DST), exist_ok=True)
     import shutil
@@ -110,11 +110,11 @@ if os.path.exists(XML_SRC):
     print('✅ Copied shortcut accessibility config XML')
 
 STRINGS_SRC = 'android-res/values/strings.xml'
-STRINGS_DST = 'android/app/src/main/res/values/aiva_strings.xml'
+STRINGS_DST = 'android/app/src/main/res/values/kaya_strings.xml'
 if os.path.exists(STRINGS_SRC):
     os.makedirs(os.path.dirname(STRINGS_DST), exist_ok=True)
     import shutil
     shutil.copy2(STRINGS_SRC, STRINGS_DST)
-    print('✅ Copied AIVA strings resource')
+    print('✅ Copied KAYA strings resource')
 
 print('✅ Android patches applied successfully')

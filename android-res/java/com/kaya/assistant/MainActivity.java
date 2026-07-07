@@ -1,4 +1,4 @@
-package com.aiva.assistant;
+package com.kaya.assistant;
 
 import android.content.Intent;
 import android.os.Build;
@@ -12,10 +12,10 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        registerPlugin(AivaCalendarPlugin.class);
-        registerPlugin(AivaShortcutPlugin.class);
+        registerPlugin(KayaCalendarPlugin.class);
+        registerPlugin(KayaShortcutPlugin.class);
         super.onCreate(savedInstanceState);
-        AivaVolumeKeyHandler.getInstance().setListener(AivaShortcutLauncher::launchListening);
+        KayaVolumeKeyHandler.getInstance().setListener(KayaShortcutLauncher::launchListening);
         handleLaunchIntent(getIntent());
     }
 
@@ -48,7 +48,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (AivaVolumeKeyHandler.getInstance().handleKeyEvent(this, event.getKeyCode(), event)) {
+        if (KayaVolumeKeyHandler.getInstance().handleKeyEvent(this, event.getKeyCode(), event)) {
             notifyShortcutToJs();
             return true;
         }
@@ -58,9 +58,9 @@ public class MainActivity extends BridgeActivity {
     private void notifyShortcutToJs() {
         wakeScreen();
         if (getBridge() == null) return;
-        com.getcapacitor.PluginHandle handle = getBridge().getPlugin("AivaShortcut");
-        if (handle != null && handle.getInstance() instanceof AivaShortcutPlugin) {
-            ((AivaShortcutPlugin) handle.getInstance()).notifyShortcutTriggered();
+        com.getcapacitor.PluginHandle handle = getBridge().getPlugin("KayaShortcut");
+        if (handle != null && handle.getInstance() instanceof KayaShortcutPlugin) {
+            ((KayaShortcutPlugin) handle.getInstance()).notifyShortcutTriggered();
         }
     }
 }

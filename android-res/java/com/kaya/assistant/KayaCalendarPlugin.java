@@ -1,4 +1,4 @@
-package com.aiva.assistant;
+package com.kaya.assistant;
 
 import android.Manifest;
 import android.content.ContentResolver;
@@ -24,18 +24,18 @@ import java.util.TimeZone;
 
 /**
  * Native Android calendar integration via CalendarContract.
- * Inserts/updates/removes AIVA tasks as calendar events with reminders.
+ * Inserts/updates/removes KAYA tasks as calendar events with reminders.
  */
 @CapacitorPlugin(
-    name = "AivaCalendar",
+    name = "KayaCalendar",
     permissions = {
         @Permission(strings = { Manifest.permission.READ_CALENDAR }, alias = "calendar"),
         @Permission(strings = { Manifest.permission.WRITE_CALENDAR }, alias = "calendar")
     }
 )
-public class AivaCalendarPlugin extends Plugin {
+public class KayaCalendarPlugin extends Plugin {
 
-    private static final String TAG = "AivaCalendar";
+    private static final String TAG = "KayaCalendar";
 
     @PluginMethod
     public void requestPermissions(PluginCall call) {
@@ -192,7 +192,7 @@ public class AivaCalendarPlugin extends Plugin {
     public void addEvent(PluginCall call) {
         if (!ensureCalendarPermission(call)) return;
 
-        String title = call.getString("title", "AIVA задача");
+        String title = call.getString("title", "KAYA задача");
         String description = call.getString("description", "");
         String location = call.getString("location", "");
         long startTime = call.getLong("startTime", 0L);
@@ -256,7 +256,7 @@ public class AivaCalendarPlugin extends Plugin {
         }
 
         long eventId = Long.parseLong(eventIdStr);
-        String title = call.getString("title", "AIVA задача");
+        String title = call.getString("title", "KAYA задача");
         String description = call.getString("description", "");
         String location = call.getString("location", "");
         long startTime = call.getLong("startTime", 0L);

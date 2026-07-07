@@ -1,4 +1,4 @@
-const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.AIVA_SETTINGS;
+const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.KAYA_SETTINGS;
 
 const form = document.getElementById('adminForm');
 const saveState = document.getElementById('saveState');
@@ -49,7 +49,7 @@ function getModalities(settings) {
 
 function renderSettings(settings) {
   document.documentElement.style.setProperty('--accent', settings.appearance.accentColor);
-  window.AIVA_VOICES?.populateVoiceSelect?.(voiceField, settings.voiceName);
+  window.KAYA_VOICES?.populateVoiceSelect?.(voiceField, settings.voiceName);
   promptField.value = settings.systemInstructions;
   modelField.value = settings.model;
   voiceField.value = settings.voiceName;

@@ -1,9 +1,9 @@
 /**
- * Shared local settings for the AIVA assistant and calendar UI.
+ * Shared local settings for the KAYA assistant and calendar UI.
  * Values are intentionally client-side so admins can tune the next Live API session instantly.
  */
 (function () {
-  const SETTINGS_KEY = 'aiva_assistant_settings_v1';
+  const SETTINGS_KEY = 'kaya_assistant_settings_v1';
 
   const DEFAULT_ASSISTANT_SETTINGS = {
     profile: {
@@ -11,7 +11,7 @@
       userName: '',
       onboardingComplete: false,
     },
-    systemInstructions: `Ти си AIVA — личен гласов асистент за задачи.
+    systemInstructions: `Ти си KAYA — личен гласов асистент за задачи.
 
 ПРАВИЛА:
 - Слушаш ТОНА на гласа, не само думите
@@ -166,7 +166,7 @@
       }
       return normalized;
     } catch (e) {
-      console.warn('AIVA settings reset after invalid localStorage payload:', e);
+      console.warn('KAYA settings reset after invalid localStorage payload:', e);
       return normalizeSettings(null);
     }
   }
@@ -174,27 +174,27 @@
   function saveAssistantSettings(settings) {
     const normalized = normalizeSettings(settings);
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalized));
-    window.dispatchEvent(new CustomEvent('aiva:settings-updated', { detail: normalized }));
+    window.dispatchEvent(new CustomEvent('kaya:settings-updated', { detail: normalized }));
     return normalized;
   }
 
   function resetAssistantSettings() {
     localStorage.removeItem(SETTINGS_KEY);
     const settings = loadAssistantSettings();
-    window.dispatchEvent(new CustomEvent('aiva:settings-updated', { detail: settings }));
+    window.dispatchEvent(new CustomEvent('kaya:settings-updated', { detail: settings }));
     return settings;
   }
 
   function buildSessionInstructions(baseInstructions, profile, extraContext) {
     const lang = profile?.language || 'bg';
     const userName = (profile?.userName || '').trim();
-    const langInstruction = window.AIVA_I18N?.getLanguageInstruction?.(lang)
+    const langInstruction = window.KAYA_I18N?.getLanguageInstruction?.(lang)
       || 'Respond in the user\'s selected language.';
 
     let instructions = (baseInstructions || '').trim();
-    instructions += `\n\n${window.AIVA_I18N?.t?.('langSectionTitle') || 'LANGUAGE:'}\n- ${langInstruction}`;
+    instructions += `\n\n${window.KAYA_I18N?.t?.('langSectionTitle') || 'LANGUAGE:'}\n- ${langInstruction}`;
     if (userName) {
-      const addr = window.AIVA_I18N?.tf?.('addressUserAs', { name: userName })
+      const addr = window.KAYA_I18N?.tf?.('addressUserAs', { name: userName })
         || `Address the user by name: ${userName}`;
       instructions += `\n- ${addr}`;
     }
@@ -204,7 +204,7 @@
     return instructions;
   }
 
-  window.AIVA_SETTINGS = {
+  window.KAYA_SETTINGS = {
     SETTINGS_KEY,
     DEFAULT_ASSISTANT_SETTINGS,
     loadAssistantSettings,

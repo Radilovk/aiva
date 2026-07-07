@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
-  <title>AIVA — Настройки</title>
+  <title>KAYA — Настройки</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -353,7 +353,7 @@
         <div class="subscribe-actions">
           <button class="btn" type="button" id="exportAllIcsBtn" data-i18n="importAllIcs">Импортирай всички задачи (.ics)</button>
         </div>
-        <p class="sync-note" data-i18n="subscribeHint">След абониране календарът обновява задачите автоматично (обикновено на 15–60 мин). При промяна в AIVA събитието се актуализира в календара.</p>
+        <p class="sync-note" data-i18n="subscribeHint">След абониране календарът обновява задачите автоматично (обикновено на 15–60 мин). При промяна в KAYA събитието се актуализира в календара.</p>
       </div>
       <div class="field" id="manualSection" style="display:none">
         <div class="toggle-row">
@@ -575,23 +575,23 @@
   <script src="lib/calendarCrud.js"></script>
   <script src="lib/calendarSync.js"></script>
   <script>
-    const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.AIVA_SETTINGS;
-    const { API_BASE, WORKER_ORIGIN } = window.AIVA_CONFIG;
-    const calendarSync = window.AIVA_CALENDAR_SYNC;
-    const calendarCrud = window.AIVA_CALENDAR_CRUD;
+    const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.KAYA_SETTINGS;
+    const { API_BASE, WORKER_ORIGIN } = window.KAYA_CONFIG;
+    const calendarSync = window.KAYA_CALENDAR_SYNC;
+    const calendarCrud = window.KAYA_CALENDAR_CRUD;
     const platform = window.Capacitor?.getPlatform?.() || 'web';
     const isAndroidPlatform = platform === 'android';
-    function t(key) { return window.AIVA_I18N?.t?.(key) ?? key; }
-    function tf(key, vars) { return window.AIVA_I18N?.tf?.(key, vars) ?? t(key); }
+    function t(key) { return window.KAYA_I18N?.t?.(key) ?? key; }
+    function tf(key, vars) { return window.KAYA_I18N?.tf?.(key, vars) ?? t(key); }
     let settings = loadAssistantSettings();
-    window.AIVA_I18N.initFromSettings(settings);
-    window.AIVA_I18N.populateLanguageSelect(document.getElementById('profileLanguage'), settings.profile?.language);
-    window.AIVA_VOICES.populateVoiceSelect(document.getElementById('voiceName'), settings.voiceName);
-    window.AIVA_I18N.applyToDocument(document);
+    window.KAYA_I18N.initFromSettings(settings);
+    window.KAYA_I18N.populateLanguageSelect(document.getElementById('profileLanguage'), settings.profile?.language);
+    window.KAYA_VOICES.populateVoiceSelect(document.getElementById('voiceName'), settings.voiceName);
+    window.KAYA_I18N.applyToDocument(document);
 
     function applySettingsLanguage(lang) {
-      window.AIVA_I18N.setLanguage(lang);
-      window.AIVA_I18N.applyToDocument(document, lang);
+      window.KAYA_I18N.setLanguage(lang);
+      window.KAYA_I18N.applyToDocument(document, lang);
     }
 
     // --- Populate UI from settings ---
@@ -618,7 +618,7 @@
 
       // Voice
       document.getElementById('model').value = settings.model;
-      window.AIVA_VOICES.populateVoiceSelect(document.getElementById('voiceName'), settings.voiceName);
+      window.KAYA_VOICES.populateVoiceSelect(document.getElementById('voiceName'), settings.voiceName);
       document.getElementById('temperature').value = settings.temperature;
       setToggle('toggleGrounding', settings.googleGrounding);
       setToggle('toggleTextOutput', settings.textOutputEnabled);
@@ -665,7 +665,7 @@
     }
 
     function getUserId() {
-      return localStorage.getItem('aiva_user_id') || '';
+      return localStorage.getItem('kaya_user_id') || '';
     }
 
     function applyCalendarPlatformUI() {
@@ -685,8 +685,8 @@
     }
 
     async function applyHardwareShortcutConfig(cfg) {
-      if (!window.AIVA_SHORTCUT?.isAndroid?.()) return;
-      await window.AIVA_SHORTCUT.applyShortcutConfig(cfg || {});
+      if (!window.KAYA_SHORTCUT?.isAndroid?.()) return;
+      await window.KAYA_SHORTCUT.applyShortcutConfig(cfg || {});
     }
 
     async function connectLocalCalendar() {
@@ -854,7 +854,7 @@
         return;
       }
 
-      localStorage.setItem('aiva_cloud_pending_provider', provider);
+      localStorage.setItem('kaya_cloud_pending_provider', provider);
       location.href = data.url;
     }
 
@@ -864,7 +864,7 @@
       const state = new URLSearchParams(location.search).get('state');
       if (!code || !state) return;
 
-      const provider = localStorage.getItem('aiva_cloud_pending_provider');
+      const provider = localStorage.getItem('kaya_cloud_pending_provider');
       const userId = getUserId();
       if (!provider || !userId) return;
 
@@ -884,7 +884,7 @@
         alert(data.error || t('errCalConnect'));
       }
 
-      localStorage.removeItem('aiva_cloud_pending_provider');
+      localStorage.removeItem('kaya_cloud_pending_provider');
       history.replaceState({}, document.title, location.pathname + location.hash);
     }
 
@@ -944,7 +944,7 @@
       if (nativeSection) nativeSection.style.display = provider === 'native' ? '' : 'none';
 
       if (provider === 'subscribe') {
-        const userId = localStorage.getItem('aiva_user_id') || 'unknown';
+        const userId = localStorage.getItem('kaya_user_id') || 'unknown';
         document.getElementById('icsUrl').value = calendarSync.getFeedUrl(userId) || `${getApiBase()}/api/calendar.ics?user_id=${encodeURIComponent(userId)}`;
       }
     }
@@ -1017,13 +1017,13 @@
       applySettingsLanguage(settings.profile?.language || 'bg');
       await applyHardwareShortcutConfig(settings.hardwareShortcut);
       if (getToggle('toggleNotifications')) {
-        if (window.AIVA_NOTIFIER) {
-          const granted = await window.AIVA_NOTIFIER.requestPermission();
+        if (window.KAYA_NOTIFIER) {
+          const granted = await window.KAYA_NOTIFIER.requestPermission();
           if (granted) {
-            const userId = localStorage.getItem('aiva_user_id');
+            const userId = localStorage.getItem('kaya_user_id');
             const res = await fetch(`${API_BASE || WORKER_ORIGIN}/api/tasks/${encodeURIComponent(userId)}`);
             const data = await res.json();
-            await window.AIVA_NOTIFIER.scheduleAll(data.tasks || [], settings.notifications.reminderMinutes);
+            await window.KAYA_NOTIFIER.scheduleAll(data.tasks || [], settings.notifications.reminderMinutes);
           }
         }
         enablePushNotifications();
@@ -1049,7 +1049,7 @@
           userVisibleOnly: true,
           applicationServerKey: null,
         });
-        const userId = localStorage.getItem('aiva_user_id');
+        const userId = localStorage.getItem('kaya_user_id');
         if (userId && subscription) {
           await fetch(`${API_BASE}/api/push/subscribe`, {
             method: 'POST',
@@ -1148,7 +1148,7 @@
       try { calendarSync.openSubscribe('outlook'); } catch (e) { alert(e.message); }
     });
     document.getElementById('exportAllIcsBtn').addEventListener('click', async () => {
-      const userId = localStorage.getItem('aiva_user_id');
+      const userId = localStorage.getItem('kaya_user_id');
       try {
         const res = await fetch(`${API_BASE || WORKER_ORIGIN}/api/tasks/${encodeURIComponent(userId)}`);
         const data = await res.json();
@@ -1177,7 +1177,7 @@
       btn.disabled = true;
       btn.textContent = t('voicePreviewing');
       try {
-        await window.AIVA_VOICE_PREVIEW.previewVoice({
+        await window.KAYA_VOICE_PREVIEW.previewVoice({
           voiceName: document.getElementById('voiceName').value,
           model: document.getElementById('model').value,
           temperature: parseFloat(document.getElementById('temperature').value) || 1.0,
@@ -1192,7 +1192,7 @@
     });
 
     document.getElementById('openA11yBtn')?.addEventListener('click', () => {
-      window.AIVA_SHORTCUT?.openAccessibilitySettings?.();
+      window.KAYA_SHORTCUT?.openAccessibilitySettings?.();
     });
 
     document.getElementById('saveBtn').addEventListener('click', async () => {
@@ -1212,14 +1212,14 @@
     });
 
     document.getElementById('exportBtn').addEventListener('click', async () => {
-      const userId = localStorage.getItem('aiva_user_id');
+      const userId = localStorage.getItem('kaya_user_id');
       try {
         const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`);
         const data = await res.json();
         const blob = new Blob([JSON.stringify({ settings, tasks: data.tasks || [] }, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `aiva-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `kaya-backup-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(a.href);
       } catch (e) {
@@ -1242,7 +1242,7 @@
           populateUI();
         }
         if (data.tasks?.length) {
-          const userId = localStorage.getItem('aiva_user_id');
+          const userId = localStorage.getItem('kaya_user_id');
           for (const task of data.tasks) {
             await fetch(`${API_BASE}/api/tasks`, {
               method: 'POST',

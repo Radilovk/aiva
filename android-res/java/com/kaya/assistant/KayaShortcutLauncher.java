@@ -1,4 +1,4 @@
-package com.aiva.assistant;
+package com.kaya.assistant;
 
 import android.content.Context;
 import android.content.Intent;
@@ -11,9 +11,9 @@ import com.getcapacitor.BridgeActivity;
 /**
  * Launches the app and signals JS to start listening mode.
  */
-public class AivaShortcutLauncher {
+public class KayaShortcutLauncher {
 
-    private static final String PREFS = "aiva_shortcut_prefs";
+    private static final String PREFS = "kaya_shortcut_prefs";
     private static final String KEY_PENDING = "pending_listen";
 
     public static void launchListening(Context context) {
@@ -44,7 +44,7 @@ public class AivaShortcutLauncher {
     }
 
     public static boolean isAccessibilityServiceEnabled(Context context) {
-        String serviceId = context.getPackageName() + "/" + AivaShortcutAccessibilityService.class.getCanonicalName();
+        String serviceId = context.getPackageName() + "/" + KayaShortcutAccessibilityService.class.getCanonicalName();
         try {
             int enabled = Settings.Secure.getInt(context.getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, 0);
             if (enabled != 1) return false;
