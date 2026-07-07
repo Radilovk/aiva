@@ -80,6 +80,8 @@ let assistantTranscriptBuffer = '';
 let assistantTurnComplete = false;
 let sessionEnding = false;
 let sessionEndTimer = null;
+let awaitingGreetingMic = false;
+let greetingMicTimer = null;
 
 function setMicUplinkMuted(muted) {
   audioStreamer?.setUplinkMuted(muted);
@@ -497,6 +499,51 @@ function clearSessionEndState() {
   if (sessionEndTimer) {
     clearTimeout(sessionEndTimer);
     sessionEndTimer = null;
+  }
+}
+
+function clearGreetingMicTimer() {
+  if (greetingMicTimer) {
+    clearTimeout(greetingMicTimer);
+    greetingMicTimer = null;
+  }
+}
+
+async function ensureMicStreaming() {
+  if (!client || audioStreamer?.isStreaming) return;
+  if (!audioStreamer) audioStreamer = new AudioStreamer(client);
+  await audioStreamer.start();
+}
+
+function scheduleGreetingMicFallback(delayMs = 8000) {
+  clearGreetingMicTimer();
+  greetingMicTimer = setTimeout(async () => {
+    greetingMicTimer = null;
+    if (!awaitingGreetingMic || !isSessionActive) return;
+    awaitingGreetingMic = false;
+    try {
+      await ensureMicStreaming();
+    } catch (e) {
+      console.error('Greeting mic fallback failed:', e);
+      showError(t('errMicrophone'));
+      disconnectSession();
+    }
+  }, delayMs);
+}
+
+async function startMicAfterGreeting() {
+  if (!awaitingGreetingMic || !isSessionActive) return;
+  awaitingGreetingMic = false;
+  clearGreetingMicTimer();
+  if (audioPlayer) {
+    await audioPlayer.waitForDrain(4000);
+  }
+  try {
+    await ensureMicStreaming();
+  } catch (e) {
+    console.error('Mic start after greeting failed:', e);
+    showError(t('errMicrophone'));
+    disconnectSession();
   }
 }
 
@@ -1486,17 +1533,17 @@ async function handleGeminiMessage(message) {
     case MultimodalLiveResponseType.SETUP_COMPLETE:
       setStatus(t('listening'), true);
       waveform.classList.add('active');
+      awaitingGreetingMic = true;
       try {
-        if (!audioStreamer) audioStreamer = new AudioStreamer(client);
-        await audioStreamer.start();
         isSessionActive = true;
         recordBtn.classList.add('recording');
         recordBtn.setAttribute('aria-label', t('stopRecording'));
         window.AIVA_HAPTICS?.onListeningStart?.();
         sendSessionGreeting();
+        scheduleGreetingMicFallback();
       } catch (e) {
-        console.error('Audio start failed:', e);
-        showError(t('errMicrophone'));
+        console.error('Session greeting failed:', e);
+        showError(t('errConnect'));
         disconnectSession();
       }
       break;
@@ -1594,7 +1641,9 @@ async function handleGeminiMessage(message) {
       assistantTranscriptBuffer = '';
       pendingUserTranscript = '';
       assistantTurnComplete = true;
-      if (sessionEnding && !sessionEndTimer) {
+      if (awaitingGreetingMic) {
+        startMicAfterGreeting();
+      } else if (sessionEnding && !sessionEndTimer) {
         scheduleSessionEnd(0);
       } else if (!sessionEnding) {
         tryUnmuteMicAfterAssistant();
@@ -1602,8 +1651,8 @@ async function handleGeminiMessage(message) {
       break;
 
     case MultimodalLiveResponseType.INTERRUPTED:
-      // Ignore spurious interrupts caused by speaker echo while mic uplink is muted
-      if (audioStreamer?.uplinkMuted) break;
+      // Ignore spurious interrupts during greeting or while assistant speaks
+      if (awaitingGreetingMic || audioStreamer?.uplinkMuted) break;
       if (audioPlayer) audioPlayer.interrupt();
       assistantTranscriptBuffer = '';
       assistantTurnComplete = false;
@@ -1726,6 +1775,8 @@ async function connectSession() {
 function disconnectSession() {
   const wasActive = isSessionActive;
   clearSessionEndState();
+  clearGreetingMicTimer();
+  awaitingGreetingMic = false;
   if (audioStreamer) {
     audioStreamer.stop();
     audioStreamer = null;
@@ -1979,14 +2030,22 @@ function tryAutoStartListening() {
   connectSession();
 }
 
+function waitForReadyAndListen(attempts = 30) {
+  if (window.AIVA_CONFIG && document.readyState === 'complete') {
+    setTimeout(tryAutoStartListening, 700);
+    return;
+  }
+  if (attempts <= 0) return;
+  setTimeout(() => waitForReadyAndListen(attempts - 1), 200);
+}
+
 window.addEventListener('aiva:shortcut-triggered', tryAutoStartListening);
 
 if (window.AIVA_SHORTCUT?.isAndroid?.()) {
   window.AIVA_SHORTCUT.onShortcutTriggered(tryAutoStartListening);
   window.AIVA_SHORTCUT.consumePendingLaunch().then((pending) => {
     if (!pending) return;
-    window.AIVA_SHORTCUT.clearPendingLaunch();
-    setTimeout(tryAutoStartListening, 500);
+    waitForReadyAndListen();
   });
 }
 

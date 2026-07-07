@@ -411,7 +411,7 @@
           <select id="voiceName" size="1"></select>
           <button class="btn" type="button" id="voicePreviewBtn" data-i18n="voicePreview">Прослушай</button>
         </div>
-        <div class="field-hint" id="voiceCountHint" data-i18n="voiceCountHint">30 HD гласа от Google Gemini Live (пълен списък)</div>
+        <div class="field-hint" id="voiceCountHint" data-i18n="voiceCountHint">12 гласа, оптимизирани за ясен български</div>
       </div>
       <div class="field">
         <span class="field-label" data-i18n="temperature">Температура (креативност)</span>
@@ -434,36 +434,21 @@
       <p class="hardware-shortcut-web-note" id="hardwareShortcutWebNote" data-i18n="hardwareShortcutWebNote">Настройките за физически бутони са налични в Android приложението (APK). Инсталирайте го на телефона си, за да стартирате слушане с бутоните за звук.</p>
       <div class="hardware-shortcut-android-only" id="hardwareShortcutAndroidControls">
         <div class="toggle-row">
-          <span class="toggle-label" data-i18n="hardwareShortcutEnabled">Включи бърз достъп с физически бутон</span>
+          <span class="toggle-label" data-i18n="hardwareShortcutEnabled">Включи бърз достъп с volume up</span>
           <div class="toggle" id="toggleShortcutEnabled"></div>
         </div>
-        <div class="row-grid">
-          <div class="field">
-            <span class="field-label" data-i18n="hardwareShortcutButton">Бутон</span>
-            <select id="shortcutButton">
-              <option value="volume_up" data-i18n="hardwareShortcutVolumeUp">Сила на звука нагоре</option>
-              <option value="volume_down" data-i18n="hardwareShortcutVolumeDown">Сила на звука надолу</option>
-              <option value="headset" data-i18n="hardwareShortcutHeadset">Бутон на слушалки</option>
-              <option value="camera" data-i18n="hardwareShortcutCamera">Бутон камера</option>
-            </select>
-          </div>
-          <div class="field">
-            <span class="field-label" data-i18n="hardwareShortcutPressCount">Брой натискания</span>
-            <select id="shortcutPressCount">
-              <option value="2">2</option>
-              <option value="3" selected>3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </div>
+        <div class="field">
+          <span class="field-label" data-i18n="hardwareShortcutPressCount">Брой натискания</span>
+          <select id="shortcutPressCount">
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
         </div>
-        <p class="field-hint" data-i18n="hardwareShortcutHint">Пример: 3 натискания на volume up стартират слушане и извеждат приложението на екрана.</p>
-        <div class="toggle-row">
-          <span class="toggle-label" data-i18n="hardwareShortcutBackground">Фонов режим (достъпност)</span>
-          <div class="toggle" id="toggleShortcutBackground"></div>
-        </div>
-        <p class="field-hint" data-i18n="hardwareShortcutBackgroundHint">Необходим за засичане на бутоните, когато приложението не е на преден план.</p>
-        <button class="btn" type="button" id="openA11yBtn" data-i18n="hardwareShortcutOpenA11y">Отвори настройки за достъпност</button>
+        <p class="field-hint" data-i18n="hardwareShortcutHint">3× volume up → отваря KAYA и започва слушане. Работи с отворено приложение. За затворено приложение или заключен екран — включете услугата по-долу.</p>
+        <button class="btn primary" type="button" id="openA11yBtn" data-i18n="hardwareShortcutOpenA11y">Включи фонов режим (достъпност)</button>
+        <p class="field-hint" data-i18n="hardwareShortcutBackgroundHint">Задължително за работа при затворено приложение и заключен екран. Натиснете бутона и активирайте услугата KAYA в настройките за достъпност.</p>
       </div>
     </div>
 
@@ -628,6 +613,7 @@
     document.getElementById('voiceSearch')?.addEventListener('input', (e) => {
       window.AIVA_VOICES.filterVoiceSelect(document.getElementById('voiceName'), e.target.value);
     });
+    window.AIVA_VOICE_PREVIEW?.prefetch?.();
 
     function applySettingsLanguage(lang) {
       window.AIVA_I18N.setLanguage(lang);
@@ -665,9 +651,7 @@
 
       // Hardware shortcut
       setToggle('toggleShortcutEnabled', settings.hardwareShortcut?.enabled);
-      document.getElementById('shortcutButton').value = settings.hardwareShortcut?.button || 'volume_up';
       document.getElementById('shortcutPressCount').value = String(settings.hardwareShortcut?.pressCount || 3);
-      setToggle('toggleShortcutBackground', settings.hardwareShortcut?.backgroundMode);
 
       // Calendar
       document.getElementById('defaultView').value = settings.calendar.defaultView;
@@ -1045,9 +1029,9 @@
         },
         hardwareShortcut: {
           enabled: getToggle('toggleShortcutEnabled'),
-          button: document.getElementById('shortcutButton').value,
+          button: 'volume_up',
           pressCount: parseInt(document.getElementById('shortcutPressCount').value, 10) || 3,
-          backgroundMode: getToggle('toggleShortcutBackground'),
+          backgroundMode: true,
         },
       };
     }

@@ -30,7 +30,7 @@ PERMISSIONS = """
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
 """
 
-if 'POST_NOTIFICATIONS' not in content:
+if 'WAKE_LOCK' not in content:
     content = content.replace('<application', PERMISSIONS + '\n    <application', 1)
     print('✅ Added notification + microphone + calendar permissions')
 
@@ -88,13 +88,31 @@ if 'AivaShortcutAccessibilityService' not in content:
 with open(MANIFEST, 'w') as f:
     f.write(content)
 
-# Copy patched MainActivity (registers plugins + volume shortcut handling)
+# Patch MainActivity for lock-screen launch + plugin registration
 PATCHED_MAIN = 'android-res/java/com/aiva/assistant/MainActivity.java'
 if os.path.exists(PATCHED_MAIN):
     import shutil
     os.makedirs(os.path.dirname(MAIN_ACTIVITY), exist_ok=True)
     shutil.copy2(PATCHED_MAIN, MAIN_ACTIVITY)
     print('✅ Installed patched MainActivity')
+
+    # Ensure lock-screen flags on launcher activity
+    if os.path.exists(MANIFEST):
+        with open(MANIFEST, 'r') as f:
+            manifest = f.read()
+        activity_attrs = (
+            'android:showWhenLocked="true"\n'
+            '            android:turnScreenOn="true"'
+        )
+        if 'android:showWhenLocked' not in manifest:
+            manifest = manifest.replace(
+                'android:name=".MainActivity"',
+                'android:name=".MainActivity"\n            ' + activity_attrs,
+                1,
+            )
+            with open(MANIFEST, 'w') as f:
+                f.write(manifest)
+            print('✅ Added lock-screen launch flags to MainActivity')
 elif os.path.exists(MAIN_ACTIVITY):
     print(f'⚠ Patched MainActivity template missing — keeping existing {MAIN_ACTIVITY}')
 else:

@@ -1,11 +1,11 @@
 /**
- * Short Gemini Live voice preview for settings — plays a sample phrase with the selected voice.
+ * Fast voice preview for settings — uses REST TTS when available, Live API as fallback.
  */
 (function () {
-  let previewClient = null;
   let previewPlayer = null;
   let previewAborted = false;
-  let previewEnding = false;
+  let cachedToken = null;
+  let cachedTokenExpiresAt = 0;
 
   function getUserId() {
     return localStorage.getItem('kaya_user_id')
@@ -14,6 +14,10 @@
   }
 
   async function fetchToken() {
+    const now = Date.now();
+    if (cachedToken && cachedTokenExpiresAt > now + 60000) {
+      return cachedToken;
+    }
     const { API_BASE } = window.AIVA_CONFIG;
     const userId = getUserId();
     const res = await fetch(`${API_BASE}/api/token`, {
@@ -25,56 +29,66 @@
     if (!res.ok || !data.token) {
       throw new Error(data.error || 'Token error');
     }
-    return data.token;
+    cachedToken = data.token;
+    cachedTokenExpiresAt = data.expires_at ? Date.parse(data.expires_at) : now + 25 * 60 * 1000;
+    return cachedToken;
   }
 
-  function getPreviewInstruction(language) {
-    const phrase = window.AIVA_I18N?.t?.('voicePreviewPhrase') || 'Hello, I am KAYA.';
-    const langInstruction = window.AIVA_I18N?.getLanguageInstruction?.(language)
-      || 'Speak in the user\'s selected language.';
-    return `${langInstruction}\nSay exactly this short sample phrase aloud, nothing else: "${phrase}"`;
+  function getPreviewPhrase(language) {
+    return window.AIVA_I18N?.t?.('voicePreviewPhrase') || 'Hello, I am KAYA.';
   }
 
-  async function finishPreview(resolve) {
-    if (previewPlayer) {
-      await previewPlayer.waitForDrain(12000);
+  async function ensurePreviewPlayer() {
+    if (!previewPlayer) {
+      previewPlayer = new AudioPlayer({ minBufferSamples: 480 });
+      await previewPlayer.init();
+    } else if (!previewPlayer.isInitialized) {
+      await previewPlayer.init();
     }
-    await stopPreview();
-    resolve?.();
+    if (previewPlayer.audioContext?.state === 'suspended') {
+      await previewPlayer.audioContext.resume();
+    }
+    return previewPlayer;
   }
 
   async function stopPreview() {
     previewAborted = true;
-    previewEnding = false;
-    if (previewClient?.webSocket) {
-      try {
-        previewClient.webSocket.close();
-      } catch {
-        // ignore
-      }
-    }
-    previewClient = null;
     if (previewPlayer) {
       previewPlayer.interrupt?.();
-      previewPlayer = null;
     }
   }
 
-  /**
-   * @param {{ voiceName: string, model?: string, temperature?: number, language?: string }} opts
-   */
-  async function previewVoice(opts) {
-    await stopPreview();
+  async function previewViaRest(opts) {
+    const { API_BASE } = window.AIVA_CONFIG;
+    const res = await fetch(`${API_BASE}/api/voice-preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        voice_name: opts.voiceName,
+        text: getPreviewPhrase(opts.language),
+        language: opts.language || 'bg',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.audio) {
+      throw new Error(data.error || 'Preview error');
+    }
+    const player = await ensurePreviewPlayer();
     previewAborted = false;
-    previewEnding = false;
+    await player.play(data.audio);
+    await player.waitForDrain(8000);
+  }
 
-    previewPlayer = new AudioPlayer();
-    await previewPlayer.init();
-
+  async function previewViaLive(opts) {
     const token = await fetchToken();
     const model = opts.model || 'gemini-3.1-flash-live-preview';
+    let previewClient = null;
+    let previewEnding = false;
 
-    return new Promise((resolve, reject) => {
+    const player = await ensurePreviewPlayer();
+    previewAborted = false;
+
+    await new Promise((resolve, reject) => {
       const client = new GeminiLiveAPI(token, model);
       previewClient = client;
 
@@ -84,34 +98,39 @@
       client.inputAudioTranscription = false;
       client.outputAudioTranscription = false;
       client.googleGrounding = false;
-      client.systemInstructions = 'You are a voice preview assistant. Only speak the requested sample phrase. Do not use tools. Keep it brief.';
+      client.systemInstructions = 'Speak only the requested sample phrase. No tools.';
 
       const timeout = setTimeout(() => {
-        finishPreview(resolve).catch(resolve);
-      }, 20000);
+        completePreview().then(resolve).catch(resolve);
+      }, 15000);
 
-      const onTurnComplete = () => {
-        if (previewAborted || previewEnding) return;
+      const completePreview = async () => {
+        if (previewEnding) return;
         previewEnding = true;
         clearTimeout(timeout);
-        finishPreview(resolve).catch(resolve);
+        if (previewClient?.webSocket) {
+          try { previewClient.webSocket.close(); } catch { /* ignore */ }
+        }
+        previewClient = null;
+        await player.waitForDrain(8000);
       };
 
       client.onReceiveResponse = async (message) => {
         if (previewAborted) return;
         switch (message.type) {
           case MultimodalLiveResponseType.SETUP_COMPLETE:
-            client.sendTextMessage(getPreviewInstruction(opts.language || 'bg'));
+            client.sendTextMessage(`Say exactly: "${getPreviewPhrase(opts.language)}"`);
             break;
           case MultimodalLiveResponseType.AUDIO:
-            await previewPlayer.play(message.data);
+            await player.play(message.data);
             break;
           case MultimodalLiveResponseType.TURN_COMPLETE:
-            onTurnComplete();
+            await completePreview();
+            resolve();
             break;
           case MultimodalLiveResponseType.ERROR:
             clearTimeout(timeout);
-            stopPreview().then(() => reject(new Error(typeof message.data === 'string' ? message.data : 'Preview error'))).catch(reject);
+            reject(new Error(typeof message.data === 'string' ? message.data : 'Preview error'));
             break;
           default:
             break;
@@ -120,22 +139,38 @@
 
       client.onError = (msg) => {
         clearTimeout(timeout);
-        stopPreview().then(() => reject(new Error(msg || 'Connection error'))).catch(reject);
-      };
-
-      client.onClose = () => {
-        if (!previewEnding && !previewAborted) {
-          clearTimeout(timeout);
-          finishPreview(resolve).catch(resolve);
-        }
+        reject(new Error(msg || 'Connection error'));
       };
 
       client.connect();
     });
   }
 
+  async function prefetch() {
+    try {
+      await ensurePreviewPlayer();
+    } catch {
+      // warm-up is best-effort
+    }
+  }
+
+  /**
+   * @param {{ voiceName: string, model?: string, temperature?: number, language?: string }} opts
+   */
+  async function previewVoice(opts) {
+    await stopPreview();
+    previewAborted = false;
+    try {
+      await previewViaRest(opts);
+    } catch (restErr) {
+      console.warn('REST voice preview failed, falling back to Live:', restErr);
+      await previewViaLive(opts);
+    }
+  }
+
   window.AIVA_VOICE_PREVIEW = {
     previewVoice,
     stopPreview,
+    prefetch,
   };
 })();

@@ -5,19 +5,25 @@ import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 
 /**
- * Optional background listener for volume-button shortcuts when the app is not in foreground.
- * User must enable this service in Android Accessibility settings.
+ * Background listener for volume-button shortcuts when the app is not in foreground.
+ * User must enable this service once in Android Accessibility settings.
  */
 public class AivaShortcutAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Key events only — no node processing needed.
+        // Key events only.
     }
 
     @Override
     public void onInterrupt() {
         // no-op
+    }
+
+    @Override
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+        AivaVolumeKeyHandler.getInstance().reloadFromPrefs(this);
     }
 
     @Override

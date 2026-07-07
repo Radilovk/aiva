@@ -4,9 +4,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
+import android.os.PowerManager;
 import android.provider.Settings;
-
-import com.getcapacitor.BridgeActivity;
 
 /**
  * Launches the app and signals JS to start listening mode.
@@ -21,10 +20,32 @@ public class AivaShortcutLauncher {
         SharedPreferences prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         prefs.edit().putBoolean(KEY_PENDING, true).apply();
 
-        Intent intent = new Intent(appContext, BridgeActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        wakeDevice(appContext);
+
+        Intent intent = new Intent(appContext, MainActivity.class);
+        intent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        );
         intent.putExtra("startListening", true);
         appContext.startActivity(intent);
+    }
+
+    private static void wakeDevice(Context context) {
+        try {
+            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (pm == null) return;
+            @SuppressWarnings("deprecation")
+            PowerManager.WakeLock wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
+                "kaya:shortcut"
+            );
+            wakeLock.acquire(8000);
+        } catch (Exception ignored) {
+            // best-effort wake
+        }
     }
 
     public static boolean consumePendingLaunch(Context context) {
@@ -44,7 +65,7 @@ public class AivaShortcutLauncher {
     }
 
     public static boolean isAccessibilityServiceEnabled(Context context) {
-        String serviceId = context.getPackageName() + "/" + AivaShortcutAccessibilityService.class.getCanonicalName();
+        String serviceId = context.getPackageName() + "/" + AivaShortcutAccessibilityService.class.getName();
         try {
             int enabled = Settings.Secure.getInt(context.getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, 0);
             if (enabled != 1) return false;
