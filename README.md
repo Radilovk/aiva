@@ -84,7 +84,7 @@ All UI lives in **`frontend/`** only (served as Worker static assets via `wrangl
 Do not use duplicate HTML/JS at the repo root — they were removed to avoid drift.
 
 - Production: `https://aiva.radilov-k.workers.dev`
-- GitHub Pages (`*.github.io`) uses the same UI but calls the Worker API for `/api/*` (see `frontend/config.js`).
+- GitHub Pages: `https://radilovk.github.io/aiva/frontend/index.html` (repo root serves README; root `index.html` redirects to the app)
 
 ## API Endpoints
 
