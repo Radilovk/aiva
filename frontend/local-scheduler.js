@@ -311,8 +311,8 @@
           reg.showNotification(entry.title || '📋 KAYA', {
             body: entry.content,
             tag: `aiva-${entry.id}`,
-            icon: '/icons/icon-192.png',
-            badge: '/icons/icon-192.png',
+            icon: window.AIVA_CONFIG?.appUrl?.('icons/icon-192.png') || 'icons/icon-192.png',
+            badge: window.AIVA_CONFIG?.appUrl?.('icons/icon-192.png') || 'icons/icon-192.png',
             data: { task_id: entry.task_id },
             vibrate: [200, 100, 200],
             actions: [

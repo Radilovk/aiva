@@ -1,42 +1,51 @@
 /**
- * AIVA Service Worker — offline caching + push notifications
+ * KAYA Service Worker — offline caching + push notifications
  */
-const CACHE_NAME = 'aiva-v9';
+const SW_BASE = (() => {
+  const path = self.location.pathname.replace(/\/?sw\.js(?:\?.*)?$/, '');
+  return path.endsWith('/') ? path : `${path}/`;
+})();
+
+function asset(path) {
+  return `${SW_BASE}${String(path).replace(/^\//, '')}`;
+}
+
+const CACHE_NAME = 'aiva-v10';
 const ASSETS = [
-  '/index.html',
-  '/settings.html',
-  '/privacy.html',
-  '/admin.html',
-  '/config.js',
-  '/settings.js',
-  '/lib/i18n.js',
-  '/lib/i18n-extended.js',
-  '/lib/i18n-privacy.js',
-  '/lib/voices.js',
-  '/lib/appOnboarding.js',
-  '/app.js',
-  '/admin.js',
-  '/local-scheduler.js',
-  '/lib/icsUtils.js',
-  '/lib/geminilive.js',
-  '/lib/mediaUtils.js',
-  '/audio-processors/capture.worklet.js',
-  '/audio-processors/playback.worklet.js',
-  '/lib/deviceCalendar.js',
-  '/lib/nativeCalendar.js',
-  '/lib/calendarCrud.js',
-  '/lib/calendarSync.js',
-  '/lib/calendarOnboarding.js',
-  '/manifest.json',
-  '/icons/brand.css',
-  '/icons/logo-mark.svg',
-  '/icons/logo-full.svg',
-  '/icons/favicon-32.png',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png',
-  '/icons/maskable-512.png',
-];
+  'index.html',
+  'settings.html',
+  'privacy.html',
+  'admin.html',
+  'config.js',
+  'settings.js',
+  'lib/i18n.js',
+  'lib/i18n-extended.js',
+  'lib/i18n-privacy.js',
+  'lib/voices.js',
+  'lib/appOnboarding.js',
+  'app.js',
+  'admin.js',
+  'local-scheduler.js',
+  'lib/icsUtils.js',
+  'lib/geminilive.js',
+  'lib/mediaUtils.js',
+  'audio-processors/capture.worklet.js',
+  'audio-processors/playback.worklet.js',
+  'lib/deviceCalendar.js',
+  'lib/nativeCalendar.js',
+  'lib/calendarCrud.js',
+  'lib/calendarSync.js',
+  'lib/calendarOnboarding.js',
+  'manifest.json',
+  'icons/brand.css',
+  'icons/logo-mark.svg',
+  'icons/logo-full.svg',
+  'icons/favicon-32.png',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
+  'icons/apple-touch-icon.png',
+  'icons/maskable-512.png',
+].map(asset);
 
 // Install — pre-cache shell assets
 self.addEventListener('install', (event) => {
@@ -59,7 +68,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Skip non-GET and API requests
-  if (event.request.method !== 'GET' || url.pathname.startsWith('/api/')) return;
+  if (event.request.method !== 'GET' || url.pathname.includes('/api/')) return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
@@ -88,8 +97,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+      icon: asset('icons/icon-192.png'),
+      badge: asset('icons/icon-192.png'),
       tag: data.tag || 'aiva-reminder',
       data: data,
       vibrate: [200, 100, 200],
@@ -123,7 +132,7 @@ self.addEventListener('notificationclick', (event) => {
           client.postMessage({ type: 'aiva:snooze', taskId, minutes: 10 });
           if ('focus' in client) return client.focus();
         }
-        return self.clients.openWindow('/index.html');
+        return self.clients.openWindow(asset('index.html'));
       })
     );
     return;
@@ -135,7 +144,7 @@ self.addEventListener('notificationclick', (event) => {
       for (const client of clients) {
         if (client.url.includes('index.html') && 'focus' in client) return client.focus();
       }
-      return self.clients.openWindow('/index.html');
+      return self.clients.openWindow(asset('index.html'));
     })
   );
 });
