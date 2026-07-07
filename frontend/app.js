@@ -75,7 +75,10 @@ let touchStartX = null;
 let voiceFocusTask = null;
 let cachedCalendarEvents = [];
 let awaitingCloseConfirmation = false;
+let awaitingExitListenConfirmation = false;
+let exitListenConfirmed = false;
 let pendingUserTranscript = '';
+let pendingExitTranscript = '';
 let assistantTranscriptBuffer = '';
 let assistantTurnComplete = false;
 
@@ -335,7 +338,7 @@ class EndSessionTool extends FunctionCallDefinition {
   constructor() {
     super(
       'end_session',
-      'Приключва гласовата сесия когато потребителят няма нужда от още помощ.',
+      'Приключва гласовата сесия след потвърждение, че потребителят иска да излезе от режим на слушане.',
       {
         type: 'object',
         properties: {
@@ -458,11 +461,19 @@ function setAssistantSpeech(text) {
 }
 
 const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още|anything\s+else|need\s+anything|something\s+else|还需要|还需要其他|कुछ\s+और|algo\s+más|شيء\s+آخر|autre\s+chose|besoin\s+d.autre|noch\s+etwas|brauchen\s+sie\s+noch|ещё\s+что|нужно\s+ещё/i;
+const EXIT_LISTEN_QUESTION_RE = /сигурен|сигурна|потвърж|излез.*слуш|спра.*слуш|спир.*слуш|stop listen|exit listen|exit listening|leave listen/i;
 const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|no|nope|nothing|that's all|done|enough|нет|没有|नहीं|नहीं\s+धन्यवाद|no\s+gracias|لا|non|nein|ничего|спасибо,\s*нет)\b/i;
+const POSITIVE_CONFIRM_RE = /^(да|yes|yeah|yep|ok|okay|давай|потвърж|разбира|точно|sure|correct|ja|oui|si|sí|好|是|是的|हाँ|हां)\b/i;
 
 function detectClosingQuestion(text) {
   if (CLOSING_QUESTION_RE.test(String(text || '').toLowerCase())) {
     awaitingCloseConfirmation = true;
+  }
+}
+
+function detectExitListenQuestion(text) {
+  if (EXIT_LISTEN_QUESTION_RE.test(String(text || '').toLowerCase())) {
+    awaitingExitListenConfirmation = true;
   }
 }
 
@@ -472,9 +483,22 @@ function isNegativeCloseResponse(text) {
   return NEGATIVE_CLOSE_RE.test(normalized);
 }
 
-function scheduleSessionEnd(delayMs = 700) {
+function isPositiveConfirmResponse(text) {
+  const normalized = String(text || '').toLowerCase().trim().replace(/[.!?,…]+$/g, '');
+  if (!normalized) return false;
+  return POSITIVE_CONFIRM_RE.test(normalized);
+}
+
+function resetSessionCloseState() {
   awaitingCloseConfirmation = false;
+  awaitingExitListenConfirmation = false;
+  exitListenConfirmed = false;
   pendingUserTranscript = '';
+  pendingExitTranscript = '';
+}
+
+function scheduleSessionEnd(delayMs = 700) {
+  resetSessionCloseState();
   setTimeout(async () => {
     if (!isSessionActive) return;
     if (audioPlayer) {
@@ -489,8 +513,45 @@ function handlePossibleCloseResponse(text, finished = false) {
   const combined = `${pendingUserTranscript}${text}`.trim();
   pendingUserTranscript = finished ? '' : combined;
   if (isNegativeCloseResponse(combined)) {
+    exitListenConfirmed = true;
     scheduleSessionEnd();
   }
+}
+
+function handleExitListenConfirmation(text, finished = false) {
+  if (!awaitingExitListenConfirmation || !text) return;
+  const combined = `${pendingExitTranscript}${text}`.trim();
+  pendingExitTranscript = finished ? '' : combined;
+  if (isPositiveConfirmResponse(combined)) {
+    exitListenConfirmed = true;
+    scheduleSessionEnd();
+  } else if (isNegativeCloseResponse(combined)) {
+    awaitingExitListenConfirmation = false;
+    pendingExitTranscript = '';
+  }
+}
+
+function handleUserTranscriptForSessionControl(text, finished = false) {
+  if (awaitingExitListenConfirmation) {
+    handleExitListenConfirmation(text, finished);
+    return;
+  }
+  if (awaitingCloseConfirmation) {
+    handlePossibleCloseResponse(text, finished);
+  }
+}
+
+function handleEndSessionRequest() {
+  if (exitListenConfirmed) {
+    scheduleSessionEnd(500);
+    return { success: true, message: 'Сесията приключва.' };
+  }
+  awaitingExitListenConfirmation = true;
+  return {
+    success: false,
+    require_confirmation: true,
+    message: 'Потребителят иска да излезе от режим на слушане. Първо попитай дали е сигурен и изчакай ясно потвърждение (да) преди повторно извикване на end_session.',
+  };
 }
 
 function showError(msg) {
@@ -1460,7 +1521,7 @@ async function handleGeminiMessage(message) {
 
     case MultimodalLiveResponseType.INPUT_TRANSCRIPTION:
       if (message.data?.text) {
-        handlePossibleCloseResponse(message.data.text, message.data.finished === true);
+        handleUserTranscriptForSessionControl(message.data.text, message.data.finished === true);
       }
       break;
 
@@ -1469,8 +1530,10 @@ async function handleGeminiMessage(message) {
         assistantTranscriptBuffer += message.data.text;
         setAssistantSpeech(assistantTranscriptBuffer);
         detectClosingQuestion(assistantTranscriptBuffer);
+        detectExitListenQuestion(assistantTranscriptBuffer);
         if (message.data.finished) {
           detectClosingQuestion(assistantTranscriptBuffer);
+          detectExitListenQuestion(assistantTranscriptBuffer);
         }
       }
       break;
@@ -1480,6 +1543,7 @@ async function handleGeminiMessage(message) {
         assistantTranscriptBuffer = String(message.data);
         setAssistantSpeech(assistantTranscriptBuffer);
         detectClosingQuestion(assistantTranscriptBuffer);
+        detectExitListenQuestion(assistantTranscriptBuffer);
       }
       break;
 
@@ -1517,8 +1581,7 @@ async function handleGeminiMessage(message) {
               result = await handleVoiceDeleteCalendarEvent(call.args || {});
               break;
             case 'end_session':
-              scheduleSessionEnd(500);
-              result = { success: true, message: 'Сесията приключва.' };
+              result = handleEndSessionRequest();
               break;
             default:
               result = client.callFunction(call.name, call.args || {}) ?? 'ok';
@@ -1536,6 +1599,7 @@ async function handleGeminiMessage(message) {
     case MultimodalLiveResponseType.TURN_COMPLETE:
       assistantTranscriptBuffer = '';
       pendingUserTranscript = '';
+      pendingExitTranscript = '';
       assistantTurnComplete = true;
       tryUnmuteMicAfterAssistant();
       break;
@@ -1599,8 +1663,7 @@ async function connectSession() {
     const model = assistantSettings.model || LIVE_MODEL;
 
     client = new GeminiLiveAPI(token, model);
-    awaitingCloseConfirmation = false;
-    pendingUserTranscript = '';
+    resetSessionCloseState();
     assistantTranscriptBuffer = '';
     assistantTurnComplete = false;
     let extraContext = buildTasksContextForAssistant()
@@ -1675,8 +1738,7 @@ function disconnectSession() {
   client = null;
   isSessionActive = false;
   isConnecting = false;
-  awaitingCloseConfirmation = false;
-  pendingUserTranscript = '';
+  resetSessionCloseState();
   assistantTranscriptBuffer = '';
   assistantTurnComplete = false;
   recordBtn.classList.remove('recording');
