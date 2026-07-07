@@ -10,7 +10,7 @@
   let selectedLang = 'bg';
 
   function getSettingsApi() {
-    return window.KAYA_SETTINGS;
+    return window.AIVA_SETTINGS;
   }
 
   function isComplete() {
@@ -44,9 +44,9 @@
       ...current,
       profile: { ...current.profile, ...patch },
     });
-    window.KAYA_I18N?.initFromSettings?.(next);
-    window.KAYA_I18N?.applyToDocument?.(document, next.profile.language);
-    window.dispatchEvent(new CustomEvent('kaya:profile-updated', { detail: next }));
+    window.AIVA_I18N?.initFromSettings?.(next);
+    window.AIVA_I18N?.applyToDocument?.(document, next.profile.language);
+    window.dispatchEvent(new CustomEvent('aiva:profile-updated', { detail: next }));
     return next;
   }
 
@@ -63,14 +63,14 @@
     });
 
     const lang = selectedLang;
-    window.KAYA_I18N?.setLanguage?.(lang);
-    window.KAYA_I18N?.applyToDocument?.(document.getElementById('appOnboard'), lang);
+    window.AIVA_I18N?.setLanguage?.(lang);
+    window.AIVA_I18N?.applyToDocument?.(document.getElementById('appOnboard'), lang);
 
     if (currentStep === STEP_LANG) {
       const grid = document.getElementById('onboardLangGrid');
       if (grid && !grid._populated) {
         grid._populated = true;
-        const langs = window.KAYA_I18N?.SUPPORTED_LANGUAGES || [];
+        const langs = window.AIVA_I18N?.SUPPORTED_LANGUAGES || [];
         for (const l of langs) {
           const btn = document.createElement('button');
           btn.type = 'button';
@@ -82,8 +82,8 @@
             grid.querySelectorAll('.onboard-lang-btn').forEach((b) => {
               b.classList.toggle('selected', b.dataset.lang === selectedLang);
             });
-            window.KAYA_I18N?.setLanguage?.(selectedLang);
-            window.KAYA_I18N?.applyToDocument?.(document.getElementById('appOnboard'), selectedLang);
+            window.AIVA_I18N?.setLanguage?.(selectedLang);
+            window.AIVA_I18N?.applyToDocument?.(document.getElementById('appOnboard'), selectedLang);
           });
           grid.appendChild(btn);
         }
@@ -104,8 +104,8 @@
     const nextBtn = document.getElementById('onboardNext');
     if (nextBtn) {
       nextBtn.textContent = currentStep === STEP_INTRO
-        ? window.KAYA_I18N?.t?.('getStarted', selectedLang) || 'Get started'
-        : window.KAYA_I18N?.t?.('continue', selectedLang) || 'Continue';
+        ? window.AIVA_I18N?.t?.('getStarted', selectedLang) || 'Get started'
+        : window.AIVA_I18N?.t?.('continue', selectedLang) || 'Continue';
     }
   }
 
@@ -151,7 +151,7 @@
     }
   }
 
-  window.KAYA_APP_ONBOARD = {
+  window.AIVA_APP_ONBOARD = {
     isComplete,
     show,
     hide,

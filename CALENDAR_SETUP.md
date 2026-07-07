@@ -1,6 +1,6 @@
 # Интеграция с Календари (Google, Apple, Android Native)
 
-Този документ описва архитектурата и стъпките за активиране на **пълен двупосочен достъп (четене и запис)** с календари в уеб версията и APK на KAYA.
+Този документ описва архитектурата и стъпките за активиране на **пълен двупосочен достъп (четене и запис)** с календари в уеб версията и APK на AIVA.
 
 ## Архитектурна матрица (Пълен достъп)
 
@@ -17,7 +17,7 @@
 
 ### Стъпки за конфигуриране:
 1.  **Регистрация на приложение:**
-    *   **Google:** В Google Cloud Console създайте OAuth 2.0 Client ID (Web Application). Добавете `https://kaya.radilov-k.workers.dev/settings.html` в Redirect URIs.
+    *   **Google:** В Google Cloud Console създайте OAuth 2.0 Client ID (Web Application). Добавете `https://aiva.radilov-k.workers.dev/settings.html` в Redirect URIs.
     *   **Microsoft:** В Azure Portal (App Registrations) регистрирайте приложение с разрешения `Calendars.ReadWrite` и `offline_access`.
 2.  **Настройка на Secrets в Cloudflare:**
     ```bash

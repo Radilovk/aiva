@@ -492,7 +492,7 @@ app.get('/api/calendar.ics', async (c) => {
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//KAYA//Task Calendar//BG',
+      'PRODID:-//AIVA//Task Calendar//BG',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'X-WR-CALNAME:KAYA Задачи',
@@ -519,7 +519,7 @@ app.get('/api/calendar.ics', async (c) => {
       const modified = toICSStamp(task.updated_at || task.created_at);
 
       lines.push('BEGIN:VEVENT');
-      lines.push(`UID:kaya-task-${task.id}@kaya.radilov-k.workers.dev`);
+      lines.push(`UID:aiva-task-${task.id}@aiva.radilov-k.workers.dev`);
       lines.push(`DTSTAMP:${nowStamp}`);
       lines.push(`LAST-MODIFIED:${modified}`);
       lines.push(`DTSTART;TZID=Europe/Sofia:${dtStart}`);
@@ -551,7 +551,7 @@ app.get('/api/calendar.ics', async (c) => {
     return new Response(lines.join('\r\n'), {
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': 'inline; filename="kaya-tasks.ics"',
+        'Content-Disposition': 'inline; filename="aiva-tasks.ics"',
         'Cache-Control': 'no-cache, max-age=0, must-revalidate',
       },
     });

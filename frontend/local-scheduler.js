@@ -1,20 +1,20 @@
 /**
- * KAYA Local Notification Scheduler
+ * AIVA Local Notification Scheduler
  * Capacitor LocalNotifications in APK mode, Service Worker fallback in PWA.
  * Supports quiet hours, advance + at-time reminders, snooze, and action buttons.
  */
 (function () {
   function t(key) {
-    return window.KAYA_I18N?.t?.(key) ?? key;
+    return window.AIVA_I18N?.t?.(key) ?? key;
   }
 
   function tf(key, vars) {
-    return window.KAYA_I18N?.tf?.(key, vars) ?? t(key);
+    return window.AIVA_I18N?.tf?.(key, vars) ?? t(key);
   }
 
   function getNotificationChannel() {
     return {
-      id: 'kaya_tasks',
+      id: 'aiva_tasks',
       name: t('channelTasks'),
       description: t('channelTasksDesc'),
       importance: 4,
@@ -25,7 +25,7 @@
 
   function getSnoozeChannel() {
     return {
-      id: 'kaya_snooze',
+      id: 'aiva_snooze',
       name: t('channelSnooze'),
       description: t('channelSnoozeDesc'),
       importance: 4,
@@ -39,7 +39,7 @@
   let scheduledIds = new Set();
 
   function getSettings() {
-    return window.KAYA_SETTINGS?.loadAssistantSettings?.()?.notifications || {};
+    return window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications || {};
   }
 
   function isEnabled() {
@@ -129,7 +129,7 @@
     });
 
     LocalNotifications.addListener('localNotificationReceived', (event) => {
-      window.dispatchEvent(new CustomEvent('kaya:notification-fired', {
+      window.dispatchEvent(new CustomEvent('aiva:notification-fired', {
         detail: { taskId: event.notification?.extra?.task_id },
       }));
     });
@@ -159,11 +159,11 @@
   }
 
   async function markTaskDone(taskId) {
-    const apiBase = window.KAYA_CONFIG?.API_BASE || location.origin;
+    const apiBase = window.AIVA_CONFIG?.API_BASE || location.origin;
     try {
       await fetch(`${apiBase}/api/tasks/${taskId}/done`, { method: 'PATCH' });
       await cancelForTask(taskId);
-      window.dispatchEvent(new CustomEvent('kaya:task-done-from-notif', { detail: { taskId } }));
+      window.dispatchEvent(new CustomEvent('aiva:task-done-from-notif', { detail: { taskId } }));
     } catch (e) {
       console.error('Mark done from notification:', e);
     }
@@ -181,7 +181,7 @@
           body,
           schedule: { at, allowWhileIdle: true },
           channelId: channelId || getNotificationChannel().id,
-          actionTypeId: 'kaya_task_reminder',
+          actionTypeId: 'aiva_task_reminder',
           extra: { task_id: taskId, content: body, type },
           sound: getSettings().sound !== false ? 'default' : undefined,
           actions: [
@@ -196,9 +196,9 @@
     }
 
     if ('serviceWorker' in navigator && Notification.permission === 'granted') {
-      const scheduled = JSON.parse(localStorage.getItem('kaya_scheduled_notifs') || '[]');
+      const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
       scheduled.push({ id, task_id: taskId, content: body, title, at: at.toISOString(), type });
-      localStorage.setItem('kaya_scheduled_notifs', JSON.stringify(scheduled));
+      localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(scheduled));
       return true;
     }
 
@@ -261,9 +261,9 @@
       await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) });
       ids.forEach((id) => scheduledIds.delete(id));
     }
-    const scheduled = JSON.parse(localStorage.getItem('kaya_scheduled_notifs') || '[]');
+    const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
     const filtered = scheduled.filter((n) => String(n.task_id) !== String(taskId));
-    localStorage.setItem('kaya_scheduled_notifs', JSON.stringify(filtered));
+    localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(filtered));
   }
 
   async function cancelAll() {
@@ -274,7 +274,7 @@
       }
     }
     scheduledIds.clear();
-    localStorage.setItem('kaya_scheduled_notifs', '[]');
+    localStorage.setItem('aiva_scheduled_notifs', '[]');
   }
 
   async function scheduleAll(tasks, reminderMinutes) {
@@ -300,7 +300,7 @@
   function checkScheduledNotifications() {
     if (!('serviceWorker' in navigator) || Notification.permission !== 'granted') return;
 
-    const scheduled = JSON.parse(localStorage.getItem('kaya_scheduled_notifs') || '[]');
+    const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
     const now = new Date();
     const remaining = [];
 
@@ -310,7 +310,7 @@
         navigator.serviceWorker.ready.then((reg) => {
           reg.showNotification(entry.title || '📋 KAYA', {
             body: entry.content,
-            tag: `kaya-${entry.id}`,
+            tag: `aiva-${entry.id}`,
             icon: '/icons/icon-192.png',
             badge: '/icons/icon-192.png',
             data: { task_id: entry.task_id },
@@ -322,7 +322,7 @@
             ],
           });
         });
-        window.dispatchEvent(new CustomEvent('kaya:notification-fired', {
+        window.dispatchEvent(new CustomEvent('aiva:notification-fired', {
           detail: { taskId: entry.task_id },
         }));
       } else {
@@ -330,7 +330,7 @@
       }
     }
 
-    localStorage.setItem('kaya_scheduled_notifs', JSON.stringify(remaining));
+    localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(remaining));
   }
 
   /** Returns upcoming tasks within the next N hours for UI display. */
@@ -373,7 +373,7 @@
     return rem ? tf('countInHourMin', { hrs, mins: rem }) : tf('countInHour', { hrs });
   }
 
-  window.KAYA_NOTIFIER = {
+  window.AIVA_NOTIFIER = {
     init,
     requestPermission,
     scheduleForTask,

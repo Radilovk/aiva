@@ -132,11 +132,11 @@
   <script src="lib/i18n-privacy.js"></script>
   <script>
     (function () {
-      const settings = window.KAYA_SETTINGS?.loadAssistantSettings?.() || {};
+      const settings = window.AIVA_SETTINGS?.loadAssistantSettings?.() || {};
       const lang = settings.profile?.language || 'bg';
-      window.KAYA_I18N.initFromSettings(settings);
-      window.KAYA_I18N.applyToDocument(document, lang);
-      document.title = 'KAYA — ' + window.KAYA_I18N.t('privacyPageTitle', lang);
+      window.AIVA_I18N.initFromSettings(settings);
+      window.AIVA_I18N.applyToDocument(document, lang);
+      document.title = 'KAYA — ' + window.AIVA_I18N.t('privacyPageTitle', lang);
     })();
   </script>
 </body>

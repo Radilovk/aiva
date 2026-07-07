@@ -53,7 +53,7 @@
     }
   }
 
-  window.KAYA_VOICES = {
+  window.AIVA_VOICES = {
     GEMINI_LIVE_VOICES,
     populateVoiceSelect,
   };

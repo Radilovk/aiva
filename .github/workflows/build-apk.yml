@@ -60,21 +60,21 @@ jobs:
       - name: Copy native Java sources
         run: |
           mkdir -p android/app/src/main/java/com/capacitorjs/plugins/localnotifications/
-          mkdir -p android/app/src/main/java/com/kaya/assistant/
-          cp android-res/java/com/capacitorjs/plugins/localnotifications/KayaNotificationReceiver.java \
+          mkdir -p android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/capacitorjs/plugins/localnotifications/AivaNotificationReceiver.java \
              android/app/src/main/java/com/capacitorjs/plugins/localnotifications/
-          cp android-res/java/com/kaya/assistant/KayaCalendarPlugin.java \
-             android/app/src/main/java/com/kaya/assistant/
-          cp android-res/java/com/kaya/assistant/KayaShortcutPlugin.java \
-             android/app/src/main/java/com/kaya/assistant/
-          cp android-res/java/com/kaya/assistant/KayaVolumeKeyHandler.java \
-             android/app/src/main/java/com/kaya/assistant/
-          cp android-res/java/com/kaya/assistant/KayaShortcutLauncher.java \
-             android/app/src/main/java/com/kaya/assistant/
-          cp android-res/java/com/kaya/assistant/KayaShortcutAccessibilityService.java \
-             android/app/src/main/java/com/kaya/assistant/
+          cp android-res/java/com/aiva/assistant/AivaCalendarPlugin.java \
+             android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaShortcutPlugin.java \
+             android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaVolumeKeyHandler.java \
+             android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaShortcutLauncher.java \
+             android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaShortcutAccessibilityService.java \
+             android/app/src/main/java/com/aiva/assistant/
 
-      - name: Patch AndroidManifest and register KayaCalendar plugin
+      - name: Patch AndroidManifest and register AivaCalendar plugin
         run: python3 android-res/patch-local-notifications.py
 
       - name: Copy ProGuard rules
@@ -106,7 +106,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: KAYA-debug
+          name: AIVA-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Create GitHub Release
@@ -115,8 +115,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v-$(date +%Y%m%d%H%M)-$(git rev-parse --short HEAD)"
-          cp android/app/build/outputs/apk/debug/app-debug.apk KAYA.apk
-          gh release create "$TAG" KAYA.apk \
-            --title "KAYA $TAG" \
+          cp android/app/build/outputs/apk/debug/app-debug.apk AIVA.apk
+          gh release create "$TAG" AIVA.apk \
+            --title "AIVA $TAG" \
             --notes "Автоматичен build от commit $(git rev-parse --short HEAD)" \
             --latest

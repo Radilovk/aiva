@@ -1,5 +1,5 @@
 /**
- * Privacy policy strings — merged into KAYA_I18N at load time.
+ * Privacy policy strings — merged into AIVA_I18N at load time.
  */
 (function () {
   const PRIVACY = {
@@ -247,7 +247,7 @@
     "privacyFooter": "© 2024 KAYA Assistant"
   }
 };
-  if (window.KAYA_I18N) {
-    window.KAYA_I18N.mergeStrings(PRIVACY);
+  if (window.AIVA_I18N) {
+    window.AIVA_I18N.mergeStrings(PRIVACY);
   }
 })();

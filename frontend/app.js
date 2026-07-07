@@ -1,28 +1,28 @@
 /**
- * KAYA — voice task assistant with calendar task management (Bulgarian)
+ * AIVA — voice task assistant with calendar task management (Bulgarian)
  */
 
-const { API_BASE, LIVE_MODEL } = window.KAYA_CONFIG;
-const { loadAssistantSettings, buildSessionInstructions } = window.KAYA_SETTINGS;
+const { API_BASE, LIVE_MODEL } = window.AIVA_CONFIG;
+const { loadAssistantSettings, buildSessionInstructions } = window.AIVA_SETTINGS;
 
 function t(key) {
-  return window.KAYA_I18N?.t?.(key) ?? key;
+  return window.AIVA_I18N?.t?.(key) ?? key;
 }
 
 function tf(key, vars) {
-  return window.KAYA_I18N?.tf?.(key, vars) ?? t(key);
+  return window.AIVA_I18N?.tf?.(key, vars) ?? t(key);
 }
 
 function getLocale() {
-  return window.KAYA_I18N?.getLocale?.() ?? 'bg-BG';
+  return window.AIVA_I18N?.getLocale?.() ?? 'bg-BG';
 }
 
 // --- User ID ---
 function getUserId() {
-  let id = localStorage.getItem('kaya_user_id');
+  let id = localStorage.getItem('aiva_user_id');
   if (!id) {
     id = 'user_' + crypto.randomUUID();
-    localStorage.setItem('kaya_user_id', id);
+    localStorage.setItem('aiva_user_id', id);
   }
   return id;
 }
@@ -438,8 +438,8 @@ function applyPreferences() {
   assistantSettings = loadAssistantSettings();
   document.documentElement.style.setProperty('--accent', assistantSettings.appearance.accentColor);
   document.body.classList.toggle('compact-calendar', assistantSettings.appearance.compactCalendar);
-  window.KAYA_I18N?.initFromSettings?.(assistantSettings);
-  window.KAYA_I18N?.applyToDocument?.(document, assistantSettings.profile?.language);
+  window.AIVA_I18N?.initFromSettings?.(assistantSettings);
+  window.AIVA_I18N?.applyToDocument?.(document, assistantSettings.profile?.language);
   if (!isSessionActive) {
     setStatus(t('tapToRecord'));
   }
@@ -545,19 +545,19 @@ function isTaskOverdue(task) {
 
 function getTaskCountdown(task) {
   const dt = getTaskDateTime(task);
-  if (!dt || !window.KAYA_NOTIFIER?.formatCountdown) return '';
-  return window.KAYA_NOTIFIER.formatCountdown(dt.getTime() - Date.now());
+  if (!dt || !window.AIVA_NOTIFIER?.formatCountdown) return '';
+  return window.AIVA_NOTIFIER.formatCountdown(dt.getTime() - Date.now());
 }
 
 function renderUpcomingStrip() {
   if (!upcomingStrip || !upcomingList) return;
   const show = assistantSettings.notifications?.showUpcomingStrip !== false;
-  if (!show || !window.KAYA_NOTIFIER?.getUpcomingTasks) {
+  if (!show || !window.AIVA_NOTIFIER?.getUpcomingTasks) {
     upcomingStrip.hidden = true;
     return;
   }
 
-  const upcoming = window.KAYA_NOTIFIER.getUpcomingTasks(tasks, 24).slice(0, 5);
+  const upcoming = window.AIVA_NOTIFIER.getUpcomingTasks(tasks, 24).slice(0, 5);
   if (!upcoming.length) {
     upcomingStrip.hidden = true;
     return;
@@ -568,7 +568,7 @@ function renderUpcomingStrip() {
 
   upcomingList.innerHTML = upcoming.map(({ task, msUntil }) => {
     const overdue = msUntil < 0;
-    const countdown = window.KAYA_NOTIFIER.formatCountdown(msUntil);
+    const countdown = window.AIVA_NOTIFIER.formatCountdown(msUntil);
     return `
       <div class="upcoming-item ${overdue ? 'is-overdue' : ''}" data-id="${task.id}" tabindex="0">
         <div class="upcoming-time">${escapeHtml(task.due_time || '—')}</div>
@@ -600,7 +600,7 @@ function renderTaskCard(task, mode = 'agenda') {
   const countdown = getTaskCountdown(task);
   const taskDt = getTaskDateTime(task);
   const msUntil = taskDt ? taskDt.getTime() - Date.now() : Infinity;
-  const synced = window.KAYA_NATIVE_CALENDAR?.isTaskSynced?.(task.id);
+  const synced = window.AIVA_NATIVE_CALENDAR?.isTaskSynced?.(task.id);
   const statusClass = overdue ? 'is-overdue' : (msUntil > 0 && msUntil <= 3600000 ? 'is-upcoming' : '');
 
   return `
@@ -932,7 +932,7 @@ function buildTasksContextForAssistant() {
 
 async function loadCalendarEventsForAssistant() {
   cachedCalendarEvents = [];
-  const crud = window.KAYA_CALENDAR_CRUD;
+  const crud = window.AIVA_CALENDAR_CRUD;
   if (!crud?.isAndroid?.() || !crud.getSelectedCalendarId()) {
     return [];
   }
@@ -940,7 +940,7 @@ async function loadCalendarEventsForAssistant() {
   const today = toISODate(new Date());
   const end = toISODate(addDays(new Date(), 14));
   try {
-    const { events = [] } = await crud.readKayaEvents({ from: today, to: end });
+    const { events = [] } = await crud.readAivaEvents({ from: today, to: end });
     cachedCalendarEvents = events;
     return events;
   } catch (e) {
@@ -950,7 +950,7 @@ async function loadCalendarEventsForAssistant() {
 }
 
 function buildCalendarContextForAssistant(events) {
-  if (!window.KAYA_CALENDAR_CRUD?.getSelectedCalendarId?.()) {
+  if (!window.AIVA_CALENDAR_CRUD?.getSelectedCalendarId?.()) {
     return '\n\nКАЛЕНДАР НА УСТРОЙСТВОТО: няма избран локален календар.';
   }
   if (!events.length) {
@@ -1063,7 +1063,7 @@ function buildCalendarEventFields(args, existing) {
 }
 
 async function handleVoiceEditCalendarEvent(args) {
-  const crud = window.KAYA_CALENDAR_CRUD;
+  const crud = window.AIVA_CALENDAR_CRUD;
   if (!crud?.isAndroid?.() || !crud.getSelectedCalendarId()) {
     return { error: 'Няма избран локален календар на устройството.' };
   }
@@ -1090,7 +1090,7 @@ async function handleVoiceEditCalendarEvent(args) {
 }
 
 async function handleVoiceDeleteCalendarEvent(args) {
-  const crud = window.KAYA_CALENDAR_CRUD;
+  const crud = window.AIVA_CALENDAR_CRUD;
   if (!crud?.isAndroid?.() || !crud.getSelectedCalendarId()) {
     return { error: 'Няма избран локален календар на устройството.' };
   }
@@ -1215,7 +1215,7 @@ async function handleVoiceDiscussTask(args) {
 }
 
 async function refreshExternalEvents() {
-  if (!window.KAYA_CALENDAR_SYNC?.syncIncomingEvents) return;
+  if (!window.AIVA_CALENDAR_SYNC?.syncIncomingEvents) return;
   let start, end;
   if (calendarView === 'week') {
     const s = startOfWeek(currentDate);
@@ -1232,7 +1232,7 @@ async function refreshExternalEvents() {
     start = toISODate(currentDate);
     end = start;
   }
-  externalEvents = await window.KAYA_CALENDAR_SYNC.syncIncomingEvents(start, end);
+  externalEvents = await window.AIVA_CALENDAR_SYNC.syncIncomingEvents(start, end);
   renderCalendar();
 }
 
@@ -1246,12 +1246,12 @@ async function loadTasks() {
     const data = await res.json();
     tasks = data.tasks || [];
     renderCalendar();
-    if (window.KAYA_CALENDAR_ONBOARD) {
-      window.KAYA_CALENDAR_ONBOARD.checkAfterLoad(tasks);
+    if (window.AIVA_CALENDAR_ONBOARD) {
+      window.AIVA_CALENDAR_ONBOARD.checkAfterLoad(tasks);
     }
     // Re-schedule notifications when tasks are refreshed
-    if (window.KAYA_NOTIFIER && assistantSettings.notifications?.enabled) {
-      window.KAYA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
+    if (window.AIVA_NOTIFIER && assistantSettings.notifications?.enabled) {
+      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
     }
   } catch (e) {
     console.error('loadTasks:', e);
@@ -1261,8 +1261,8 @@ async function loadTasks() {
 async function markDone(taskId) {
   try {
     await fetch(`${API_BASE}/api/tasks/${taskId}/done`, { method: 'PATCH' });
-    if (window.KAYA_CALENDAR_SYNC?.onTaskDone) {
-      await window.KAYA_CALENDAR_SYNC.onTaskDone(taskId);
+    if (window.AIVA_CALENDAR_SYNC?.onTaskDone) {
+      await window.AIVA_CALENDAR_SYNC.onTaskDone(taskId);
     }
     await loadTasks();
   } catch (e) {
@@ -1293,8 +1293,8 @@ async function persistTask(args) {
   if (!res.ok) throw new Error(data.error || t('errSave'));
   showToast(data.task);
   await loadTasks();
-  if (window.KAYA_CALENDAR_SYNC) {
-    await window.KAYA_CALENDAR_SYNC.handleTaskSaved(data.task);
+  if (window.AIVA_CALENDAR_SYNC) {
+    await window.AIVA_CALENDAR_SYNC.handleTaskSaved(data.task);
   }
   return { success: true, task_id: data.task.id, content: data.task.content };
 }
@@ -1331,8 +1331,8 @@ async function saveTaskFromForm() {
   if (!res.ok) throw new Error(data.error || t('errSave'));
   await loadTasks();
   showToast(data.task);
-  if (window.KAYA_CALENDAR_SYNC) {
-    await window.KAYA_CALENDAR_SYNC.handleTaskSaved(data.task, { skipPrompt: !!id });
+  if (window.AIVA_CALENDAR_SYNC) {
+    await window.AIVA_CALENDAR_SYNC.handleTaskSaved(data.task, { skipPrompt: !!id });
   }
   return data.task;
 }
@@ -1345,8 +1345,8 @@ async function removeTask(taskId) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || t('errDelete'));
-  if (window.KAYA_CALENDAR_SYNC?.onTaskRemoved) {
-    await window.KAYA_CALENDAR_SYNC.onTaskRemoved(taskId);
+  if (window.AIVA_CALENDAR_SYNC?.onTaskRemoved) {
+    await window.AIVA_CALENDAR_SYNC.onTaskRemoved(taskId);
   }
   await loadTasks();
 }
@@ -1444,7 +1444,7 @@ async function handleGeminiMessage(message) {
         isSessionActive = true;
         recordBtn.classList.add('recording');
         recordBtn.setAttribute('aria-label', t('stopRecording'));
-        window.KAYA_HAPTICS?.onListeningStart?.();
+        window.AIVA_HAPTICS?.onListeningStart?.();
         sendSessionGreeting();
       } catch (e) {
         console.error('Audio start failed:', e);
@@ -1686,7 +1686,7 @@ function disconnectSession() {
   setStatus(t('tapToRecord'));
   recordBtn.setAttribute('aria-label', t('record'));
   if (wasActive) {
-    window.KAYA_HAPTICS?.onListeningStop?.();
+    window.AIVA_HAPTICS?.onListeningStop?.();
   }
 }
 
@@ -1833,13 +1833,13 @@ addToCalendarBtn.addEventListener('click', async () => {
   }
   try {
     let result;
-    if (window.KAYA_CALENDAR_CRUD?.isAndroid?.()) {
-      result = await window.KAYA_CALENDAR_CRUD.createKayaEvent(task);
+    if (window.AIVA_CALENDAR_CRUD?.isAndroid?.()) {
+      result = await window.AIVA_CALENDAR_CRUD.createAivaEvent(task);
     } else {
-      const native = window.KAYA_NATIVE_CALENDAR;
+      const native = window.AIVA_NATIVE_CALENDAR;
       result = native
         ? await native.addToDeviceCalendar(task)
-        : await window.KAYA_CALENDAR.addToDevice(task);
+        : await window.AIVA_CALENDAR.addToDevice(task);
     }
     if (result?.method !== 'aborted' && result !== 'aborted') {
       showToast({ content: t('toastCalendarAdd'), emotion: 'neutral', priority: 3 });
@@ -1857,26 +1857,26 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && taskModal.classList.contains('visible')) closeTaskModal();
 });
 
-window.addEventListener('kaya:settings-updated', () => {
+window.addEventListener('aiva:settings-updated', () => {
   applyPreferences();
   renderCalendar();
-  window.KAYA_CALENDAR_ONBOARD?.updateHeaderStatus?.();
-  window.KAYA_CALENDAR_ONBOARD?.updateBanner?.(tasks.some((t) => t.due_date));
+  window.AIVA_CALENDAR_ONBOARD?.updateHeaderStatus?.();
+  window.AIVA_CALENDAR_ONBOARD?.updateBanner?.(tasks.some((t) => t.due_date));
 });
 
-window.addEventListener('kaya:profile-updated', () => {
+window.addEventListener('aiva:profile-updated', () => {
   applyPreferences();
 });
 
-window.addEventListener('kaya:calendar-connected', () => {
+window.addEventListener('aiva:calendar-connected', () => {
   showToast({ content: t('toastCalendarSync'), emotion: 'neutral', priority: 3 });
 });
 
-window.addEventListener('kaya:task-done-from-notif', () => {
+window.addEventListener('aiva:task-done-from-notif', () => {
   loadTasks();
 });
 
-window.addEventListener('kaya:notification-fired', () => {
+window.addEventListener('aiva:notification-fired', () => {
   renderUpcomingStrip();
 });
 
@@ -1890,8 +1890,8 @@ if (upcomingList) {
       const task = getTaskById(taskId);
       if (action === 'done') {
         await markDone(taskId);
-      } else if (action === 'snooze' && task && window.KAYA_NOTIFIER) {
-        await window.KAYA_NOTIFIER.snoozeTask(taskId, task.content, 10);
+      } else if (action === 'snooze' && task && window.AIVA_NOTIFIER) {
+        await window.AIVA_NOTIFIER.snoozeTask(taskId, task.content, 10);
         showToast({ content: t('toastSnooze10'), emotion: 'neutral', priority: 3 });
       }
       return;
@@ -1919,32 +1919,32 @@ function tryAutoStartListening() {
   connectSession();
 }
 
-window.addEventListener('kaya:shortcut-triggered', tryAutoStartListening);
+window.addEventListener('aiva:shortcut-triggered', tryAutoStartListening);
 
-if (window.KAYA_SHORTCUT?.isAndroid?.()) {
-  window.KAYA_SHORTCUT.onShortcutTriggered(tryAutoStartListening);
-  window.KAYA_SHORTCUT.consumePendingLaunch().then((pending) => {
+if (window.AIVA_SHORTCUT?.isAndroid?.()) {
+  window.AIVA_SHORTCUT.onShortcutTriggered(tryAutoStartListening);
+  window.AIVA_SHORTCUT.consumePendingLaunch().then((pending) => {
     if (!pending) return;
-    window.KAYA_SHORTCUT.clearPendingLaunch();
+    window.AIVA_SHORTCUT.clearPendingLaunch();
     setTimeout(tryAutoStartListening, 500);
   });
 }
 
 // Initialize notification scheduler
-if (window.KAYA_NOTIFIER) {
-  window.KAYA_NOTIFIER.init().then(() => {
+if (window.AIVA_NOTIFIER) {
+  window.AIVA_NOTIFIER.init().then(() => {
     if (assistantSettings.notifications?.enabled) {
-      window.KAYA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
+      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
     }
   });
 }
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', async (event) => {
-    if (event.data?.type === 'kaya:snooze' && window.KAYA_NOTIFIER) {
+    if (event.data?.type === 'aiva:snooze' && window.AIVA_NOTIFIER) {
       const task = getTaskById(event.data.taskId);
       if (task) {
-        await window.KAYA_NOTIFIER.snoozeTask(event.data.taskId, task.content, event.data.minutes || 10);
+        await window.AIVA_NOTIFIER.snoozeTask(event.data.taskId, task.content, event.data.minutes || 10);
         showToast({ content: t('toastSnooze'), emotion: 'neutral', priority: 3 });
       }
     }

@@ -7,11 +7,11 @@ import android.content.SharedPreferences;
 import android.util.Log;
 
 /**
- * BroadcastReceiver for KAYA notification action buttons.
+ * BroadcastReceiver for AIVA notification action buttons.
  * Writes pending actions to Capacitor Preferences storage for JS to process.
  */
-public class KayaNotificationReceiver extends BroadcastReceiver {
-    private static final String TAG = "KayaNotifReceiver";
+public class AivaNotificationReceiver extends BroadcastReceiver {
+    private static final String TAG = "AivaNotifReceiver";
     private static final String PREFS_NAME = "CapacitorStorage";
 
     @Override

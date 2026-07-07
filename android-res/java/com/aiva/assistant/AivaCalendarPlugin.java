@@ -1,4 +1,4 @@
-package com.kaya.assistant;
+package com.aiva.assistant;
 
 import android.Manifest;
 import android.content.ContentResolver;
@@ -24,18 +24,18 @@ import java.util.TimeZone;
 
 /**
  * Native Android calendar integration via CalendarContract.
- * Inserts/updates/removes KAYA tasks as calendar events with reminders.
+ * Inserts/updates/removes AIVA tasks as calendar events with reminders.
  */
 @CapacitorPlugin(
-    name = "KayaCalendar",
+    name = "AivaCalendar",
     permissions = {
         @Permission(strings = { Manifest.permission.READ_CALENDAR }, alias = "calendar"),
         @Permission(strings = { Manifest.permission.WRITE_CALENDAR }, alias = "calendar")
     }
 )
-public class KayaCalendarPlugin extends Plugin {
+public class AivaCalendarPlugin extends Plugin {
 
-    private static final String TAG = "KayaCalendar";
+    private static final String TAG = "AivaCalendar";
 
     @PluginMethod
     public void requestPermissions(PluginCall call) {

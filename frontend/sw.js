@@ -1,7 +1,7 @@
 /**
- * KAYA Service Worker — offline caching + push notifications
+ * AIVA Service Worker — offline caching + push notifications
  */
-const CACHE_NAME = 'kaya-v8';
+const CACHE_NAME = 'aiva-v8';
 const ASSETS = [
   '/index.html',
   '/settings.html',
@@ -72,7 +72,7 @@ self.addEventListener('fetch', (event) => {
 
 // Push notification handler
 self.addEventListener('push', (event) => {
-  let data = { title: 'KAYA', body: 'You have a reminder', tag: 'kaya-reminder' };
+  let data = { title: 'KAYA', body: 'You have a reminder', tag: 'aiva-reminder' };
   try {
     if (event.data) data = Object.assign(data, event.data.json());
   } catch (_e) {
@@ -84,7 +84,7 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      tag: data.tag || 'kaya-reminder',
+      tag: data.tag || 'aiva-reminder',
       data: data,
       vibrate: [200, 100, 200],
       actions: [
@@ -102,7 +102,7 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'done' && taskId) {
     const apiBase = self.location.origin.includes('localhost')
-      ? 'https://kaya.radilov-k.workers.dev'
+      ? 'https://aiva.radilov-k.workers.dev'
       : self.location.origin;
     event.waitUntil(
       fetch(`${apiBase}/api/tasks/${taskId}/done`, { method: 'PATCH' })
@@ -114,7 +114,7 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(
       self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
         for (const client of clients) {
-          client.postMessage({ type: 'kaya:snooze', taskId, minutes: 10 });
+          client.postMessage({ type: 'aiva:snooze', taskId, minutes: 10 });
           if ('focus' in client) return client.focus();
         }
         return self.clients.openWindow('/index.html');
@@ -136,7 +136,7 @@ self.addEventListener('notificationclick', (event) => {
 
 // Handle snooze messages from SW notification actions
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'kaya:snooze') {
+  if (event.data?.type === 'aiva:snooze') {
     // Forwarded to main app via postMessage on client
   }
 });
