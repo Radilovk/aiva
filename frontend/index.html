@@ -7,8 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta property="og:title" content="KAYA — Гласов асистент">
+  <meta property="og:description" content="Гласов асистент за задачи с календар">
+  <meta property="og:image" content="icons/og-image.png">
+  <link rel="stylesheet" href="icons/brand.css">
   <title>KAYA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -94,6 +99,10 @@
     .brand {
       flex: 1;
       text-align: left;
+    }
+
+    .brand-lockup .brand-wordmark {
+      font-size: 1.35rem;
     }
 
     .logo {
@@ -1524,8 +1533,13 @@
   <div class="app">
     <header class="header">
       <div class="brand">
-        <div class="logo">KAYA</div>
-        <div class="tagline" data-i18n="tagline">гласов асистент за задачи</div>
+        <div class="brand-lockup">
+          <img class="brand-mark" src="icons/logo-mark.svg" alt="" width="42" height="42">
+          <div class="brand-text">
+            <div class="brand-wordmark logo">KAYA</div>
+            <div class="tagline brand-tagline" data-i18n="tagline">гласов асистент за задачи</div>
+          </div>
+        </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="calendar-sync-chip" id="calendarSyncChip" type="button" hidden title="Календар">📅 <span data-i18n="calendar">Календар</span></button>
@@ -1721,6 +1735,9 @@
       </div>
 
       <div class="onboard-step" id="onboardStepIntro" hidden>
+        <div class="onboard-brand">
+          <img class="brand-mark brand-mark-xl" src="icons/logo-mark.svg" alt="" width="96" height="96">
+        </div>
         <h2 data-i18n="onboardingIntroTitle">Добре дошли в KAYA</h2>
         <p class="onboard-intro-body" data-i18n="onboardingIntroBody">KAYA е вашият личен гласов асистент за задачи и календар.</p>
       </div>
