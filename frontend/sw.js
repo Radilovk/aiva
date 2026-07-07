@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v11';
+const CACHE_NAME = 'aiva-v12';
 const ASSETS = [
   'index.html',
   'settings.html',
@@ -22,6 +22,8 @@ const ASSETS = [
   'lib/i18n-extended.js',
   'lib/i18n-privacy.js',
   'lib/voices.js',
+  'lib/voicePreview.js',
+  'lib/shortcutBridge.js',
   'lib/appOnboarding.js',
   'app.js',
   'admin.js',

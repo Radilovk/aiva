@@ -78,13 +78,15 @@ let awaitingCloseConfirmation = false;
 let pendingUserTranscript = '';
 let assistantTranscriptBuffer = '';
 let assistantTurnComplete = false;
+let sessionEnding = false;
+let sessionEndTimer = null;
 
 function setMicUplinkMuted(muted) {
   audioStreamer?.setUplinkMuted(muted);
 }
 
 async function tryUnmuteMicAfterAssistant() {
-  if (!assistantTurnComplete || audioPlayer?.isPlaying) return;
+  if (sessionEnding || !assistantTurnComplete || audioPlayer?.isPlaying) return;
   setMicUplinkMuted(false);
 }
 
@@ -459,6 +461,8 @@ function setAssistantSpeech(text) {
 
 const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още|anything\s+else|need\s+anything|something\s+else|还需要|还需要其他|कुछ\s+और|algo\s+más|شيء\s+آخر|autre\s+chose|besoin\s+d.autre|noch\s+etwas|brauchen\s+sie\s+noch|ещё\s+что|нужно\s+ещё/i;
 const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|no|nope|nothing|that's all|done|enough|нет|没有|नहीं|नहीं\s+धन्यवाद|no\s+gracias|لا|non|nein|ничего|спасибо,\s*нет)\b/i;
+const USER_GOODBYE_RE = /^(спри|стоп|затвори|излез|чао|довиждане|до\s*видане|goodbye|bye|stop|exit|quit)\b/i;
+const ASSISTANT_GOODBYE_RE = /\b(чао|довиждане|до\s*скоро|до\s*видане|приятен\s+ден|лека\s+нощ|оставам\s+на\s+разположение|goodbye|bye\s*bye|see\s+you|take\s+care|auf\s+wiedersehen|au\s+revoir|adiós|adios|до\s+свидания)\b/i;
 
 function detectClosingQuestion(text) {
   if (CLOSING_QUESTION_RE.test(String(text || '').toLowerCase())) {
@@ -472,17 +476,47 @@ function isNegativeCloseResponse(text) {
   return NEGATIVE_CLOSE_RE.test(normalized);
 }
 
+function isUserGoodbye(text) {
+  const normalized = String(text || '').toLowerCase().trim().replace(/[.!?,…]+$/g, '');
+  if (!normalized) return false;
+  return USER_GOODBYE_RE.test(normalized);
+}
+
+function detectAssistantGoodbye(text) {
+  if (!text || sessionEnding) return false;
+  return ASSISTANT_GOODBYE_RE.test(String(text).toLowerCase());
+}
+
 function resetSessionCloseState() {
   awaitingCloseConfirmation = false;
   pendingUserTranscript = '';
 }
 
-function scheduleSessionEnd(delayMs = 700) {
-  resetSessionCloseState();
-  setTimeout(async () => {
+function clearSessionEndState() {
+  sessionEnding = false;
+  if (sessionEndTimer) {
+    clearTimeout(sessionEndTimer);
+    sessionEndTimer = null;
+  }
+}
+
+function beginSessionEnd() {
+  if (sessionEnding) return;
+  sessionEnding = true;
+  awaitingCloseConfirmation = false;
+  pendingUserTranscript = '';
+  setMicUplinkMuted(true);
+  waveform.classList.remove('active');
+}
+
+function scheduleSessionEnd(delayMs = 300) {
+  beginSessionEnd();
+  if (sessionEndTimer) return;
+  sessionEndTimer = setTimeout(async () => {
+    sessionEndTimer = null;
     if (!isSessionActive) return;
     if (audioPlayer) {
-      await audioPlayer.waitForDrain(8000);
+      await audioPlayer.waitForDrain(12000);
     }
     if (isSessionActive) disconnectSession();
   }, delayMs);
@@ -500,6 +534,10 @@ function handlePossibleCloseResponse(text, finished = false) {
 function handleUserTranscriptForSessionControl(text, finished = false) {
   if (awaitingCloseConfirmation) {
     handlePossibleCloseResponse(text, finished);
+    return;
+  }
+  if (finished && isUserGoodbye(text)) {
+    beginSessionEnd();
   }
 }
 
@@ -1479,8 +1517,14 @@ async function handleGeminiMessage(message) {
         assistantTranscriptBuffer += message.data.text;
         setAssistantSpeech(assistantTranscriptBuffer);
         detectClosingQuestion(assistantTranscriptBuffer);
+        if (detectAssistantGoodbye(assistantTranscriptBuffer)) {
+          scheduleSessionEnd();
+        }
         if (message.data.finished) {
           detectClosingQuestion(assistantTranscriptBuffer);
+          if (detectAssistantGoodbye(assistantTranscriptBuffer)) {
+            scheduleSessionEnd();
+          }
         }
       }
       break;
@@ -1490,6 +1534,9 @@ async function handleGeminiMessage(message) {
         assistantTranscriptBuffer = String(message.data);
         setAssistantSpeech(assistantTranscriptBuffer);
         detectClosingQuestion(assistantTranscriptBuffer);
+        if (detectAssistantGoodbye(assistantTranscriptBuffer)) {
+          scheduleSessionEnd();
+        }
       }
       break;
 
@@ -1547,7 +1594,11 @@ async function handleGeminiMessage(message) {
       assistantTranscriptBuffer = '';
       pendingUserTranscript = '';
       assistantTurnComplete = true;
-      tryUnmuteMicAfterAssistant();
+      if (sessionEnding && !sessionEndTimer) {
+        scheduleSessionEnd(0);
+      } else if (!sessionEnding) {
+        tryUnmuteMicAfterAssistant();
+      }
       break;
 
     case MultimodalLiveResponseType.INTERRUPTED:
@@ -1674,6 +1725,7 @@ async function connectSession() {
 
 function disconnectSession() {
   const wasActive = isSessionActive;
+  clearSessionEndState();
   if (audioStreamer) {
     audioStreamer.stop();
     audioStreamer = null;
