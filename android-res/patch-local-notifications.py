@@ -67,46 +67,54 @@ if 'AivaNotificationReceiver' not in content:
     content = content.replace('</application>', RECEIVER + '\n    </application>', 1)
     print('✅ Added AivaNotificationReceiver')
 
+ACCESSIBILITY_SERVICE = """
+        <service
+            android:name="com.aiva.assistant.AivaShortcutAccessibilityService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/aiva_shortcut_service_config" />
+        </service>
+"""
+
+if 'AivaShortcutAccessibilityService' not in content:
+    content = content.replace('</application>', ACCESSIBILITY_SERVICE + '\n    </application>', 1)
+    print('✅ Added AivaShortcutAccessibilityService')
+
 with open(MANIFEST, 'w') as f:
     f.write(content)
 
-# Patch MainActivity to register AivaCalendarPlugin
-if os.path.exists(MAIN_ACTIVITY):
-    with open(MAIN_ACTIVITY, 'r') as f:
-        main = f.read()
-
-    if 'AivaCalendarPlugin' not in main:
-        if 'import com.aiva.assistant.AivaCalendarPlugin;' not in main:
-            main = main.replace(
-                'import com.getcapacitor.BridgeActivity;',
-                'import com.getcapacitor.BridgeActivity;\nimport com.aiva.assistant.AivaCalendarPlugin;',
-            )
-
-        if 'registerPlugin(AivaCalendarPlugin.class)' not in main:
-            # Capacitor 8 MainActivity extends BridgeActivity without onCreate override
-            if 'onCreate' in main:
-                main = re.sub(
-                    r'(super\.onCreate\(savedInstanceState\);)',
-                    r'registerPlugin(AivaCalendarPlugin.class);\n        \1',
-                    main,
-                    count=1,
-                )
-            else:
-                main = main.replace(
-                    'public class MainActivity extends BridgeActivity {}',
-                    '''public class MainActivity extends BridgeActivity {
-    @Override
-    public void onCreate(android.os.Bundle savedInstanceState) {
-        registerPlugin(AivaCalendarPlugin.class);
-        super.onCreate(savedInstanceState);
-    }
-}''',
-                )
-
-        with open(MAIN_ACTIVITY, 'w') as f:
-            f.write(main)
-        print('✅ Registered AivaCalendarPlugin in MainActivity')
+# Copy patched MainActivity (registers plugins + volume shortcut handling)
+PATCHED_MAIN = 'android-res/java/com/aiva/assistant/MainActivity.java'
+if os.path.exists(PATCHED_MAIN):
+    import shutil
+    os.makedirs(os.path.dirname(MAIN_ACTIVITY), exist_ok=True)
+    shutil.copy2(PATCHED_MAIN, MAIN_ACTIVITY)
+    print('✅ Installed patched MainActivity')
+elif os.path.exists(MAIN_ACTIVITY):
+    print(f'⚠ Patched MainActivity template missing — keeping existing {MAIN_ACTIVITY}')
 else:
     print(f'⚠ MainActivity not found at {MAIN_ACTIVITY} — plugin registration skipped')
+
+# Copy accessibility XML + strings
+XML_SRC = 'android-res/xml/aiva_shortcut_service_config.xml'
+XML_DST = 'android/app/src/main/res/xml/aiva_shortcut_service_config.xml'
+if os.path.exists(XML_SRC):
+    os.makedirs(os.path.dirname(XML_DST), exist_ok=True)
+    import shutil
+    shutil.copy2(XML_SRC, XML_DST)
+    print('✅ Copied shortcut accessibility config XML')
+
+STRINGS_SRC = 'android-res/values/strings.xml'
+STRINGS_DST = 'android/app/src/main/res/values/aiva_strings.xml'
+if os.path.exists(STRINGS_SRC):
+    os.makedirs(os.path.dirname(STRINGS_DST), exist_ok=True)
+    import shutil
+    shutil.copy2(STRINGS_SRC, STRINGS_DST)
+    print('✅ Copied AIVA strings resource')
 
 print('✅ Android patches applied successfully')

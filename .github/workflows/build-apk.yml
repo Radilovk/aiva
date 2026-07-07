@@ -65,6 +65,14 @@ jobs:
              android/app/src/main/java/com/capacitorjs/plugins/localnotifications/
           cp android-res/java/com/aiva/assistant/AivaCalendarPlugin.java \
              android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaShortcutPlugin.java \
+             android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaVolumeKeyHandler.java \
+             android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaShortcutLauncher.java \
+             android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaShortcutAccessibilityService.java \
+             android/app/src/main/java/com/aiva/assistant/
 
       - name: Patch AndroidManifest and register AivaCalendar plugin
         run: python3 android-res/patch-local-notifications.py

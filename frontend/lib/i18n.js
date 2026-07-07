@@ -69,6 +69,7 @@
       settingsSaved: 'Settings saved',
       notifications: 'Notifications',
       askAnything: 'Do you need anything else?',
+      listeningGreetingPrompt: 'Greet the user briefly in one short sentence, invite them to speak, and do not use any tools.',
     },
     zh: {
       tagline: '语音任务助手',
@@ -124,6 +125,7 @@
       settingsSaved: '设置已保存',
       notifications: '通知',
       askAnything: '还需要其他帮助吗？',
+      listeningGreetingPrompt: '用一句话简短问候用户，邀请对方开始说话，不要使用任何工具。',
     },
     hi: {
       tagline: 'वॉइस टास्क असिस्टेंट',
@@ -179,6 +181,7 @@
       settingsSaved: 'सेटिंग्स सहेजी गईं',
       notifications: 'सूचनाएं',
       askAnything: 'क्या आपको और कुछ चाहिए?',
+      listeningGreetingPrompt: 'एक छोटे वाक्य में अभिवादन करें, बोलने के लिए आमंत्रित करें, और कोई टूल न उपयोग करें।',
     },
     es: {
       tagline: 'asistente de voz para tareas',
@@ -234,6 +237,7 @@
       settingsSaved: 'Ajustes guardados',
       notifications: 'Notificaciones',
       askAnything: '¿Necesitas algo más?',
+      listeningGreetingPrompt: 'Saluda brevemente en una frase corta, invita al usuario a hablar y no uses herramientas.',
     },
     fr: {
       tagline: 'assistant vocal pour les tâches',
@@ -289,6 +293,7 @@
       settingsSaved: 'Paramètres enregistrés',
       notifications: 'Notifications',
       askAnything: 'Avez-vous besoin d\'autre chose ?',
+      listeningGreetingPrompt: 'Saluez brièvement en une phrase courte, invitez l\'utilisateur à parler et n\'utilisez aucun outil.',
     },
     de: {
       tagline: 'Sprachassistent für Aufgaben',
@@ -344,6 +349,7 @@
       settingsSaved: 'Einstellungen gespeichert',
       notifications: 'Benachrichtigungen',
       askAnything: 'Brauchen Sie noch etwas?',
+      listeningGreetingPrompt: 'Begrüßen Sie kurz in einem Satz, laden Sie zum Sprechen ein und verwenden Sie keine Tools.',
     },
     ru: {
       tagline: 'голосовой помощник для задач',
@@ -399,6 +405,7 @@
       settingsSaved: 'Настройки сохранены',
       notifications: 'Уведомления',
       askAnything: 'Вам нужно что-то ещё?',
+      listeningGreetingPrompt: 'Кратко поприветствуйте одним предложением, пригласите говорить и не используйте инструменты.',
     },
     ar: {
       tagline: 'مساعد صوتي للمهام',
@@ -454,6 +461,7 @@
       settingsSaved: 'تم حفظ الإعدادات',
       notifications: 'الإشعارات',
       askAnything: 'هل تحتاج إلى شيء آخر؟',
+      listeningGreetingPrompt: 'حيّ المستخدم بجملة قصيرة، ادعه للتحدث، ولا تستخدم أي أدوات.',
     },
     bg: {
       tagline: 'гласов асистент за задачи',
@@ -509,6 +517,7 @@
       settingsSaved: 'Настройките са запазени',
       notifications: 'Нотификации',
       askAnything: 'Имаш ли нужда от още нещо?',
+      listeningGreetingPrompt: 'Поздрави накратко с едно изречение, покани потребителя да говори и не използвай инструменти.',
     },
   };
 

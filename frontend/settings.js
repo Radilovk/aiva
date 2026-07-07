@@ -101,6 +101,12 @@
       autoExportOnSave: false,
       subscribedAt: null,
     },
+    hardwareShortcut: {
+      enabled: false,
+      button: 'volume_up',
+      pressCount: 3,
+      backgroundMode: false,
+    },
   };
 
   function deepMerge(base, override) {

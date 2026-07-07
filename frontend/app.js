@@ -1445,6 +1445,7 @@ async function handleGeminiMessage(message) {
         recordBtn.classList.add('recording');
         recordBtn.setAttribute('aria-label', t('stopRecording'));
         window.AIVA_HAPTICS?.onListeningStart?.();
+        sendSessionGreeting();
       } catch (e) {
         console.error('Audio start failed:', e);
         showError(t('errMicrophone'));
@@ -1555,6 +1556,16 @@ async function handleGeminiMessage(message) {
     default:
       break;
   }
+}
+
+function sendSessionGreeting() {
+  if (!client) return;
+  const userName = (assistantSettings.profile?.userName || '').trim();
+  let prompt = t('listeningGreetingPrompt');
+  if (userName) {
+    prompt += ` ${tf('addressUserAs', { name: userName })}`;
+  }
+  client.sendTextMessage(prompt);
 }
 
 async function fetchToken() {
@@ -1902,6 +1913,22 @@ applyPreferences();
 renderCalendar();
 loadTasks();
 refreshExternalEvents();
+
+function tryAutoStartListening() {
+  if (isSessionActive || isConnecting) return;
+  connectSession();
+}
+
+window.addEventListener('aiva:shortcut-triggered', tryAutoStartListening);
+
+if (window.AIVA_SHORTCUT?.isAndroid?.()) {
+  window.AIVA_SHORTCUT.onShortcutTriggered(tryAutoStartListening);
+  window.AIVA_SHORTCUT.consumePendingLaunch().then((pending) => {
+    if (!pending) return;
+    window.AIVA_SHORTCUT.clearPendingLaunch();
+    setTimeout(tryAutoStartListening, 500);
+  });
+}
 
 // Initialize notification scheduler
 if (window.AIVA_NOTIFIER) {
