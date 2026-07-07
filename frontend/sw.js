@@ -1,7 +1,7 @@
 /**
  * AIVA Service Worker — offline caching + push notifications
  */
-const CACHE_NAME = 'aiva-v8';
+const CACHE_NAME = 'aiva-v9';
 const ASSETS = [
   '/index.html',
   '/settings.html',
@@ -28,8 +28,14 @@ const ASSETS = [
   '/lib/calendarSync.js',
   '/lib/calendarOnboarding.js',
   '/manifest.json',
+  '/icons/brand.css',
+  '/icons/logo-mark.svg',
+  '/icons/logo-full.svg',
+  '/icons/favicon-32.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/icons/apple-touch-icon.png',
+  '/icons/maskable-512.png',
 ];
 
 // Install — pre-cache shell assets

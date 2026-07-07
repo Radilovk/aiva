@@ -96,6 +96,8 @@ jobs:
           img.save('$MIPMAP_BASE/$DIR/ic_launcher_round.png')
           " 2>/dev/null || cp frontend/icons/icon-192.png "$MIPMAP_BASE/$DIR/ic_launcher.png"
           done
+          mkdir -p "$MIPMAP_BASE/drawable"
+          cp android-res/drawable/ic_stat_aiva.png "$MIPMAP_BASE/drawable/ic_stat_aiva.png"
 
       - name: Build APK
         working-directory: android

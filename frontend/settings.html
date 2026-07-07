@@ -7,6 +7,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="icons/brand.css">
   <title>KAYA — Настройки</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -210,7 +214,10 @@
 <body>
   <div class="settings-app">
     <div class="settings-header">
-      <h1>⚙ <span data-i18n="settingsTitle">Настройки</span></h1>
+      <div class="settings-brand">
+        <img class="brand-mark" src="icons/logo-mark.svg" alt="" width="36" height="36">
+        <h1><span data-i18n="settingsTitle">Настройки</span></h1>
+      </div>
       <a class="back-link" href="./index.html" data-i18n="backHome">← Начало</a>
     </div>
 
