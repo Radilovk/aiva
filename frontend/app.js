@@ -335,7 +335,7 @@ class EndSessionTool extends FunctionCallDefinition {
   constructor() {
     super(
       'end_session',
-      'Приключва гласовата сесия когато потребителят няма нужда от още помощ.',
+      'Приключва гласовата сесия. Използвай го САМО след като вече си произнесъл на глас кратко сбогуване на езика на потребителя.',
       {
         type: 'object',
         properties: {
@@ -472,9 +472,13 @@ function isNegativeCloseResponse(text) {
   return NEGATIVE_CLOSE_RE.test(normalized);
 }
 
-function scheduleSessionEnd(delayMs = 700) {
+function resetSessionCloseState() {
   awaitingCloseConfirmation = false;
   pendingUserTranscript = '';
+}
+
+function scheduleSessionEnd(delayMs = 700) {
+  resetSessionCloseState();
   setTimeout(async () => {
     if (!isSessionActive) return;
     if (audioPlayer) {
@@ -490,6 +494,12 @@ function handlePossibleCloseResponse(text, finished = false) {
   pendingUserTranscript = finished ? '' : combined;
   if (isNegativeCloseResponse(combined)) {
     scheduleSessionEnd();
+  }
+}
+
+function handleUserTranscriptForSessionControl(text, finished = false) {
+  if (awaitingCloseConfirmation) {
+    handlePossibleCloseResponse(text, finished);
   }
 }
 
@@ -1460,7 +1470,7 @@ async function handleGeminiMessage(message) {
 
     case MultimodalLiveResponseType.INPUT_TRANSCRIPTION:
       if (message.data?.text) {
-        handlePossibleCloseResponse(message.data.text, message.data.finished === true);
+        handleUserTranscriptForSessionControl(message.data.text, message.data.finished === true);
       }
       break;
 
@@ -1517,7 +1527,7 @@ async function handleGeminiMessage(message) {
               result = await handleVoiceDeleteCalendarEvent(call.args || {});
               break;
             case 'end_session':
-              scheduleSessionEnd(500);
+              scheduleSessionEnd();
               result = { success: true, message: 'Сесията приключва.' };
               break;
             default:
@@ -1599,8 +1609,7 @@ async function connectSession() {
     const model = assistantSettings.model || LIVE_MODEL;
 
     client = new GeminiLiveAPI(token, model);
-    awaitingCloseConfirmation = false;
-    pendingUserTranscript = '';
+    resetSessionCloseState();
     assistantTranscriptBuffer = '';
     assistantTurnComplete = false;
     let extraContext = buildTasksContextForAssistant()
@@ -1675,8 +1684,7 @@ function disconnectSession() {
   client = null;
   isSessionActive = false;
   isConnecting = false;
-  awaitingCloseConfirmation = false;
-  pendingUserTranscript = '';
+  resetSessionCloseState();
   assistantTranscriptBuffer = '';
   assistantTurnComplete = false;
   recordBtn.classList.remove('recording');
