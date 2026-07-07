@@ -5,13 +5,13 @@
  */
 
 class PCMProcessor extends AudioWorkletProcessor {
-  constructor() {
+  constructor(options) {
     super();
     this.audioQueue = [];
     this.currentOffset = 0;
     this.queuedSamples = 0;
-    // ~100ms at 24kHz — absorb network jitter before starting playback
-    this.minBufferSamples = 2400;
+    const configuredMin = options?.processorOptions?.minBufferSamples;
+    this.minBufferSamples = Number.isFinite(configuredMin) ? configuredMin : 2400;
     this.buffering = true;
     this.wasPlaying = false;
 

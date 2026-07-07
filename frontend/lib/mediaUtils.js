@@ -408,13 +408,14 @@ class ScreenCapture extends BaseVideoCapture {
  * Audio Player - Plays audio responses from Gemini
  */
 class AudioPlayer {
-  constructor() {
+  constructor(options = {}) {
     this.audioContext = null;
     this.workletNode = null;
     this.gainNode = null;
     this.isInitialized = false;
     this.volume = 1.0;
     this.sampleRate = 24000; // Gemini outputs at 24kHz
+    this.minBufferSamples = options.minBufferSamples ?? 2400;
     this._playChain = Promise.resolve();
     this._isPlaying = false;
     this._drainResolvers = [];
@@ -442,7 +443,8 @@ class AudioPlayer {
       // Create worklet node
       this.workletNode = new AudioWorkletNode(
         this.audioContext,
-        "pcm-processor"
+        "pcm-processor",
+        { processorOptions: { minBufferSamples: this.minBufferSamples } }
       );
 
       this.workletNode.port.onmessage = (event) => {

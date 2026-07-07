@@ -232,6 +232,54 @@ app.post('/api/token', async (c) => {
   return c.json({ token: data.name, expires_at: expireTime.toISOString() });
 });
 
+app.post('/api/voice-preview', async (c) => {
+  const body = await c.req.json<{
+    voice_name?: string;
+    text?: string;
+    language?: string;
+  }>().catch(() => ({} as { voice_name?: string; text?: string; language?: string }));
+
+  const voiceName = body.voice_name || 'Kore';
+  const text = body.text || 'Здравейте! Аз съм KAYA. С какво мога да ви помогна?';
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${c.env.GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName },
+            },
+          },
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error('Voice preview failed:', errText);
+    return c.json({ error: 'Неуспешно генериране на аудио пример' }, 500);
+  }
+
+  const data = await response.json() as any;
+  const inlineData = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+  const audioB64 = inlineData?.data;
+  if (!audioB64) {
+    return c.json({ error: 'Липсва аудио в отговора' }, 500);
+  }
+
+  return c.json({
+    audio: audioB64,
+    mime_type: inlineData?.mimeType || 'audio/L16;codec=pcm;rate=24000',
+  });
+});
+
 // --- Save task endpoint (called directly by frontend after Gemini function call) ---
 
 app.post('/api/tasks', async (c) => {

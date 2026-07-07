@@ -1,88 +1,42 @@
 /**
- * All 30 prebuilt HD voices supported by Google Gemini Live API.
+ * Bulgarian-friendly Gemini Live voices — curated for clear, natural Bulgarian speech.
  * @see https://ai.google.dev/gemini-api/docs/speech-generation
  */
 (function () {
-  const GEMINI_LIVE_VOICES = [
-    { name: 'Achernar', character: 'Soft' },
-    { name: 'Achird', character: 'Friendly' },
-    { name: 'Algenib', character: 'Gravelly' },
-    { name: 'Algieba', character: 'Smooth' },
-    { name: 'Alnilam', character: 'Firm' },
-    { name: 'Aoede', character: 'Breezy' },
-    { name: 'Autonoe', character: 'Bright' },
-    { name: 'Callirrhoe', character: 'Easy-going' },
-    { name: 'Charon', character: 'Informative' },
-    { name: 'Despina', character: 'Smooth' },
-    { name: 'Enceladus', character: 'Breathy' },
-    { name: 'Erinome', character: 'Clear' },
-    { name: 'Fenrir', character: 'Excitable' },
-    { name: 'Gacrux', character: 'Mature' },
-    { name: 'Iapetus', character: 'Clear' },
-    { name: 'Kore', character: 'Firm' },
-    { name: 'Laomedeia', character: 'Upbeat' },
-    { name: 'Leda', character: 'Youthful' },
-    { name: 'Orus', character: 'Firm' },
-    { name: 'Puck', character: 'Upbeat' },
-    { name: 'Pulcherrima', character: 'Forward' },
-    { name: 'Rasalgethi', character: 'Informative' },
-    { name: 'Sadachbia', character: 'Lively' },
-    { name: 'Sadaltager', character: 'Knowledgeable' },
-    { name: 'Schedar', character: 'Even' },
-    { name: 'Sulafat', character: 'Warm' },
-    { name: 'Umbriel', character: 'Easy-going' },
-    { name: 'Vindemiatrix', character: 'Gentle' },
-    { name: 'Zephyr', character: 'Bright' },
-    { name: 'Zubenelgenubi', character: 'Casual' },
+  const BULGARIAN_VOICES = [
+    { name: 'Kore', character: 'Firm', note: 'Препоръчан' },
+    { name: 'Puck', character: 'Upbeat', note: 'Ясен' },
+    { name: 'Charon', character: 'Informative', note: 'Естествен' },
+    { name: 'Zephyr', character: 'Bright', note: 'Лек' },
+    { name: 'Aoede', character: 'Breezy', note: 'Плавен' },
+    { name: 'Erinome', character: 'Clear', note: 'Чист' },
+    { name: 'Iapetus', character: 'Clear', note: 'Спокоен' },
+    { name: 'Despina', character: 'Smooth', note: 'Мек' },
+    { name: 'Leda', character: 'Youthful', note: 'Свеж' },
+    { name: 'Achird', character: 'Friendly', note: 'Приятелски' },
+    { name: 'Schedar', character: 'Even', note: 'Равномерен' },
+    { name: 'Sulafat', character: 'Warm', note: 'Топъл' },
   ];
 
-  const CHARACTER_ORDER = [
-    'Bright', 'Upbeat', 'Youthful', 'Lively', 'Excitable', 'Breezy', 'Warm',
-    'Friendly', 'Gentle', 'Soft', 'Casual', 'Easy-going', 'Smooth', 'Clear',
-    'Even', 'Firm', 'Forward', 'Mature', 'Knowledgeable', 'Informative',
-    'Breathy', 'Gravelly',
-  ];
-
-  function groupVoicesByCharacter(voices) {
-    const groups = new Map();
-    for (const voice of voices) {
-      const key = voice.character || 'Other';
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(voice);
-    }
-    const ordered = [];
-    for (const character of CHARACTER_ORDER) {
-      if (groups.has(character)) {
-        ordered.push({ character, voices: groups.get(character) });
-        groups.delete(character);
-      }
-    }
-    for (const [character, list] of groups) {
-      ordered.push({ character, voices: list });
-    }
-    return ordered;
-  }
+  const GEMINI_LIVE_VOICES = BULGARIAN_VOICES;
 
   function populateVoiceSelect(selectEl, selectedVoice, filter = '') {
     if (!selectEl) return;
     const current = selectedVoice || selectEl.value;
     const query = String(filter || '').trim().toLowerCase();
     const filtered = query
-      ? GEMINI_LIVE_VOICES.filter((v) =>
-        v.name.toLowerCase().includes(query) || v.character.toLowerCase().includes(query))
-      : GEMINI_LIVE_VOICES;
+      ? BULGARIAN_VOICES.filter((v) =>
+        v.name.toLowerCase().includes(query)
+        || v.character.toLowerCase().includes(query)
+        || (v.note || '').toLowerCase().includes(query))
+      : BULGARIAN_VOICES;
 
     selectEl.innerHTML = '';
-    for (const group of groupVoicesByCharacter(filtered)) {
-      const optgroup = document.createElement('optgroup');
-      optgroup.label = group.character;
-      for (const voice of group.voices) {
-        const opt = document.createElement('option');
-        opt.value = voice.name;
-        opt.textContent = `${voice.name} — ${voice.character}`;
-        optgroup.appendChild(opt);
-      }
-      selectEl.appendChild(optgroup);
+    for (const voice of filtered) {
+      const opt = document.createElement('option');
+      opt.value = voice.name;
+      opt.textContent = `${voice.name} — ${voice.character}${voice.note ? ` (${voice.note})` : ''}`;
+      selectEl.appendChild(opt);
     }
 
     if (current && filtered.some((v) => v.name === current)) {
@@ -94,12 +48,8 @@
 
     const hint = document.getElementById('voiceCountHint');
     if (hint) {
-      const total = GEMINI_LIVE_VOICES.length;
-      const shown = filtered.length;
-      const base = window.AIVA_I18N?.t?.('voiceCountHint') || `${total} HD voices from Google Gemini Live (full list)`;
-      hint.textContent = query && shown !== total
-        ? `${shown} / ${total} — ${base}`
-        : base.replace('{count}', String(total));
+      const base = window.AIVA_I18N?.t?.('voiceCountHint') || `${BULGARIAN_VOICES.length} voices optimized for Bulgarian`;
+      hint.textContent = base.replace('{count}', String(BULGARIAN_VOICES.length));
     }
   }
 
@@ -109,6 +59,7 @@
 
   window.AIVA_VOICES = {
     GEMINI_LIVE_VOICES,
+    BULGARIAN_VOICES,
     populateVoiceSelect,
     filterVoiceSelect,
   };
