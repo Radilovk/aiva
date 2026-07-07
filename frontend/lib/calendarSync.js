@@ -1,5 +1,5 @@
 /**
- * KAYA Calendar Sync
+ * AIVA Calendar Sync
  *
  * Cross-platform sync modes:
  *   subscribe  — ICS webcal feed (Google / Apple / Outlook)
@@ -7,18 +7,18 @@
  *   manual     — Per-task share flow
  */
 (function () {
-  const { API_BASE, WORKER_ORIGIN } = window.KAYA_CONFIG;
+  const { API_BASE, WORKER_ORIGIN } = window.AIVA_CONFIG;
 
   function getApiBase() {
     return API_BASE || WORKER_ORIGIN || location.origin;
   }
 
   function getUserId() {
-    return localStorage.getItem('kaya_user_id') || '';
+    return localStorage.getItem('aiva_user_id') || '';
   }
 
   function getReminderMinutes() {
-    return window.KAYA_SETTINGS?.loadAssistantSettings?.()?.notifications?.reminderMinutes ?? 15;
+    return window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications?.reminderMinutes ?? 15;
   }
 
   function getFeedUrl(userId) {
@@ -69,11 +69,11 @@
   function buildMultiEventICS(tasks) {
     const opts = {
       reminderMinutes: getReminderMinutes(),
-      remindAtStart: window.KAYA_SETTINGS?.loadAssistantSettings?.()?.notifications?.remindAtStart !== false,
+      remindAtStart: window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications?.remindAtStart !== false,
       calendarName: 'KAYA Задачи',
       includeRefresh: true,
     };
-    return window.KAYA_ICS?.buildMultiICS(tasks, opts) || null;
+    return window.AIVA_ICS?.buildMultiICS(tasks, opts) || null;
   }
 
   async function shareICS(ics, fileName, title) {
@@ -99,11 +99,11 @@
   async function exportAllToDevice(tasks) {
     const ics = buildMultiEventICS(tasks);
     if (!ics) throw new Error('Няма задачи с дата за експорт');
-    return shareICS(ics, 'kaya-tasks.ics', 'KAYA — всички задачи');
+    return shareICS(ics, 'aiva-tasks.ics', 'KAYA — всички задачи');
   }
 
   function getSyncSettings() {
-    return window.KAYA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
+    return window.AIVA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
   }
 
   function isSubscribeMode() {
@@ -127,32 +127,32 @@
   async function syncTaskToCalendar(task) {
     if (!task?.due_date) return { action: 'skip' };
 
-    if (isNativeMode() && window.KAYA_CALENDAR_CRUD?.isAndroid?.()) {
+    if (isNativeMode() && window.AIVA_CALENDAR_CRUD?.isAndroid?.()) {
       try {
-        const crud = window.KAYA_CALENDAR_CRUD;
+        const crud = window.AIVA_CALENDAR_CRUD;
         if (crud.hasLocalEvent(task.id)) {
-          const result = await crud.updateKayaEvent(task);
+          const result = await crud.updateAivaEvent(task);
           return { action: 'updated', method: 'android-local', ...result };
         }
-        const result = await crud.createKayaEvent(task);
+        const result = await crud.createAivaEvent(task);
         return { action: 'native', method: 'android-local', ...result };
       } catch (e) {
         if (e?.name !== 'AbortError') console.warn('Android local calendar sync:', e);
       }
     }
 
-    if (isNativeMode() && window.KAYA_NATIVE_CALENDAR) {
+    if (isNativeMode() && window.AIVA_NATIVE_CALENDAR) {
       try {
-        const result = await window.KAYA_NATIVE_CALENDAR.syncTaskToDevice(task);
+        const result = await window.AIVA_NATIVE_CALENDAR.syncTaskToDevice(task);
         return { action: 'native', ...result };
       } catch (e) {
         if (e?.name !== 'AbortError') console.warn('Native calendar sync:', e);
       }
     }
 
-    if (isManualMode() && getSyncSettings().autoExportOnSave && window.KAYA_NATIVE_CALENDAR) {
+    if (isManualMode() && getSyncSettings().autoExportOnSave && window.AIVA_NATIVE_CALENDAR) {
       try {
-        const result = await window.KAYA_NATIVE_CALENDAR.addToDeviceCalendar(task);
+        const result = await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
         if (result?.method !== 'aborted') return { action: 'shared', ...result };
       } catch (e) {
         if (e?.name !== 'AbortError') console.warn('Manual calendar export:', e);
@@ -169,7 +169,7 @@
   async function handleTaskSaved(task, options = {}) {
     if (!task?.due_date) return { action: 'skip' };
 
-    const onboard = window.KAYA_CALENDAR_ONBOARD;
+    const onboard = window.AIVA_CALENDAR_ONBOARD;
     if (onboard && !isConfigured() && !options.skipPrompt) {
       if (onboard.maybePrompt(task)) return { action: 'prompted' };
     }
@@ -185,19 +185,19 @@
     if (syncResult.action !== 'none') return syncResult;
 
     // Schedule local notification for new/updated task
-    if (window.KAYA_NOTIFIER?.isEnabled?.()) {
-      const mins = window.KAYA_SETTINGS?.loadAssistantSettings?.()?.notifications?.reminderMinutes;
-      await window.KAYA_NOTIFIER.scheduleForTask(task, mins);
+    if (window.AIVA_NOTIFIER?.isEnabled?.()) {
+      const mins = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications?.reminderMinutes;
+      await window.AIVA_NOTIFIER.scheduleForTask(task, mins);
     }
 
     return { action: 'none' };
   }
 
   async function syncIncomingEvents(startDate, endDate) {
-    const crud = window.KAYA_CALENDAR_CRUD;
+    const crud = window.AIVA_CALENDAR_CRUD;
     if (!crud?.isAndroid?.() || !crud.getSelectedCalendarId()) return [];
     try {
-      const { events = [] } = await crud.readKayaEvents({ from: startDate, to: endDate });
+      const { events = [] } = await crud.readAivaEvents({ from: startDate, to: endDate });
       const localIds = crud.getLocalEventIds?.() || new Set();
       return events
         .filter((ev) => !localIds.has(String(ev.eventId || ev.id || '')))
@@ -220,18 +220,18 @@
   }
 
   async function onTaskRemoved(taskId) {
-    if (window.KAYA_CALENDAR_CRUD?.isAndroid?.()) {
+    if (window.AIVA_CALENDAR_CRUD?.isAndroid?.()) {
       try {
-        await window.KAYA_CALENDAR_CRUD.deleteKayaEvent(taskId);
+        await window.AIVA_CALENDAR_CRUD.deleteAivaEvent(taskId);
       } catch (e) {
         console.warn('Android local calendar remove:', e);
       }
     }
-    if (window.KAYA_NATIVE_CALENDAR?.removeFromDeviceCalendar) {
-      await window.KAYA_NATIVE_CALENDAR.removeFromDeviceCalendar(taskId);
+    if (window.AIVA_NATIVE_CALENDAR?.removeFromDeviceCalendar) {
+      await window.AIVA_NATIVE_CALENDAR.removeFromDeviceCalendar(taskId);
     }
-    if (window.KAYA_NOTIFIER?.cancelForTask) {
-      await window.KAYA_NOTIFIER.cancelForTask(taskId);
+    if (window.AIVA_NOTIFIER?.cancelForTask) {
+      await window.AIVA_NOTIFIER.cancelForTask(taskId);
     }
   }
 
@@ -239,7 +239,7 @@
     await onTaskRemoved(taskId);
   }
 
-  window.KAYA_CALENDAR_SYNC = {
+  window.AIVA_CALENDAR_SYNC = {
     getFeedUrl,
     getWebcalUrl,
     getGoogleSubscribeUrl,

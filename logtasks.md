@@ -1,10 +1,10 @@
-# KAYA — Лог на задачите
+# AIVA — Лог на задачите
 
 ## 2026-06-10: Входящ поток на外部 календарни събития — syncIncomingEvents
 
 ### Какво е имплементирано
-- `frontend/lib/calendarCrud.js`: добавена функция `getLocalEventIds()`, която връща Set от всички Android eventId-та, записани от KAYA — използва се за защита срещу infinite sync loops.
-- `frontend/lib/calendarSync.js`: добавена `syncIncomingEvents(startDate, endDate)` — извиква `readKayaEvents`, филтрира KAYA-създадени събития чрез `getLocalEventIds`, нормализира резултата до KAYA task модел с `isExternal: true`.
+- `frontend/lib/calendarCrud.js`: добавена функция `getLocalEventIds()`, която връща Set от всички Android eventId-та, записани от AIVA — използва се за защита срещу infinite sync loops.
+- `frontend/lib/calendarSync.js`: добавена `syncIncomingEvents(startDate, endDate)` — извиква `readAivaEvents`, филтрира AIVA-създадени събития чрез `getLocalEventIds`, нормализира резултата до AIVA task модел с `isExternal: true`.
 - `frontend/app.js`:
   - Добавена state variable `externalEvents = []`.
   - Добавена `refreshExternalEvents()` — изчислява date range спрямо текущия view, зарежда external events, рендерира.
@@ -23,9 +23,9 @@
   - условен UI рендер за `web` срещу `android`;
   - бутон „Свържи локален календар“, заявка за права, зареждане на локални календари, `<select>` и запазване на `calendarId` в `localStorage`.
 - Интеграция на новия CRUD слой в календарната синхронизация:
-  - `frontend/lib/calendarSync.js` използва `KAYA_CALENDAR_CRUD` за Android native режим при create/update/delete.
+  - `frontend/lib/calendarSync.js` използва `AIVA_CALENDAR_CRUD` за Android native режим при create/update/delete.
 - Обновени asset/script връзки:
-  - `frontend/index.html`, `frontend/settings.html`, `frontend/sw.js` (cache bump до `kaya-v3`) включват `lib/calendarCrud.js`.
+  - `frontend/index.html`, `frontend/settings.html`, `frontend/sw.js` (cache bump до `aiva-v3`) включват `lib/calendarCrud.js`.
 - Android build конфигурация:
   - `.github/workflows/build-apk.yml` добавя `@capacitor-community/calendar` към Capacitor зависимостите.
   - Calendar permissions (`READ_CALENDAR`/`WRITE_CALENDAR`) остават покрити от `android-res/patch-local-notifications.py`.
@@ -90,7 +90,7 @@
 ## 2026-06-03: Fix — AudioWorklet грешка при инициализация + SyntaxError при зареждане на задачи
 
 ### Проблем
-1. **Workers (https://kaya.radilov-k.workers.dev/)**: `app.js:374 Mic error: InvalidStateError: Failed to construct 'AudioWorkletNode': AudioWorkletNode cannot be created: AudioWorklet does not have a valid AudioWorkletGlobalScope. Load a script via audioWorklet.addModule() first.`
+1. **Workers (https://aiva.radilov-k.workers.dev/)**: `app.js:374 Mic error: InvalidStateError: Failed to construct 'AudioWorkletNode': AudioWorkletNode cannot be created: AudioWorklet does not have a valid AudioWorkletGlobalScope. Load a script via audioWorklet.addModule() first.`
 2. **GitHub/локален файл**: `app.js:450 Load tasks error: SyntaxError: Unexpected token '<'`
 
 ### Причина
@@ -286,7 +286,7 @@
 ## 2026-06-07: Имплементация на план за нови функции
 
 ### Задача
-Пълна имплементация на 6-точковия план за нови функции на KAYA:
+Пълна имплементация на 6-точковия план за нови функции на AIVA:
 1. Синхронизация с календар + настройки
 2. Гласово управление на задачи (четене/редакция/изтриване)
 3. Обсъждане на задачи + интернет достъп
@@ -337,9 +337,9 @@
 - [x] `searchTasks()`, `getTasksForDate()`, `getUpcomingTasks()` функции в tasks.ts
 
 #### Capacitor APK
-- [x] `capacitor.config.json` — конфигурация за `com.kaya.assistant`
+- [x] `capacitor.config.json` — конфигурация за `com.aiva.assistant`
 - [x] `.github/workflows/build-apk.yml` — CI/CD pipeline за автоматичен APK build
 - [x] `android-res/patch-local-notifications.py` — патч за AndroidManifest (пермисии + receiver)
-- [x] `android-res/java/.../KayaNotificationReceiver.java` — BroadcastReceiver за action бутони
+- [x] `android-res/java/.../AivaNotificationReceiver.java` — BroadcastReceiver за action бутони
 - [x] `android-res/proguard-rules.pro` — ProGuard конфигурация
 - [x] `.gitignore` обновен за android/ и capacitor-shell/

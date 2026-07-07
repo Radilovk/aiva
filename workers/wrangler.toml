@@ -1,4 +1,4 @@
-name = "kaya"
+name = "aiva"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
@@ -7,7 +7,7 @@ crons = ["0 19 * * *"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "kaya-db"
+database_name = "aiva-db"
 database_id = "3e660ebf-11b1-47c3-b2c8-752d039dd7dc"
 
 [[kv_namespaces]]

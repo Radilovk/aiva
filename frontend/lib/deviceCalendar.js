@@ -1,5 +1,5 @@
 /**
- * KAYA Device Calendar
+ * AIVA Device Calendar
  * Saves a task as an event into the calendar app used on the device itself.
  *
  * Strategy:
@@ -9,7 +9,7 @@
  */
 (function () {
   function getReminderOptions() {
-    const settings = window.KAYA_SETTINGS?.loadAssistantSettings?.() || {};
+    const settings = window.AIVA_SETTINGS?.loadAssistantSettings?.() || {};
     return {
       reminderMinutes: settings.notifications?.reminderMinutes ?? 15,
       remindAtStart: settings.notifications?.remindAtStart !== false,
@@ -17,7 +17,7 @@
   }
 
   function buildICS(task, options = {}) {
-    const ics = window.KAYA_ICS;
+    const ics = window.AIVA_ICS;
     if (!ics) {
       throw new Error('ICS utilities not loaded');
     }
@@ -54,9 +54,9 @@
       throw new Error('Задачата няма дата — не може да се добави в календара');
     }
 
-    const fileName = `kaya-${task.id || 'task'}.ics`;
+    const fileName = `aiva-${task.id || 'task'}.ics`;
     return shareOrDownloadICS(task, ics, fileName);
   }
 
-  window.KAYA_CALENDAR = { addToDevice, buildICS, shareOrDownloadICS };
+  window.AIVA_CALENDAR = { addToDevice, buildICS, shareOrDownloadICS };
 })();

@@ -2,15 +2,15 @@
  * Intuitive calendar + notification setup — shown in-context when it matters.
  */
 (function () {
-  const DISMISS_KEY = 'kaya_calendar_dismissed_until';
+  const DISMISS_KEY = 'aiva_calendar_dismissed_until';
   const DISMISS_DAYS = 14;
 
   function t(key) {
-    return window.KAYA_I18N?.t?.(key) ?? key;
+    return window.AIVA_I18N?.t?.(key) ?? key;
   }
 
   function tf(key, vars) {
-    return window.KAYA_I18N?.tf?.(key, vars) ?? t(key);
+    return window.AIVA_I18N?.tf?.(key, vars) ?? t(key);
   }
 
   function isNative() {
@@ -67,7 +67,7 @@
   }
 
   function saveCalendarSettings(patch) {
-    const { loadAssistantSettings, saveAssistantSettings } = window.KAYA_SETTINGS;
+    const { loadAssistantSettings, saveAssistantSettings } = window.AIVA_SETTINGS;
     const current = loadAssistantSettings();
     saveAssistantSettings({
       ...current,
@@ -76,7 +76,7 @@
   }
 
   function saveNotificationSettings(patch) {
-    const { loadAssistantSettings, saveAssistantSettings } = window.KAYA_SETTINGS;
+    const { loadAssistantSettings, saveAssistantSettings } = window.AIVA_SETTINGS;
     const current = loadAssistantSettings();
     saveAssistantSettings({
       ...current,
@@ -85,7 +85,7 @@
   }
 
   function isConfigured() {
-    const sync = window.KAYA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
+    const sync = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
     return sync.setupComplete && sync.provider && sync.provider !== 'none';
   }
 
@@ -99,8 +99,8 @@
   function updateHeaderStatus() {
     const chip = document.getElementById('calendarSyncChip');
     if (!chip) return;
-    const sync = window.KAYA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
-    const notif = window.KAYA_SETTINGS?.loadAssistantSettings?.()?.notifications || {};
+    const sync = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
+    const notif = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications || {};
 
     if (sync.setupComplete && sync.provider === 'subscribe') {
       chip.hidden = false;
@@ -139,7 +139,7 @@
     const text = document.getElementById('calendarOnboardText');
     const deviceBtn = document.getElementById('calendarOnboardDevice');
 
-    const platformLabel = window.KAYA_NATIVE_CALENDAR?.getPlatformLabel?.() || getProviderLabel(provider);
+    const platformLabel = window.AIVA_NATIVE_CALENDAR?.getPlatformLabel?.() || getProviderLabel(provider);
 
     if (text) {
       text.textContent = task?.content
@@ -178,8 +178,8 @@
   }
 
   async function enableNotifications() {
-    if (!window.KAYA_NOTIFIER) return false;
-    const granted = await window.KAYA_NOTIFIER.requestPermission();
+    if (!window.AIVA_NOTIFIER) return false;
+    const granted = await window.AIVA_NOTIFIER.requestPermission();
     saveNotificationSettings({ enabled: granted });
     return granted;
   }
@@ -196,14 +196,14 @@
 
     await enableNotifications();
 
-    const sync = window.KAYA_CALENDAR_SYNC;
+    const sync = window.AIVA_CALENDAR_SYNC;
     if (sync) {
       sync.openSubscribe(provider || detectPreferredProvider());
     }
 
     updateHeaderStatus();
     updateBanner(false);
-    window.dispatchEvent(new CustomEvent('kaya:calendar-connected'));
+    window.dispatchEvent(new CustomEvent('aiva:calendar-connected'));
   }
 
   async function enableNativeSync(task) {
@@ -217,9 +217,9 @@
 
     await enableNotifications();
 
-    if (task?.due_date && window.KAYA_NATIVE_CALENDAR) {
+    if (task?.due_date && window.AIVA_NATIVE_CALENDAR) {
       try {
-        await window.KAYA_NATIVE_CALENDAR.addToDeviceCalendar(task);
+        await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
       } catch (e) {
         if (e?.name !== 'AbortError') console.warn('Native calendar setup:', e);
       }
@@ -227,7 +227,7 @@
 
     updateHeaderStatus();
     updateBanner(false);
-    window.dispatchEvent(new CustomEvent('kaya:calendar-connected'));
+    window.dispatchEvent(new CustomEvent('aiva:calendar-connected'));
   }
 
   async function enableDevicePerTask(task) {
@@ -240,9 +240,9 @@
 
     await enableNotifications();
 
-    if (task?.due_date && window.KAYA_NATIVE_CALENDAR) {
+    if (task?.due_date && window.AIVA_NATIVE_CALENDAR) {
       try {
-        await window.KAYA_NATIVE_CALENDAR.addToDeviceCalendar(task);
+        await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
       } catch (e) {
         if (e?.name !== 'AbortError') console.warn('Device calendar export:', e);
       }
@@ -250,7 +250,7 @@
 
     updateHeaderStatus();
     updateBanner(false);
-    window.dispatchEvent(new CustomEvent('kaya:calendar-connected'));
+    window.dispatchEvent(new CustomEvent('aiva:calendar-connected'));
   }
 
   function maybePrompt(task) {
@@ -325,7 +325,7 @@
     });
   }
 
-  window.KAYA_CALENDAR_ONBOARD = {
+  window.AIVA_CALENDAR_ONBOARD = {
     detectPreferredProvider,
     detectRecommendedMode,
     isConfigured,

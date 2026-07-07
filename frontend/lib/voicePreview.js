@@ -7,8 +7,8 @@
   let previewAborted = false;
 
   async function fetchToken() {
-    const { API_BASE } = window.KAYA_CONFIG;
-    const userId = localStorage.getItem('kaya_user_id') || '';
+    const { API_BASE } = window.AIVA_CONFIG;
+    const userId = localStorage.getItem('aiva_user_id') || '';
     const res = await fetch(`${API_BASE}/api/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -22,8 +22,8 @@
   }
 
   function getPreviewInstruction(language) {
-    const phrase = window.KAYA_I18N?.t?.('voicePreviewPhrase') || 'Hello, I am KAYA.';
-    const langInstruction = window.KAYA_I18N?.getLanguageInstruction?.(language)
+    const phrase = window.AIVA_I18N?.t?.('voicePreviewPhrase') || 'Hello, I am KAYA.';
+    const langInstruction = window.AIVA_I18N?.getLanguageInstruction?.(language)
       || 'Speak in the user\'s selected language.';
     return `${langInstruction}\nSay exactly this short sample phrase aloud, nothing else: "${phrase}"`;
   }
@@ -109,7 +109,7 @@
     });
   }
 
-  window.KAYA_VOICE_PREVIEW = {
+  window.AIVA_VOICE_PREVIEW = {
     previewVoice,
     stopPreview,
   };

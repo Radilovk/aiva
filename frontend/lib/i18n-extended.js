@@ -1,5 +1,5 @@
 /**
- * Extended UI strings — merged into KAYA_I18N at load time.
+ * Extended UI strings — merged into AIVA_I18N at load time.
  */
 (function () {
   const EXT = {
@@ -1975,7 +1975,7 @@
     "todayPrefix": "Днес"
   }
 };
-  if (window.KAYA_I18N) {
-    window.KAYA_I18N.mergeStrings(EXT);
+  if (window.AIVA_I18N) {
+    window.AIVA_I18N.mergeStrings(EXT);
   }
 })();

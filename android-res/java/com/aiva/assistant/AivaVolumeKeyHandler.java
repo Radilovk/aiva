@@ -1,19 +1,19 @@
-package com.kaya.assistant;
+package com.aiva.assistant;
 
 import android.content.Context;
 import android.content.Intent;
 import android.view.KeyEvent;
 
 /**
- * Detects repeated volume key presses for the KAYA hardware shortcut.
+ * Detects repeated volume key presses for the AIVA hardware shortcut.
  */
-public class KayaVolumeKeyHandler {
+public class AivaVolumeKeyHandler {
 
     public interface TriggerListener {
         void onShortcutTriggered(Context context);
     }
 
-    private static final KayaVolumeKeyHandler INSTANCE = new KayaVolumeKeyHandler();
+    private static final AivaVolumeKeyHandler INSTANCE = new AivaVolumeKeyHandler();
 
     private boolean enabled = false;
     private String button = "volume_up";
@@ -24,7 +24,7 @@ public class KayaVolumeKeyHandler {
     private long lastPressTime = 0;
     private TriggerListener listener;
 
-    public static KayaVolumeKeyHandler getInstance() {
+    public static AivaVolumeKeyHandler getInstance() {
         return INSTANCE;
     }
 

@@ -1,4 +1,4 @@
-package com.kaya.assistant;
+package com.aiva.assistant;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -9,10 +9,10 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-@CapacitorPlugin(name = "KayaShortcut")
-public class KayaShortcutPlugin extends Plugin {
+@CapacitorPlugin(name = "AivaShortcut")
+public class AivaShortcutPlugin extends Plugin {
 
-    private static final String PREFS = "kaya_shortcut_prefs";
+    private static final String PREFS = "aiva_shortcut_prefs";
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_BUTTON = "button";
     private static final String KEY_PRESS_COUNT = "press_count";
@@ -21,7 +21,7 @@ public class KayaShortcutPlugin extends Plugin {
     @Override
     public void load() {
         super.load();
-        KayaVolumeKeyHandler.getInstance().setListener(KayaShortcutLauncher::launchListening);
+        AivaVolumeKeyHandler.getInstance().setListener(AivaShortcutLauncher::launchListening);
         reloadHandlerFromPrefs();
     }
 
@@ -34,7 +34,7 @@ public class KayaShortcutPlugin extends Plugin {
         boolean enabled = prefs.getBoolean(KEY_ENABLED, false);
         String button = prefs.getString(KEY_BUTTON, "volume_up");
         int pressCount = prefs.getInt(KEY_PRESS_COUNT, 3);
-        KayaVolumeKeyHandler.getInstance().configure(enabled, button, pressCount);
+        AivaVolumeKeyHandler.getInstance().configure(enabled, button, pressCount);
     }
 
     @PluginMethod
@@ -61,26 +61,26 @@ public class KayaShortcutPlugin extends Plugin {
     @PluginMethod
     public void getPendingLaunch(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("pending", KayaShortcutLauncher.consumePendingLaunch(getContext()));
+        result.put("pending", AivaShortcutLauncher.consumePendingLaunch(getContext()));
         call.resolve(result);
     }
 
     @PluginMethod
     public void clearPendingLaunch(PluginCall call) {
-        KayaShortcutLauncher.clearPendingLaunch(getContext());
+        AivaShortcutLauncher.clearPendingLaunch(getContext());
         call.resolve();
     }
 
     @PluginMethod
     public void openAccessibilitySettings(PluginCall call) {
-        KayaShortcutLauncher.openAccessibilitySettings(getContext());
+        AivaShortcutLauncher.openAccessibilitySettings(getContext());
         call.resolve();
     }
 
     @PluginMethod
     public void isAccessibilityEnabled(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("enabled", KayaShortcutLauncher.isAccessibilityServiceEnabled(getContext()));
+        result.put("enabled", AivaShortcutLauncher.isAccessibilityServiceEnabled(getContext()));
         call.resolve(result);
     }
 

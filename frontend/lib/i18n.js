@@ -636,7 +636,7 @@
     }
   }
 
-  window.KAYA_I18N = {
+  window.AIVA_I18N = {
     SUPPORTED_LANGUAGES,
     STRINGS,
     LANGUAGE_INSTRUCTIONS,
