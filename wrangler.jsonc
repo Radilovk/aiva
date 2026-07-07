@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "kaya",
+  "name": "aiva",
   "main": "workers/src/index.ts",
   "compatibility_date": "2026-06-02",
   "observability": {
