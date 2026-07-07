@@ -44,13 +44,30 @@ public class AivaVolumeKeyHandler {
         lastPressTime = 0;
     }
 
+    private boolean matchesButton(int keyCode, String button) {
+        if ("volume_up".equals(button)) {
+            return keyCode == KeyEvent.KEYCODE_VOLUME_UP;
+        }
+        if ("volume_down".equals(button)) {
+            return keyCode == KeyEvent.KEYCODE_VOLUME_DOWN;
+        }
+        if ("headset".equals(button)) {
+            return keyCode == KeyEvent.KEYCODE_HEADSETHOOK
+                || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
+        }
+        if ("camera".equals(button)) {
+            return keyCode == KeyEvent.KEYCODE_CAMERA
+                || keyCode == KeyEvent.KEYCODE_FOCUS;
+        }
+        return false;
+    }
+
     public boolean handleKeyEvent(Context context, int keyCode, KeyEvent event) {
         if (!enabled || event == null || event.getAction() != KeyEvent.ACTION_DOWN) {
             return false;
         }
 
-        boolean isTarget = ("volume_up".equals(button) && keyCode == KeyEvent.KEYCODE_VOLUME_UP)
-            || ("volume_down".equals(button) && keyCode == KeyEvent.KEYCODE_VOLUME_DOWN);
+        boolean isTarget = matchesButton(keyCode, button);
         if (!isTarget) {
             return false;
         }

@@ -1,60 +1,115 @@
 /**
- * All 30 prebuilt voices supported by Google Gemini Live API.
+ * All 30 prebuilt HD voices supported by Google Gemini Live API.
  * @see https://ai.google.dev/gemini-api/docs/speech-generation
  */
 (function () {
   const GEMINI_LIVE_VOICES = [
-    { name: 'Zephyr', character: 'Bright' },
-    { name: 'Puck', character: 'Upbeat' },
+    { name: 'Achernar', character: 'Soft' },
+    { name: 'Achird', character: 'Friendly' },
+    { name: 'Algenib', character: 'Gravelly' },
+    { name: 'Algieba', character: 'Smooth' },
+    { name: 'Alnilam', character: 'Firm' },
+    { name: 'Aoede', character: 'Breezy' },
+    { name: 'Autonoe', character: 'Bright' },
+    { name: 'Callirrhoe', character: 'Easy-going' },
     { name: 'Charon', character: 'Informative' },
-    { name: 'Kore', character: 'Firm' },
+    { name: 'Despina', character: 'Smooth' },
+    { name: 'Enceladus', character: 'Breathy' },
+    { name: 'Erinome', character: 'Clear' },
     { name: 'Fenrir', character: 'Excitable' },
+    { name: 'Gacrux', character: 'Mature' },
+    { name: 'Iapetus', character: 'Clear' },
+    { name: 'Kore', character: 'Firm' },
+    { name: 'Laomedeia', character: 'Upbeat' },
     { name: 'Leda', character: 'Youthful' },
     { name: 'Orus', character: 'Firm' },
-    { name: 'Aoede', character: 'Breezy' },
-    { name: 'Callirrhoe', character: 'Easy-going' },
-    { name: 'Autonoe', character: 'Bright' },
-    { name: 'Enceladus', character: 'Breathy' },
-    { name: 'Iapetus', character: 'Clear' },
-    { name: 'Umbriel', character: 'Easy-going' },
-    { name: 'Algenib', character: 'Gravelly' },
-    { name: 'Despina', character: 'Smooth' },
-    { name: 'Erinome', character: 'Clear' },
-    { name: 'Laomedeia', character: 'Upbeat' },
-    { name: 'Achernar', character: 'Soft' },
-    { name: 'Algieba', character: 'Smooth' },
-    { name: 'Schedar', character: 'Even' },
-    { name: 'Gacrux', character: 'Mature' },
+    { name: 'Puck', character: 'Upbeat' },
     { name: 'Pulcherrima', character: 'Forward' },
-    { name: 'Achird', character: 'Friendly' },
-    { name: 'Zubenelgenubi', character: 'Casual' },
-    { name: 'Vindemiatrix', character: 'Gentle' },
+    { name: 'Rasalgethi', character: 'Informative' },
     { name: 'Sadachbia', character: 'Lively' },
     { name: 'Sadaltager', character: 'Knowledgeable' },
+    { name: 'Schedar', character: 'Even' },
     { name: 'Sulafat', character: 'Warm' },
-    { name: 'Alnilam', character: 'Firm' },
-    { name: 'Rasalgethi', character: 'Informative' },
+    { name: 'Umbriel', character: 'Easy-going' },
+    { name: 'Vindemiatrix', character: 'Gentle' },
+    { name: 'Zephyr', character: 'Bright' },
+    { name: 'Zubenelgenubi', character: 'Casual' },
   ];
 
-  function populateVoiceSelect(selectEl, selectedVoice) {
+  const CHARACTER_ORDER = [
+    'Bright', 'Upbeat', 'Youthful', 'Lively', 'Excitable', 'Breezy', 'Warm',
+    'Friendly', 'Gentle', 'Soft', 'Casual', 'Easy-going', 'Smooth', 'Clear',
+    'Even', 'Firm', 'Forward', 'Mature', 'Knowledgeable', 'Informative',
+    'Breathy', 'Gravelly',
+  ];
+
+  function groupVoicesByCharacter(voices) {
+    const groups = new Map();
+    for (const voice of voices) {
+      const key = voice.character || 'Other';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(voice);
+    }
+    const ordered = [];
+    for (const character of CHARACTER_ORDER) {
+      if (groups.has(character)) {
+        ordered.push({ character, voices: groups.get(character) });
+        groups.delete(character);
+      }
+    }
+    for (const [character, list] of groups) {
+      ordered.push({ character, voices: list });
+    }
+    return ordered;
+  }
+
+  function populateVoiceSelect(selectEl, selectedVoice, filter = '') {
     if (!selectEl) return;
     const current = selectedVoice || selectEl.value;
+    const query = String(filter || '').trim().toLowerCase();
+    const filtered = query
+      ? GEMINI_LIVE_VOICES.filter((v) =>
+        v.name.toLowerCase().includes(query) || v.character.toLowerCase().includes(query))
+      : GEMINI_LIVE_VOICES;
+
     selectEl.innerHTML = '';
-    for (const voice of GEMINI_LIVE_VOICES) {
-      const opt = document.createElement('option');
-      opt.value = voice.name;
-      opt.textContent = `${voice.name} — ${voice.character}`;
-      selectEl.appendChild(opt);
+    for (const group of groupVoicesByCharacter(filtered)) {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = group.character;
+      for (const voice of group.voices) {
+        const opt = document.createElement('option');
+        opt.value = voice.name;
+        opt.textContent = `${voice.name} — ${voice.character}`;
+        optgroup.appendChild(opt);
+      }
+      selectEl.appendChild(optgroup);
     }
-    if (current && GEMINI_LIVE_VOICES.some((v) => v.name === current)) {
+
+    if (current && filtered.some((v) => v.name === current)) {
       selectEl.value = current;
-    } else if (GEMINI_LIVE_VOICES.length) {
-      selectEl.value = GEMINI_LIVE_VOICES.find((v) => v.name === 'Kore')?.name || GEMINI_LIVE_VOICES[0].name;
+    } else if (filtered.length) {
+      const fallback = filtered.find((v) => v.name === 'Kore') || filtered[0];
+      selectEl.value = fallback.name;
     }
+
+    const hint = document.getElementById('voiceCountHint');
+    if (hint) {
+      const total = GEMINI_LIVE_VOICES.length;
+      const shown = filtered.length;
+      const base = window.AIVA_I18N?.t?.('voiceCountHint') || `${total} HD voices from Google Gemini Live (full list)`;
+      hint.textContent = query && shown !== total
+        ? `${shown} / ${total} — ${base}`
+        : base.replace('{count}', String(total));
+    }
+  }
+
+  function filterVoiceSelect(selectEl, query) {
+    populateVoiceSelect(selectEl, selectEl?.value, query);
   }
 
   window.AIVA_VOICES = {
     GEMINI_LIVE_VOICES,
     populateVoiceSelect,
+    filterVoiceSelect,
   };
 })();

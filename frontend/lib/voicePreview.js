@@ -5,10 +5,17 @@
   let previewClient = null;
   let previewPlayer = null;
   let previewAborted = false;
+  let previewEnding = false;
+
+  function getUserId() {
+    return localStorage.getItem('kaya_user_id')
+      || localStorage.getItem('aiva_user_id')
+      || '';
+  }
 
   async function fetchToken() {
     const { API_BASE } = window.AIVA_CONFIG;
-    const userId = localStorage.getItem('aiva_user_id') || '';
+    const userId = getUserId();
     const res = await fetch(`${API_BASE}/api/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -28,8 +35,17 @@
     return `${langInstruction}\nSay exactly this short sample phrase aloud, nothing else: "${phrase}"`;
   }
 
+  async function finishPreview(resolve) {
+    if (previewPlayer) {
+      await previewPlayer.waitForDrain(12000);
+    }
+    await stopPreview();
+    resolve?.();
+  }
+
   async function stopPreview() {
     previewAborted = true;
+    previewEnding = false;
     if (previewClient?.webSocket) {
       try {
         previewClient.webSocket.close();
@@ -50,6 +66,10 @@
   async function previewVoice(opts) {
     await stopPreview();
     previewAborted = false;
+    previewEnding = false;
+
+    previewPlayer = new AudioPlayer();
+    await previewPlayer.init();
 
     const token = await fetchToken();
     const model = opts.model || 'gemini-3.1-flash-live-preview';
@@ -67,8 +87,15 @@
       client.systemInstructions = 'You are a voice preview assistant. Only speak the requested sample phrase. Do not use tools. Keep it brief.';
 
       const timeout = setTimeout(() => {
-        stopPreview().then(resolve).catch(resolve);
-      }, 15000);
+        finishPreview(resolve).catch(resolve);
+      }, 20000);
+
+      const onTurnComplete = () => {
+        if (previewAborted || previewEnding) return;
+        previewEnding = true;
+        clearTimeout(timeout);
+        finishPreview(resolve).catch(resolve);
+      };
 
       client.onReceiveResponse = async (message) => {
         if (previewAborted) return;
@@ -77,15 +104,10 @@
             client.sendTextMessage(getPreviewInstruction(opts.language || 'bg'));
             break;
           case MultimodalLiveResponseType.AUDIO:
-            if (!previewPlayer) {
-              previewPlayer = new AudioPlayer();
-              await previewPlayer.init();
-            }
             await previewPlayer.play(message.data);
             break;
           case MultimodalLiveResponseType.TURN_COMPLETE:
-            clearTimeout(timeout);
-            setTimeout(() => stopPreview().then(resolve).catch(resolve), 400);
+            onTurnComplete();
             break;
           case MultimodalLiveResponseType.ERROR:
             clearTimeout(timeout);
@@ -102,7 +124,10 @@
       };
 
       client.onClose = () => {
-        clearTimeout(timeout);
+        if (!previewEnding && !previewAborted) {
+          clearTimeout(timeout);
+          finishPreview(resolve).catch(resolve);
+        }
       };
 
       client.connect();
