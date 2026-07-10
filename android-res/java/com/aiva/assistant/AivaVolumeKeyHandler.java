@@ -37,10 +37,21 @@ public class AivaVolumeKeyHandler {
     }
 
     public void configure(boolean enabled, String button, int pressCount) {
+        String nextButton = button != null ? button : "volume_up";
+        int nextPressCount = Math.max(2, Math.min(5, pressCount));
+        // Reset the press sequence only when the config actually changes.
+        // configure() runs on every key event (via reloadFromPrefs), so an
+        // unconditional reset() here wiped the counter and the shortcut
+        // could never reach pressCount.
+        boolean changed = this.enabled != enabled
+            || !this.button.equals(nextButton)
+            || this.pressCount != nextPressCount;
         this.enabled = enabled;
-        this.button = button != null ? button : "volume_up";
-        this.pressCount = Math.max(2, Math.min(5, pressCount));
-        reset();
+        this.button = nextButton;
+        this.pressCount = nextPressCount;
+        if (changed) {
+            reset();
+        }
     }
 
     public void reloadFromPrefs(Context context) {
@@ -74,6 +85,11 @@ public class AivaVolumeKeyHandler {
 
         if (!matchesButton(keyCode, button)) {
             return false;
+        }
+
+        // Auto-repeat while the button is held must not count as extra presses.
+        if (event.getRepeatCount() != 0) {
+            return true;
         }
 
         long now = System.currentTimeMillis();

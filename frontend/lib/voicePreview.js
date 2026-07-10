@@ -8,8 +8,8 @@
   let cachedTokenExpiresAt = 0;
 
   function getUserId() {
-    return localStorage.getItem('kaya_user_id')
-      || localStorage.getItem('aiva_user_id')
+    return localStorage.getItem('aiva_user_id')
+      || localStorage.getItem('kaya_user_id')
       || '';
   }
 

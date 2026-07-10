@@ -32,6 +32,9 @@ interface Env {
   DB: D1Database;
   SESSIONS: KVNamespace;
   GEMINI_API_KEY: string;
+  MAX_SESSIONS_PER_DAY?: string;
+  MAX_SESSIONS_PER_IP?: string;
+  MAX_PREVIEWS_PER_IP?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_REDIRECT_URI?: string;
@@ -41,15 +44,48 @@ interface Env {
   MICROSOFT_TENANT_ID?: string;
 }
 
-// --- Cost protection constants ---
-const MAX_SESSIONS_PER_DAY = 50;
+// --- Cost protection: daily limits (overridable via wrangler vars) ---
+const DEFAULT_MAX_SESSIONS_PER_DAY = 15;
+const DEFAULT_MAX_SESSIONS_PER_IP = 40;
+const DEFAULT_MAX_PREVIEWS_PER_IP = 10;
+
+function envInt(value: string | undefined, fallback: number): number {
+  const parsed = parseInt(value || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** Increments a per-day KV counter; returns false when the limit is reached. */
+async function incrementDailyLimit(kv: KVNamespace, key: string, limit: number): Promise<boolean> {
+  const fullKey = `${key}:${new Date().toISOString().slice(0, 10)}`;
+  const current = parseInt((await kv.get(fullKey)) || '0', 10);
+  if (current >= limit) return false;
+  await kv.put(fullKey, String(current + 1), { expirationTtl: 86400 });
+  return true;
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+const ALLOWED_ORIGINS = new Set([
+  'https://aiva.radilov-k.workers.dev',
+  'https://radilovk.github.io',
+  'https://localhost', // Capacitor Android shell
+  'capacitor://localhost', // Capacitor iOS shell
+]);
+
+function isAllowedOrigin(origin: string): boolean {
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
 
 const app = new Hono<{ Bindings: Env }>();
 
 app.use(
   '*',
   cors({
-    origin: (origin) => origin || '*',
+    origin: (origin) => (origin && isAllowedOrigin(origin) ? origin : ''),
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type'],
   })
@@ -70,13 +106,21 @@ app.get('/api/tasks/:user_id', async (c) => {
 
 app.patch('/api/tasks/:id/done', async (c) => {
   const id = parseInt(c.req.param('id'), 10);
-  const success = await markTaskDone(c.env.DB, id);
-  if (!success) return c.json({ error: 'Задачата не е намерена' }, 404);
-  const updatedTask = await getTaskById(c.env.DB, id);
-  if (updatedTask) {
-    await removeTaskFromCloudCalendars(c.env, updatedTask.user_id, updatedTask.id, requestOrigin(new URL(c.req.url)));
+  if (!Number.isFinite(id)) {
+    return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
   }
-  return c.json({ success: true });
+  const result = await markTaskDone(c.env.DB, id);
+  if (!result.changed) return c.json({ error: 'Задачата не е намерена' }, 404);
+
+  const origin = requestOrigin(new URL(c.req.url));
+  if (result.task) {
+    c.executionCtx.waitUntil(removeTaskFromCloudCalendars(c.env, result.task.user_id, result.task.id, origin));
+  }
+  // Recurring task: sync the auto-created next occurrence in the background
+  if (result.next) {
+    c.executionCtx.waitUntil(syncTaskToCloudCalendars(c.env, result.next, origin));
+  }
+  return c.json({ success: true, next_task: result.next ?? null });
 });
 
 app.patch('/api/tasks/:id', async (c) => {
@@ -121,7 +165,7 @@ app.patch('/api/tasks/:id', async (c) => {
       body.user_id
     );
     if (!task) return c.json({ error: 'Задачата не е намерена' }, 404);
-    await syncTaskToCloudCalendars(c.env, task, requestOrigin(new URL(c.req.url)));
+    c.executionCtx.waitUntil(syncTaskToCloudCalendars(c.env, task, requestOrigin(new URL(c.req.url))));
     return c.json({ success: true, task });
   } catch (e) {
     console.error('Task update error:', e);
@@ -142,7 +186,9 @@ app.delete('/api/tasks/:id', async (c) => {
     const success = await deleteTask(c.env.DB, id, body.user_id);
     if (!success) return c.json({ error: 'Задачата не е намерена' }, 404);
     if (existingTask) {
-      await removeTaskFromCloudCalendars(c.env, existingTask.user_id, existingTask.id, requestOrigin(new URL(c.req.url)));
+      c.executionCtx.waitUntil(
+        removeTaskFromCloudCalendars(c.env, existingTask.user_id, existingTask.id, requestOrigin(new URL(c.req.url)))
+      );
     }
     return c.json({ success: true });
   } catch (e) {
@@ -198,12 +244,17 @@ app.post('/api/token', async (c) => {
   const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as any));
   const userId = body?.user_id || 'anonymous';
 
-  const rateLimitKey = `rate:${userId}:${new Date().toISOString().slice(0, 10)}`;
-  const currentCount = parseInt(await c.env.SESSIONS.get(rateLimitKey) || '0', 10);
-  if (currentCount >= MAX_SESSIONS_PER_DAY) {
-    return c.json({ error: 'Достигнат е дневният лимит от сесии. Опитайте утре.' }, 429);
+  // Двоен дневен лимит: по потребител + по IP (user_id идва от клиента и може да се ротира)
+  const userLimit = envInt(c.env.MAX_SESSIONS_PER_DAY, DEFAULT_MAX_SESSIONS_PER_DAY);
+  const ipLimit = envInt(c.env.MAX_SESSIONS_PER_IP, DEFAULT_MAX_SESSIONS_PER_IP);
+  const ip = c.req.header('cf-connecting-ip') || 'unknown';
+
+  if (!(await incrementDailyLimit(c.env.SESSIONS, `rate:${userId}`, userLimit))) {
+    return c.json({ error: 'Достигнат е дневният лимит от гласови сесии. Опитайте утре.' }, 429);
   }
-  await c.env.SESSIONS.put(rateLimitKey, String(currentCount + 1), { expirationTtl: 86400 });
+  if (!(await incrementDailyLimit(c.env.SESSIONS, `rate:ip:${ip}`, ipLimit))) {
+    return c.json({ error: 'Достигнат е дневният лимит от гласови сесии за тази мрежа. Опитайте утре.' }, 429);
+  }
 
   const now = new Date();
   const expireTime = new Date(now.getTime() + 30 * 60 * 1000); // 30 min
@@ -239,8 +290,19 @@ app.post('/api/voice-preview', async (c) => {
     language?: string;
   }>().catch(() => ({} as { voice_name?: string; text?: string; language?: string }));
 
-  const voiceName = body.voice_name || 'Kore';
-  const text = body.text || 'Здравейте! Аз съм KAYA. С какво мога да ви помогна?';
+  const voiceName = /^[A-Za-z][A-Za-z -]{0,30}$/.test(body.voice_name || '') ? body.voice_name! : 'Kore';
+  const text = (body.text || 'Здравейте! Аз съм KAYA. С какво мога да ви помогна?').slice(0, 120);
+
+  // Кеш по глас+текст: гласовете са краен брой, така TTS API се вика веднъж на комбинация
+  const cacheKey = `tts:${voiceName}:${await sha256Hex(text)}`;
+  const cached = await c.env.SESSIONS.get(cacheKey, 'json') as { audio: string; mime_type: string } | null;
+  if (cached?.audio) return c.json(cached);
+
+  const previewLimit = envInt(c.env.MAX_PREVIEWS_PER_IP, DEFAULT_MAX_PREVIEWS_PER_IP);
+  const ip = c.req.header('cf-connecting-ip') || 'unknown';
+  if (!(await incrementDailyLimit(c.env.SESSIONS, `rate:preview:${ip}`, previewLimit))) {
+    return c.json({ error: 'Достигнат е дневният лимит за аудио примери. Опитайте утре.' }, 429);
+  }
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${c.env.GEMINI_API_KEY}`,
@@ -274,10 +336,22 @@ app.post('/api/voice-preview', async (c) => {
     return c.json({ error: 'Липсва аудио в отговора' }, 500);
   }
 
-  return c.json({
+  const payload = {
     audio: audioB64,
     mime_type: inlineData?.mimeType || 'audio/L16;codec=pcm;rate=24000',
-  });
+  };
+  c.executionCtx.waitUntil(
+    c.env.SESSIONS.put(cacheKey, JSON.stringify(payload), { expirationTtl: 30 * 86400 })
+  );
+  return c.json(payload);
+});
+
+// --- Daily brief (generated by the evening cron, stored in KV) ---
+
+app.get('/api/brief/:user_id', async (c) => {
+  const userId = c.req.param('user_id');
+  const brief = await c.env.SESSIONS.get(`brief:${userId}`, 'json');
+  return c.json({ brief: brief ?? null });
 });
 
 // --- Save task endpoint (called directly by frontend after Gemini function call) ---
@@ -316,7 +390,7 @@ app.post('/api/tasks', async (c) => {
       repeat_rule: body.repeat_rule || null,
       tags: body.tags || null,
     });
-    await syncTaskToCloudCalendars(c.env, task, requestOrigin(new URL(c.req.url)));
+    c.executionCtx.waitUntil(syncTaskToCloudCalendars(c.env, task, requestOrigin(new URL(c.req.url))));
     return c.json({ success: true, task });
   } catch (e) {
     console.error('Task save error:', e);
@@ -557,13 +631,14 @@ app.get('/api/calendar.ics', async (c) => {
       const timeStr = task.due_time ? task.due_time.replace(':', '') + '00' : '090000';
       const dtStart = `${dateStr}T${timeStr}`;
 
+      // Wall-clock date math via Date (UTC-anchored) so events past midnight roll the date over
       const durationMin = task.estimated_minutes || 30;
-      const startH = parseInt(timeStr.slice(0, 2), 10);
-      const startM = parseInt(timeStr.slice(2, 4), 10);
-      const endTotal = startH * 60 + startM + durationMin;
-      const endH = String(Math.floor(endTotal / 60) % 24).padStart(2, '0');
-      const endM = String(endTotal % 60).padStart(2, '0');
-      const dtEnd = `${dateStr}T${endH}${endM}00`;
+      const startDate = new Date(`${task.due_date}T${task.due_time || '09:00'}:00Z`);
+      const endDate = new Date(startDate.getTime() + durationMin * 60000);
+      const p2 = (n: number) => String(n).padStart(2, '0');
+      const dtEnd =
+        `${endDate.getUTCFullYear()}${p2(endDate.getUTCMonth() + 1)}${p2(endDate.getUTCDate())}` +
+        `T${p2(endDate.getUTCHours())}${p2(endDate.getUTCMinutes())}00`;
       const modified = toICSStamp(task.updated_at || task.created_at);
 
       lines.push('BEGIN:VEVENT');
@@ -632,14 +707,6 @@ app.post('/api/push/subscribe', async (c) => {
 app.get('/', async (c) => {
   return c.redirect('/index.html');
 });
-
-// --- Stub for delete-class migration (remove after successful deploy) ---
-export class VoiceWebSocket {
-  constructor(private state: DurableObjectState, private env: Env) {}
-  async fetch(_request: Request) {
-    return new Response('This Durable Object is being deleted', { status: 410 });
-  }
-}
 
 // --- Export ---
 

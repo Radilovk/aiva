@@ -66,7 +66,20 @@ let audioPlayer = null;
 let isSessionActive = false;
 let isConnecting = false;
 let assistantSettings = loadAssistantSettings();
-let tasks = [];
+
+// Offline-first: render the last known task list instantly, then refresh from network
+const TASKS_CACHE_KEY = 'aiva_tasks_cache';
+
+function readCachedTasks() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(TASKS_CACHE_KEY) || '[]');
+    return Array.isArray(cached) ? cached : [];
+  } catch (_e) {
+    return [];
+  }
+}
+
+let tasks = readCachedTasks();
 let externalEvents = [];
 let currentDate = new Date();
 let calendarView = assistantSettings.calendar.defaultView || 'day';
@@ -464,7 +477,8 @@ function setAssistantSpeech(text) {
 const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още|anything\s+else|need\s+anything|something\s+else|还需要|还需要其他|कुछ\s+और|algo\s+más|شيء\s+آخر|autre\s+chose|besoin\s+d.autre|noch\s+etwas|brauchen\s+sie\s+noch|ещё\s+что|нужно\s+ещё/i;
 const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|no|nope|nothing|that's all|done|enough|нет|没有|नहीं|नहीं\s+धन्यवाद|no\s+gracias|لا|non|nein|ничего|спасибо,\s*нет)\b/i;
 const USER_GOODBYE_RE = /^(спри|стоп|затвори|излез|чао|довиждане|до\s*видане|goodbye|bye|stop|exit|quit)\b/i;
-const ASSISTANT_GOODBYE_RE = /\b(чао|довиждане|до\s*скоро|до\s*видане|приятен\s+ден|лека\s+нощ|оставам\s+на\s+разположение|goodbye|bye\s*bye|see\s+you|take\s+care|auf\s+wiedersehen|au\s+revoir|adiós|adios|до\s+свидания)\b/i;
+// Само изрични сбогувания — фрази като "приятен ден" се появяват и насред разговор
+const ASSISTANT_GOODBYE_RE = /\b(чао|довиждане|до\s*видане|goodbye|bye\s*bye|auf\s+wiedersehen|au\s+revoir|adiós|adios|до\s+свидания)\b/i;
 
 function detectClosingQuestion(text) {
   if (CLOSING_QUESTION_RE.test(String(text || '').toLowerCase())) {
@@ -1013,16 +1027,25 @@ function buildTasksContextForAssistant() {
     return '\n\nТЕКУЩИ ЗАДАЧИ: няма активни задачи.';
   }
 
+  let overdueCount = 0;
   const lines = tasks.slice(0, 60).map((task) => {
     const parts = [`ID ${task.id}: "${task.content}"`];
     if (task.due_date) parts.push(`дата ${task.due_date}`);
     if (task.due_time) parts.push(`час ${task.due_time}`);
     if (task.priority) parts.push(`приоритет ${task.priority}`);
     if (task.notes) parts.push(`бележки: ${String(task.notes).slice(0, 120)}`);
+    if (isTaskOverdue(task)) {
+      overdueCount++;
+      parts.push('⚠ ПРОСРОЧЕНА');
+    }
     return `- ${parts.join(', ')}`;
   });
 
-  return `\n\nТЕКУЩИ ЗАДАЧИ НА ПОТРЕБИТЕЛЯ (${tasks.length}):\n${lines.join('\n')}\n\nПри редакция, изтриване или обсъждане използвай task_id от списъка. Ако потребителят спомене задача по име, намери най-близкото съвпадение.`;
+  let context = `\n\nТЕКУЩИ ЗАДАЧИ НА ПОТРЕБИТЕЛЯ (${tasks.length}):\n${lines.join('\n')}\n\nПри редакция, изтриване или обсъждане използвай task_id от списъка. Ако потребителят спомене задача по име, намери най-близкото съвпадение.`;
+  if (overdueCount > 0) {
+    context += `\n\nИма ${overdueCount} просрочени задачи (маркирани с ⚠). При подходящ момент в разговора предложи веднъж да ги преместим за друг ден — кратко, без да настояваш.`;
+  }
+  return context;
 }
 
 async function loadCalendarEventsForAssistant() {
@@ -1258,12 +1281,66 @@ async function handleVoiceEditTask(args) {
   return { success: true, task_id: taskId, content: data.task.content, message: 'Задачата е редактирана.' };
 }
 
+// Undo за гласово изтриване — гласовото разпознаване греши, затова пазим
+// копие на задачата и даваме 8 секунди за връщане.
+let undoToastEl = null;
+let undoToastTimer = null;
+
+function hideUndoToast() {
+  if (undoToastTimer) {
+    clearTimeout(undoToastTimer);
+    undoToastTimer = null;
+  }
+  undoToastEl?.remove();
+  undoToastEl = null;
+}
+
+function showUndoToast(deletedTask) {
+  hideUndoToast();
+
+  undoToastEl = document.createElement('div');
+  undoToastEl.className = 'undo-toast';
+
+  const label = document.createElement('span');
+  label.textContent = `${t('undoDeleted')}: ${String(deletedTask.content).slice(0, 40)}`;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = t('undoAction');
+  btn.addEventListener('click', async () => {
+    hideUndoToast();
+    try {
+      await persistTask({
+        task: deletedTask.content,
+        emotion: deletedTask.emotion,
+        priority: deletedTask.priority,
+        due_date: deletedTask.due_date,
+        due_time: deletedTask.due_time,
+        estimated_minutes: deletedTask.estimated_minutes,
+        notes: deletedTask.notes,
+        location: deletedTask.location,
+        repeat_rule: deletedTask.repeat_rule,
+        tags: deletedTask.tags,
+      });
+      showToast({ content: t('undoRestored'), emotion: 'neutral', priority: 3 });
+    } catch (e) {
+      showError(e.message || t('errSave'));
+    }
+  });
+
+  undoToastEl.append(label, btn);
+  document.body.appendChild(undoToastEl);
+  undoToastTimer = setTimeout(hideUndoToast, 8000);
+}
+
 async function handleVoiceDeleteTask(args) {
   const taskId = await resolveTaskId(args);
   if (!taskId) return { error: 'Не намерих задача с това описание.' };
 
+  const snapshot = getTaskById(taskId);
   try {
     await removeTask(taskId);
+    if (snapshot) showUndoToast(snapshot);
     return { success: true, task_id: taskId, message: 'Задачата е изтрита.' };
   } catch (e) {
     return { error: e.message || 'Грешка при изтриване' };
@@ -1564,14 +1641,10 @@ async function handleGeminiMessage(message) {
         assistantTranscriptBuffer += message.data.text;
         setAssistantSpeech(assistantTranscriptBuffer);
         detectClosingQuestion(assistantTranscriptBuffer);
-        if (detectAssistantGoodbye(assistantTranscriptBuffer)) {
+        // Сбогуването се проверява само на завършен транскрипт — частичните
+        // фрагменти дават фалшиви съвпадения и затварят сесията погрешно.
+        if (message.data.finished && detectAssistantGoodbye(assistantTranscriptBuffer)) {
           scheduleSessionEnd();
-        }
-        if (message.data.finished) {
-          detectClosingQuestion(assistantTranscriptBuffer);
-          if (detectAssistantGoodbye(assistantTranscriptBuffer)) {
-            scheduleSessionEnd();
-          }
         }
       }
       break;
@@ -1675,6 +1748,17 @@ function sendSessionGreeting() {
   if (userName) {
     prompt += ` ${tf('addressUserAs', { name: userName })}`;
   }
+
+  // Проактивен бриф: при първата сесия за деня асистентът обобщава днешните задачи
+  const todayIso = toISODate(new Date());
+  if (localStorage.getItem('aiva_last_brief_date') !== todayIso) {
+    const todaysTasks = tasks.filter((task) => task.due_date === todayIso);
+    if (todaysTasks.length) {
+      prompt += ` ${tf('morningBriefPrompt', { count: todaysTasks.length })}`;
+    }
+    localStorage.setItem('aiva_last_brief_date', todayIso);
+  }
+
   client.sendTextMessage(prompt);
 }
 
@@ -2012,18 +2096,55 @@ if (upcomingList) {
   });
 }
 
-// Refresh countdowns every minute
+// Refresh countdowns every minute — update text in place instead of
+// rebuilding the whole calendar DOM.
+function updateCountdownsInPlace() {
+  document.querySelectorAll('.task-card').forEach((card) => {
+    const task = getTaskById(card.dataset.id);
+    if (!task) return;
+    const countdownEl = card.querySelector('.task-countdown');
+    if (countdownEl) countdownEl.textContent = getTaskCountdown(task);
+    card.classList.toggle('is-overdue', isTaskOverdue(task));
+  });
+}
+
 setInterval(() => {
   if (tasks.length) {
     renderUpcomingStrip();
-    renderCalendar();
+    updateCountdownsInPlace();
   }
 }, 60000);
+
+// --- Daily brief card (generated by the evening cron) ---
+const briefCard = document.getElementById('briefCard');
+const briefText = document.getElementById('briefText');
+const briefDismissBtn = document.getElementById('briefDismiss');
+
+async function loadDailyBrief() {
+  if (!briefCard || !briefText) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/brief/${encodeURIComponent(userId)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const brief = data.brief;
+    if (!brief?.text) return;
+    if (localStorage.getItem('aiva_brief_dismissed') === brief.generated_at) return;
+    briefText.textContent = brief.text;
+    briefCard.dataset.generatedAt = brief.generated_at || '';
+    briefCard.hidden = false;
+  } catch (_e) { /* офлайн — картата просто не се показва */ }
+}
+
+briefDismissBtn?.addEventListener('click', () => {
+  briefCard.hidden = true;
+  localStorage.setItem('aiva_brief_dismissed', briefCard.dataset.generatedAt || 'unknown');
+});
 
 applyPreferences();
 renderCalendar();
 loadTasks();
 refreshExternalEvents();
+loadDailyBrief();
 
 function tryAutoStartListening() {
   if (isSessionActive || isConnecting) return;

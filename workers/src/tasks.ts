@@ -204,7 +204,7 @@ export async function updateTask(
   }
 
   setClauses.push('updated_at = datetime(\'now\')');
-  if ('done' in input) {
+  if (input.done !== undefined) {
     setClauses.push(input.done ? 'completed_at = datetime(\'now\')' : 'completed_at = NULL');
   }
 
@@ -268,15 +268,84 @@ export async function duplicateTask(
   });
 }
 
-export async function markTaskDone(db: D1Database, taskId: number): Promise<boolean> {
+// --- Recurring tasks ---
+// repeat_rule is free text from voice input; recognize the common Bulgarian/English forms.
+
+const REPEAT_INTERVALS: Array<{ re: RegExp; days?: number; months?: number }> = [
+  { re: /(всеки\s+ден|всекидневно|ежедневно|daily|every\s+day)/i, days: 1 },
+  { re: /(всяка\s+седмица|ежеседмично|седмично|weekly|every\s+week)/i, days: 7 },
+  { re: /(всеки\s+месец|ежемесечно|месечно|monthly|every\s+month)/i, months: 1 },
+];
+
+function parseRepeatRule(rule: string): { days?: number; months?: number } | null {
+  const custom = rule.match(/(?:every|на\s+всеки)\s+(\d{1,3})\s+(?:days?|дни|дена|деня)/i);
+  if (custom) return { days: parseInt(custom[1], 10) };
+  for (const entry of REPEAT_INTERVALS) {
+    if (entry.re.test(rule)) return { days: entry.days, months: entry.months };
+  }
+  return null;
+}
+
+/** Next occurrence strictly after today (UTC date), advancing from due_date. */
+export function nextRepeatDate(dueDate: string, rule: string): string | null {
+  const interval = parseRepeatRule(rule);
+  if (!interval) return null;
+
+  const [y, m, d] = dueDate.split('-').map(Number);
+  if (!y || !m || !d) return null;
+
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const next = new Date(Date.UTC(y, m - 1, d));
+
+  for (let i = 0; i < 400 && next.getTime() <= todayUtc; i++) {
+    if (interval.months) next.setUTCMonth(next.getUTCMonth() + interval.months);
+    else next.setUTCDate(next.getUTCDate() + (interval.days || 1));
+  }
+  if (next.getTime() <= todayUtc) return null;
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}`;
+}
+
+export interface MarkDoneResult {
+  changed: boolean;
+  task?: Task;
+  next?: Task;
+}
+
+export async function markTaskDone(db: D1Database, taskId: number): Promise<MarkDoneResult> {
   await ensureTaskSchema(db);
 
-  const result = await db
+  const task = await db.prepare('SELECT * FROM tasks WHERE id = ?').bind(taskId).first<Task>();
+  if (!task) return { changed: false };
+
+  await db
     .prepare('UPDATE tasks SET done = 1, completed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
     .bind(taskId)
     .run();
 
-  return result.meta.changes > 0;
+  let next: Task | undefined;
+  if (!task.done && task.repeat_rule && task.due_date) {
+    const nextDate = nextRepeatDate(task.due_date, task.repeat_rule);
+    if (nextDate) {
+      next = await createTask(db, {
+        user_id: task.user_id,
+        content: task.content,
+        emotion: task.emotion,
+        priority: task.priority,
+        due_date: nextDate,
+        due_time: task.due_time,
+        estimated_minutes: task.estimated_minutes,
+        notes: task.notes,
+        location: task.location,
+        repeat_rule: task.repeat_rule,
+        tags: task.tags,
+      });
+    }
+  }
+
+  return { changed: true, task: { ...task, done: 1 }, next };
 }
 
 export async function registerUser(db: D1Database, userId: string, appToken: string): Promise<void> {
@@ -305,44 +374,3 @@ export async function searchTasks(db: D1Database, userId: string, query: string)
   return results;
 }
 
-export async function getTasksForDate(db: D1Database, userId: string, date: string): Promise<Task[]> {
-  await ensureTaskSchema(db);
-
-  const { results } = await db
-    .prepare(
-      `SELECT * FROM tasks
-       WHERE user_id = ? AND done = 0 AND due_date = ?
-       ORDER BY COALESCE(due_time, '99:99') ASC, priority ASC`
-    )
-    .bind(userId, date)
-    .all<Task>();
-
-  return results;
-}
-
-export async function getUpcomingTasks(db: D1Database, withinMinutes: number = 30): Promise<(Task & { app_token?: string })[]> {
-  await ensureTaskSchema(db);
-
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-  const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const targetMinutes = nowMinutes + withinMinutes;
-  const targetTime = `${String(Math.floor(targetMinutes / 60)).padStart(2, '0')}:${String(targetMinutes % 60).padStart(2, '0')}`;
-
-  const { results } = await db
-    .prepare(
-      `SELECT t.*, u.app_token FROM tasks t
-       LEFT JOIN users u ON t.user_id = u.id
-       WHERE t.done = 0 AND t.due_date = ? AND t.due_time IS NOT NULL
-         AND t.due_time >= ? AND t.due_time <= ?
-       ORDER BY t.due_time ASC`
-    )
-    .bind(
-      todayStr,
-      `${String(Math.floor(nowMinutes / 60)).padStart(2, '0')}:${String(nowMinutes % 60).padStart(2, '0')}`,
-      targetTime
-    )
-    .all<Task & { app_token?: string }>();
-
-  return results;
-}

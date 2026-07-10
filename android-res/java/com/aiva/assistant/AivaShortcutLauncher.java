@@ -37,9 +37,13 @@ public class AivaShortcutLauncher {
         try {
             PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
             if (pm == null) return;
+            // ACQUIRE_CAUSES_WAKEUP only turns the screen on for (deprecated)
+            // screen wake locks — with PARTIAL_WAKE_LOCK it is a no-op and the
+            // display stayed dark. The activity's turnScreenOn attributes take
+            // over once it is in the foreground.
             @SuppressWarnings("deprecation")
             PowerManager.WakeLock wakeLock = pm.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
                 "kaya:shortcut"
             );
             wakeLock.acquire(8000);

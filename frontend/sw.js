@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v13';
+const CACHE_NAME = 'aiva-v14';
 const ASSETS = [
   'index.html',
   'settings.html',
@@ -65,12 +65,29 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch — network-first for API, cache-first for assets
+// Fetch — network-first for HTML navigation (fresh app shell), cache-first for assets
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Skip non-GET and API requests
   if (event.request.method !== 'GET' || url.pathname.includes('/api/')) return;
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(event.request).then((cached) => cached || caches.match(asset('index.html')))
+        )
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
@@ -118,7 +135,8 @@ self.addEventListener('notificationclick', (event) => {
   const taskId = event.notification.data?.task_id;
 
   if (event.action === 'done' && taskId) {
-    const apiBase = self.location.origin.includes('localhost')
+    const host = self.location.hostname;
+    const apiBase = (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.github.io'))
       ? 'https://aiva.radilov-k.workers.dev'
       : self.location.origin;
     event.waitUntil(
