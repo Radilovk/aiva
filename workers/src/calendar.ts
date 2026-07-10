@@ -480,11 +480,18 @@ function buildGoogleEvent(task: Task): Record<string, unknown> | null {
   };
 }
 
+function escapeICSText(value: string | null | undefined): string {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+
 function buildAppleEventICS(task: Task): string | null {
   const range = taskDateRange(task);
   if (!range) return null;
 
-  const pad = (n: number) => String(n).padStart(2, '0');
   const toICSStamp = (iso: string) => iso.replace(/[-:]/g, '').split('.')[0] + 'Z';
 
   const dtStart = toICSStamp(range.startDateTime);
@@ -500,9 +507,9 @@ function buildAppleEventICS(task: Task): string | null {
     `DTSTAMP:${now}`,
     `DTSTART;TZID=Europe/Sofia:${dtStart.replace('Z', '')}`,
     `DTEND;TZID=Europe/Sofia:${dtEnd.replace('Z', '')}`,
-    `SUMMARY:${task.content}`,
-    `DESCRIPTION:${task.notes || ''}`,
-    `LOCATION:${task.location || ''}`,
+    `SUMMARY:${escapeICSText(task.content)}`,
+    `DESCRIPTION:${escapeICSText(task.notes)}`,
+    `LOCATION:${escapeICSText(task.location)}`,
     'END:VEVENT',
     'END:VCALENDAR',
   ];
@@ -985,6 +992,16 @@ export async function listExternalEvents(
   if (!selected) return [];
 
   if (provider === 'apple') {
+    // Parse + reformat the range instead of interpolating raw query input into XML.
+    const toCalDavStamp = (iso: string): string | null => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return null;
+      return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+    const rangeStart = toCalDavStamp(fromIso);
+    const rangeEnd = toCalDavStamp(toIso);
+    if (!rangeStart || !rangeEnd) return [];
+
     // CalDAV REPORT to fetch events in a range
     const body = `<?xml version="1.0" encoding="utf-8" ?>
       <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
@@ -992,7 +1009,7 @@ export async function listExternalEvents(
         <c:filter>
           <c:comp-filter name="VCALENDAR">
             <c:comp-filter name="VEVENT">
-              <c:time-range start="${fromIso.replace(/[-:]/g, '').split('.')[0]}Z" end="${toIso.replace(/[-:]/g, '').split('.')[0]}Z"/>
+              <c:time-range start="${rangeStart}" end="${rangeEnd}"/>
             </c:comp-filter>
           </c:comp-filter>
         </c:filter>

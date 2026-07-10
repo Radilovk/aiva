@@ -1415,6 +1415,70 @@
       padding: 10px;
     }
 
+    /* Daily brief card */
+    .brief-card {
+      margin: 0 16px 12px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+
+    .brief-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .brief-dismiss {
+      background: none;
+      border: none;
+      color: inherit;
+      opacity: 0.6;
+      font-size: 0.9rem;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+
+    .brief-card-text {
+      margin: 0;
+      opacity: 0.85;
+      white-space: pre-wrap;
+    }
+
+    /* Undo toast (voice delete) */
+    .undo-toast {
+      position: fixed;
+      bottom: calc(var(--safe-bottom) + 72px);
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(20, 20, 28, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-size: 0.82rem;
+      z-index: 110;
+    }
+
+    .undo-toast button {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
     /* Error toast */
     .error-toast {
       position: fixed;
@@ -1551,6 +1615,14 @@
       <span data-i18n="calendarBanner">Свържи календара си — задачите ще се появяват автоматично с напомняния</span>
       <button class="calendar-banner-btn" id="calendarBannerConnect" type="button" data-i18n="connectCalendar">Свържи</button>
     </div>
+
+    <section class="brief-card" id="briefCard" hidden>
+      <div class="brief-card-header">
+        <span>🌙 <span data-i18n="briefTitle">Преглед от асистента</span></span>
+        <button class="brief-dismiss" id="briefDismiss" type="button" data-i18n-aria="briefDismiss" aria-label="Скрий">✕</button>
+      </div>
+      <p class="brief-card-text" id="briefText"></p>
+    </section>
 
     <section class="upcoming-strip" id="upcomingStrip" hidden>
       <div class="upcoming-strip-header">

@@ -689,7 +689,8 @@
     }
 
     function getUserId() {
-      return localStorage.getItem('kaya_user_id') || '';
+      // app.js записва идентификатора като 'aiva_user_id'; 'kaya_user_id' е стар ключ
+      return localStorage.getItem('aiva_user_id') || localStorage.getItem('kaya_user_id') || '';
     }
 
     function applyCalendarPlatformUI() {
@@ -968,7 +969,7 @@
       if (nativeSection) nativeSection.style.display = provider === 'native' ? '' : 'none';
 
       if (provider === 'subscribe') {
-        const userId = localStorage.getItem('kaya_user_id') || 'unknown';
+        const userId = getUserId() || 'unknown';
         document.getElementById('icsUrl').value = calendarSync.getFeedUrl(userId) || `${getApiBase()}/api/calendar.ics?user_id=${encodeURIComponent(userId)}`;
       }
     }
@@ -1044,7 +1045,7 @@
         if (window.AIVA_NOTIFIER) {
           const granted = await window.AIVA_NOTIFIER.requestPermission();
           if (granted) {
-            const userId = localStorage.getItem('kaya_user_id');
+            const userId = getUserId();
             const res = await fetch(`${API_BASE || WORKER_ORIGIN}/api/tasks/${encodeURIComponent(userId)}`);
             const data = await res.json();
             await window.AIVA_NOTIFIER.scheduleAll(data.tasks || [], settings.notifications.reminderMinutes);
@@ -1073,7 +1074,7 @@
           userVisibleOnly: true,
           applicationServerKey: null,
         });
-        const userId = localStorage.getItem('kaya_user_id');
+        const userId = getUserId();
         if (userId && subscription) {
           await fetch(`${API_BASE}/api/push/subscribe`, {
             method: 'POST',
@@ -1172,7 +1173,7 @@
       try { calendarSync.openSubscribe('outlook'); } catch (e) { alert(e.message); }
     });
     document.getElementById('exportAllIcsBtn').addEventListener('click', async () => {
-      const userId = localStorage.getItem('kaya_user_id');
+      const userId = getUserId();
       try {
         const res = await fetch(`${API_BASE || WORKER_ORIGIN}/api/tasks/${encodeURIComponent(userId)}`);
         const data = await res.json();
@@ -1236,7 +1237,7 @@
     });
 
     document.getElementById('exportBtn').addEventListener('click', async () => {
-      const userId = localStorage.getItem('kaya_user_id');
+      const userId = getUserId();
       try {
         const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`);
         const data = await res.json();
@@ -1266,7 +1267,7 @@
           populateUI();
         }
         if (data.tasks?.length) {
-          const userId = localStorage.getItem('kaya_user_id');
+          const userId = getUserId();
           for (const task of data.tasks) {
             await fetch(`${API_BASE}/api/tasks`, {
               method: 'POST',

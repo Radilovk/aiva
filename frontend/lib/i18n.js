@@ -70,6 +70,12 @@
       notifications: 'Notifications',
       askAnything: 'Do you need anything else?',
       listeningGreetingPrompt: 'Greet the user briefly in one short sentence, invite them to speak, and do not use any tools.',
+      morningBriefPrompt: 'After the greeting, give a very short overview of today\'s {count} task(s) in one or two sentences and ask if anything should be rescheduled.',
+      briefTitle: 'Assistant review',
+      briefDismiss: 'Dismiss',
+      undoDeleted: 'Task deleted',
+      undoAction: 'Undo',
+      undoRestored: 'Task restored',
     },
     zh: {
       tagline: '语音任务助手',
@@ -518,6 +524,12 @@
       notifications: 'Нотификации',
       askAnything: 'Имаш ли нужда от още нещо?',
       listeningGreetingPrompt: 'Поздрави накратко с едно изречение, покани потребителя да говори и не използвай инструменти.',
+      morningBriefPrompt: 'След поздрава направи съвсем кратък преглед на днешните {count} задачи в 1-2 изречения и попитай дали да разместим нещо.',
+      briefTitle: 'Преглед от асистента',
+      briefDismiss: 'Скрий',
+      undoDeleted: 'Задачата е изтрита',
+      undoAction: 'Върни',
+      undoRestored: 'Задачата е възстановена',
     },
   };
 
