@@ -16,12 +16,8 @@
     const plugin = getPlugin();
     if (!plugin?.configure) return { ok: false, reason: 'unavailable' };
 
-    await plugin.configure({
-      enabled: !!config.enabled,
-      button: config.button || 'volume_up',
-      pressCount: config.pressCount || 3,
-      backgroundMode: !!config.backgroundMode,
-    });
+    // Тригерът е фиксиран: двата бутона за звук (+ и −) натиснати едновременно
+    await plugin.configure({ enabled: !!config.enabled });
     return { ok: true };
   }
 

@@ -73,6 +73,8 @@ jobs:
              android/app/src/main/java/com/aiva/assistant/
           cp android-res/java/com/aiva/assistant/AivaShortcutAccessibilityService.java \
              android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaDevicePlugin.java \
+             android/app/src/main/java/com/aiva/assistant/
 
       - name: Patch AndroidManifest and register AivaCalendar plugin
         run: python3 android-res/patch-local-notifications.py

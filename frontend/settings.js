@@ -92,7 +92,9 @@
       compactCalendar: false,
     },
     notifications: {
-      enabled: false,
+      // Включени по подразбиране — приложението е за напомняния; OS-ът пита
+      // за разрешение при първия старт (Android 13+).
+      enabled: true,
       reminderMinutes: 15,
       remindAtStart: true,
       quietHoursStart: '22:00',
@@ -108,10 +110,8 @@
       subscribedAt: null,
     },
     hardwareShortcut: {
+      // Тригерът е фиксиран: двата бутона за звук (+ и −) едновременно
       enabled: false,
-      button: 'volume_up',
-      pressCount: 3,
-      backgroundMode: false,
     },
   };
 

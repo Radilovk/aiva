@@ -1410,13 +1410,28 @@ async function refreshExternalEvents() {
 
 async function loadTasks() {
   try {
-    const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`);
+    // Условно опресняване: с ETag от последния отговор сървърът връща празен
+    // 304, когато нищо не е променено — кешът остава валиден без трансфер.
+    const headers = {};
+    const lastEtag = localStorage.getItem('aiva_tasks_etag');
+    if (lastEtag && localStorage.getItem(TASKS_CACHE_KEY) !== null) {
+      headers['If-None-Match'] = lastEtag;
+    }
+
+    const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`, { headers });
+    if (res.status === 304) return; // кешираните задачи са актуални
     if (!res.ok) return;
     const ct = res.headers.get('content-type');
     if (!ct?.includes('application/json')) return;
 
     const data = await res.json();
     tasks = data.tasks || [];
+    try {
+      localStorage.setItem(TASKS_CACHE_KEY, JSON.stringify(tasks));
+      const etag = res.headers.get('etag');
+      if (etag) localStorage.setItem('aiva_tasks_etag', etag);
+      else localStorage.removeItem('aiva_tasks_etag');
+    } catch (_e) { /* пълен storage — кешът е best-effort */ }
     renderCalendar();
     if (window.AIVA_CALENDAR_ONBOARD) {
       window.AIVA_CALENDAR_ONBOARD.checkAfterLoad(tasks);
@@ -2140,11 +2155,41 @@ briefDismissBtn?.addEventListener('click', () => {
   localStorage.setItem('aiva_brief_dismissed', briefCard.dataset.generatedAt || 'unknown');
 });
 
+// --- Device-specific first-run setup (Android APK) ---
+// Засича марката при първото стартиране ("инсталация") и ако телефонът има
+// агресивен battery manager (Xiaomi, Huawei, Oppo...), показва еднократен
+// банер към настройките за автостарт/батерия.
+async function initDeviceBanner() {
+  const banner = document.getElementById('deviceBanner');
+  if (!banner || !window.AIVA_DEVICE?.isAndroid?.()) return;
+  if (localStorage.getItem('aiva_device_banner_done')) return;
+
+  const profile = await window.AIVA_DEVICE.detect();
+  if (!profile) return;
+
+  const needsAttention = profile.needsAutostart || !profile.batteryOptimizationIgnored;
+  if (!needsAttention) {
+    localStorage.setItem('aiva_device_banner_done', '1');
+    return;
+  }
+
+  banner.hidden = false;
+  document.getElementById('deviceBannerOpen')?.addEventListener('click', () => {
+    localStorage.setItem('aiva_device_banner_done', '1');
+    location.href = `${window.AIVA_CONFIG.appUrl('settings.html')}#deviceSetupSection`;
+  });
+  document.getElementById('deviceBannerDismiss')?.addEventListener('click', () => {
+    localStorage.setItem('aiva_device_banner_done', '1');
+    banner.hidden = true;
+  });
+}
+
 applyPreferences();
 renderCalendar();
 loadTasks();
 refreshExternalEvents();
 loadDailyBrief();
+initDeviceBanner();
 
 function tryAutoStartListening() {
   if (isSessionActive || isConnecting) return;

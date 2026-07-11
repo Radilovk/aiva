@@ -106,9 +106,51 @@
       // Don't auto-request — let onboarding/settings handle it
     }
 
-    if ('serviceWorker' in navigator) {
-      setInterval(checkScheduledNotifications, 15000);
+    if (!isCapacitor && 'serviceWorker' in navigator) {
+      // Прецизен таймер до следващото напомняне вместо постоянен 15-сек. polling
+      checkScheduledNotifications();
+      armPreciseTimer();
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          checkScheduledNotifications();
+          armPreciseTimer();
+        }
+      });
     }
+  }
+
+  // --- Precise web timer (PWA fallback path) ---
+  let webTimer = null;
+
+  function armPreciseTimer() {
+    if (isCapacitor) return; // нативните аларми се управляват от OS
+    if (!('serviceWorker' in navigator)) return;
+    if (webTimer) {
+      clearTimeout(webTimer);
+      webTimer = null;
+    }
+
+    let scheduled = [];
+    try {
+      scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
+    } catch (_e) { /* повреден запис — таймерът просто не се навива */ }
+    if (!scheduled.length) return;
+
+    const now = Date.now();
+    let nextAt = Infinity;
+    for (const entry of scheduled) {
+      const at = new Date(entry.at).getTime();
+      if (Number.isFinite(at)) nextAt = Math.min(nextAt, at);
+    }
+    if (!Number.isFinite(nextAt)) return;
+
+    // Просрочени, но потиснати от тихите часове записи: проверка веднъж в минута
+    const delay = nextAt <= now ? 60000 : Math.min(nextAt - now + 250, 6 * 3600000);
+    webTimer = setTimeout(() => {
+      webTimer = null;
+      checkScheduledNotifications();
+      armPreciseTimer();
+    }, delay);
   }
 
   function bindCapacitorListeners() {
@@ -199,6 +241,7 @@
       const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
       scheduled.push({ id, task_id: taskId, content: body, title, at: at.toISOString(), type });
       localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(scheduled));
+      armPreciseTimer();
       return true;
     }
 
@@ -264,6 +307,7 @@
     const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
     const filtered = scheduled.filter((n) => String(n.task_id) !== String(taskId));
     localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(filtered));
+    armPreciseTimer();
   }
 
   async function cancelAll() {
@@ -275,14 +319,61 @@
     }
     scheduledIds.clear();
     localStorage.setItem('aiva_scheduled_notifs', '[]');
+    localStorage.setItem(FP_KEY, '{}');
+    armPreciseTimer();
+  }
+
+  // --- Delta scheduling ---
+  // Fingerprint на всяка задача (дата/час/настройки на напомнянето). При
+  // рефреш се (пре)насрочват само нови/променени задачи и се отменят само
+  // изчезнали — без cancelAll/reschedule лавина от alarm заявки към OS.
+  const FP_KEY = 'aiva_notif_fingerprints';
+
+  function taskFingerprint(task, advanceMin, remindAtStart) {
+    return [task.due_date, task.due_time || '', advanceMin, remindAtStart ? 1 : 0, task.content].join('|');
+  }
+
+  function readFingerprints() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(FP_KEY) || '{}');
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_e) {
+      return {};
+    }
   }
 
   async function scheduleAll(tasks, reminderMinutes) {
-    if (!isEnabled()) return;
-    await cancelAll();
-    for (const task of tasks) {
-      if (!task.done) await scheduleForTask(task, reminderMinutes);
+    if (!isEnabled()) {
+      await cancelAll();
+      localStorage.setItem(FP_KEY, '{}');
+      return;
     }
+
+    const settings = getSettings();
+    const advanceMin = reminderMinutes ?? settings.reminderMinutes ?? 15;
+    const remindAtStart = settings.remindAtStart !== false;
+
+    const prev = readFingerprints();
+    const next = {};
+    for (const task of tasks || []) {
+      if (task.done || !task.due_date) continue;
+      next[task.id] = taskFingerprint(task, advanceMin, remindAtStart);
+    }
+
+    // Отмени напомнянията на премахнати/завършени задачи
+    for (const id of Object.keys(prev)) {
+      if (!(id in next)) await cancelForTask(id);
+    }
+
+    // (Пре)насрочи само промените
+    for (const task of tasks || []) {
+      if (!(task.id in next)) continue;
+      if (prev[task.id] === next[task.id]) continue;
+      await scheduleForTask(task, advanceMin);
+    }
+
+    localStorage.setItem(FP_KEY, JSON.stringify(next));
+    armPreciseTimer();
   }
 
   async function requestPermission() {
@@ -302,11 +393,14 @@
 
     const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
     const now = new Date();
+    // Тихите часове се проверяват спрямо "сега" — иначе запис, чийто час е
+    // попаднал в тих период, оставаше блокиран завинаги.
+    const quietNow = isInQuietHours(now);
     const remaining = [];
 
     for (const entry of scheduled) {
       const at = new Date(entry.at);
-      if (at <= now && !isInQuietHours(at)) {
+      if (at <= now && !quietNow) {
         navigator.serviceWorker.ready.then((reg) => {
           reg.showNotification(entry.title || '📋 KAYA', {
             body: entry.content,

@@ -434,21 +434,26 @@
       <p class="hardware-shortcut-web-note" id="hardwareShortcutWebNote" data-i18n="hardwareShortcutWebNote">Настройките за физически бутони са налични в Android приложението (APK). Инсталирайте го на телефона си, за да стартирате слушане с бутоните за звук.</p>
       <div class="hardware-shortcut-android-only" id="hardwareShortcutAndroidControls">
         <div class="toggle-row">
-          <span class="toggle-label" data-i18n="hardwareShortcutEnabled">Включи бърз достъп с volume up</span>
+          <span class="toggle-label" data-i18n="hardwareShortcutEnabled">Включи бърз достъп: + и − едновременно</span>
           <div class="toggle" id="toggleShortcutEnabled"></div>
         </div>
-        <div class="field">
-          <span class="field-label" data-i18n="hardwareShortcutPressCount">Брой натискания</span>
-          <select id="shortcutPressCount">
-            <option value="2">2</option>
-            <option value="3" selected>3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-          </select>
-        </div>
-        <p class="field-hint" data-i18n="hardwareShortcutHint">3× volume up → отваря KAYA и започва слушане. Работи с отворено приложение. За затворено приложение или заключен екран — включете услугата по-долу.</p>
+        <p class="field-hint" data-i18n="hardwareShortcutHint">Натисни двата бутона за звук (усилване + намаляване) едновременно → KAYA се отваря и започва да слуша. Кратко натискане — без задържане. Ако телефонът не отчита двата бутона заедно, натисни последователно + − + −. За затворено приложение или заключен екран — включете услугата по-долу.</p>
         <button class="btn primary" type="button" id="openA11yBtn" data-i18n="hardwareShortcutOpenA11y">Включи фонов режим (достъпност)</button>
         <p class="field-hint" data-i18n="hardwareShortcutBackgroundHint">Задължително за работа при затворено приложение и заключен екран. Натиснете бутона и активирайте услугата KAYA в настройките за достъпност.</p>
+      </div>
+    </div>
+
+    <!-- Device-specific setup (Android APK only) -->
+    <div class="section" id="deviceSetupSection" style="display:none">
+      <div class="section-title" data-i18n="deviceSetupTitle">📲 Настройка за вашия телефон</div>
+      <p class="sync-note" id="deviceSetupInfo"></p>
+      <div class="toggle-row">
+        <span class="toggle-label" data-i18n="deviceBatteryLabel">Напомняния без ограничения от батерията</span>
+        <button class="btn" type="button" id="batteryOptBtn" data-i18n="deviceBatteryAllowBtn">Разреши</button>
+      </div>
+      <div class="field" id="autostartField" style="display:none">
+        <button class="btn primary" type="button" id="autostartBtn" data-i18n="deviceAutostartBtn">Отвори настройки за автостарт</button>
+        <p class="field-hint" id="autostartHint"></p>
       </div>
     </div>
 
@@ -589,6 +594,7 @@
   <script src="lib/mediaUtils.js"></script>
   <script src="lib/voicePreview.js"></script>
   <script src="lib/shortcutBridge.js"></script>
+  <script src="lib/deviceProfile.js"></script>
   <script src="lib/icsUtils.js"></script>
   <script src="local-scheduler.js"></script>
   <script src="lib/deviceCalendar.js"></script>
@@ -649,9 +655,8 @@
       setToggle('toggleGrounding', settings.googleGrounding);
       setToggle('toggleTextOutput', settings.textOutputEnabled);
 
-      // Hardware shortcut
+      // Hardware shortcut (fixed +−+− pattern)
       setToggle('toggleShortcutEnabled', settings.hardwareShortcut?.enabled);
-      document.getElementById('shortcutPressCount').value = String(settings.hardwareShortcut?.pressCount || 3);
 
       // Calendar
       document.getElementById('defaultView').value = settings.calendar.defaultView;
@@ -1030,9 +1035,6 @@
         },
         hardwareShortcut: {
           enabled: getToggle('toggleShortcutEnabled'),
-          button: 'volume_up',
-          pressCount: parseInt(document.getElementById('shortcutPressCount').value, 10) || 3,
-          backgroundMode: true,
         },
       };
     }
@@ -1283,6 +1285,48 @@
       e.target.value = '';
     });
 
+    // --- Device-specific setup (detected profile → OEM guidance) ---
+    async function initDeviceSetup() {
+      const section = document.getElementById('deviceSetupSection');
+      if (!section || !window.AIVA_DEVICE?.isAndroid?.()) return;
+
+      const profile = await window.AIVA_DEVICE.getStatus();
+      if (!profile) return;
+
+      section.style.display = '';
+      document.getElementById('deviceSetupInfo').textContent = tf('deviceSetupDetected', {
+        brand: profile.manufacturer || profile.brand || 'Android',
+        model: profile.model || '',
+        version: profile.androidVersion || '',
+      });
+
+      const batteryBtn = document.getElementById('batteryOptBtn');
+      const refreshBattery = (ignored) => {
+        batteryBtn.textContent = ignored ? t('deviceBatteryAllowed') : t('deviceBatteryAllowBtn');
+        batteryBtn.disabled = !!ignored;
+      };
+      refreshBattery(profile.batteryOptimizationIgnored);
+      batteryBtn.addEventListener('click', () => {
+        window.AIVA_DEVICE.requestIgnoreBatteryOptimizations();
+      });
+      // Статусът се опреснява при връщане от системния диалог
+      document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState !== 'visible') return;
+        const fresh = await window.AIVA_DEVICE.getStatus();
+        if (fresh) refreshBattery(fresh.batteryOptimizationIgnored);
+      });
+
+      if (profile.needsAutostart) {
+        document.getElementById('autostartField').style.display = '';
+        document.getElementById('autostartHint').textContent = tf('deviceAutostartHint', {
+          brand: profile.manufacturer || profile.brand || 'този телефон',
+        });
+        document.getElementById('autostartBtn').addEventListener('click', () => {
+          window.AIVA_DEVICE.openAutostartSettings();
+        });
+      }
+    }
+
     (async () => {
       applyCalendarPlatformUI();
       if (!isAndroidPlatform) {
@@ -1292,6 +1336,10 @@
       if (isAndroidPlatform) {
         await applyHardwareShortcutConfig(settings.hardwareShortcut);
         syncAndroidCalendarStatus();
+        await initDeviceSetup();
+        if (location.hash === '#deviceSetupSection') {
+          document.getElementById('deviceSetupSection')?.scrollIntoView({ behavior: 'smooth' });
+        }
       } else {
         await loadCloudCalendars();
         await renderCloudStatus();

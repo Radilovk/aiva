@@ -87,7 +87,8 @@ app.use(
   cors({
     origin: (origin) => (origin && isAllowedOrigin(origin) ? origin : ''),
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type'],
+    allowHeaders: ['Content-Type', 'If-None-Match'],
+    exposeHeaders: ['ETag'],
   })
 );
 
@@ -97,7 +98,13 @@ app.get('/api/tasks/:user_id', async (c) => {
   const userId = c.req.param('user_id');
   try {
     const tasks = await getIncompleteTasks(c.env.DB, userId);
-    return c.json({ tasks });
+    // ETag от съдържанието: при непроменен списък клиентът получава празен
+    // 304 вместо целия JSON — нулев трансфер при всяко "нищо ново" опресняване.
+    const etag = `"${await sha256Hex(JSON.stringify(tasks))}"`;
+    if (c.req.header('if-none-match') === etag) {
+      return new Response(null, { status: 304, headers: { ETag: etag } });
+    }
+    return c.json({ tasks }, 200, { ETag: etag });
   } catch (e) {
     console.error('Get tasks error:', e);
     return c.json({ tasks: [] }, 500);
@@ -707,6 +714,19 @@ app.post('/api/push/subscribe', async (c) => {
 app.get('/', async (c) => {
   return c.redirect('/index.html');
 });
+
+// --- Legacy Durable Object stub ---
+// The old VoiceWebSocket DO namespace still exists on the account and the
+// Workers Builds CI deploys via "versions upload", which cannot apply DO
+// migrations — so the class export must stay or every deploy fails with
+// error 10064. To remove it for good: run `npx wrangler deploy` locally once
+// (it applies the delete-class migration from wrangler.jsonc), then delete
+// this stub and the migrations block.
+export class VoiceWebSocket {
+  async fetch(_request: Request) {
+    return new Response('This Durable Object is no longer used', { status: 410 });
+  }
+}
 
 // --- Export ---
 
