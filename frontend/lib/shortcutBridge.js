@@ -16,12 +16,8 @@
     const plugin = getPlugin();
     if (!plugin?.configure) return { ok: false, reason: 'unavailable' };
 
-    await plugin.configure({
-      enabled: !!config.enabled,
-      button: config.button || 'volume_up',
-      pressCount: config.pressCount || 3,
-      backgroundMode: !!config.backgroundMode,
-    });
+    // Тригерът е фиксирана комбинация: усилване, намаляване, усилване, намаляване
+    await plugin.configure({ enabled: !!config.enabled });
     return { ok: true };
   }
 

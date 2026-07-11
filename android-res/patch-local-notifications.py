@@ -22,6 +22,7 @@ PERMISSIONS = """
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -53,6 +54,18 @@ if 'RECORD_AUDIO' not in content:
         1,
     )
     print('✅ Added microphone permissions')
+
+# USE_EXACT_ALARM (Android 14+): granted automatically for calendar/alarm apps,
+# so reminders keep firing exactly on time without the revocable
+# SCHEDULE_EXACT_ALARM special-access toggle.
+if 'USE_EXACT_ALARM' not in content:
+    content = content.replace(
+        '<application',
+        '    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />\n'
+        '    <application',
+        1,
+    )
+    print('✅ Added USE_EXACT_ALARM permission')
 
 RECEIVER = """
         <receiver android:name="com.capacitorjs.plugins.localnotifications.AivaNotificationReceiver"

@@ -5,7 +5,10 @@ import android.content.SharedPreferences;
 import android.view.KeyEvent;
 
 /**
- * Detects repeated hardware key presses for the KAYA listening shortcut.
+ * Detects the KAYA listening shortcut: volume up, down, up, down — four
+ * alternating presses within a short window. The alternating pattern never
+ * fires from normal volume use, and the volume level ends unchanged
+ * (two ups + two downs cancel out), so no key press needs to be swallowed.
  */
 public class AivaVolumeKeyHandler {
 
@@ -16,15 +19,19 @@ public class AivaVolumeKeyHandler {
     private static final AivaVolumeKeyHandler INSTANCE = new AivaVolumeKeyHandler();
     private static final String PREFS = "aiva_shortcut_prefs";
     private static final String KEY_ENABLED = "enabled";
-    private static final String KEY_BUTTON = "button";
-    private static final String KEY_PRESS_COUNT = "press_count";
+
+    // Expected press sequence: +, -, +, -
+    private static final int[] PATTERN = {
+        KeyEvent.KEYCODE_VOLUME_UP,
+        KeyEvent.KEYCODE_VOLUME_DOWN,
+        KeyEvent.KEYCODE_VOLUME_UP,
+        KeyEvent.KEYCODE_VOLUME_DOWN,
+    };
 
     private boolean enabled = false;
-    private String button = "volume_up";
-    private int pressCount = 3;
-    private long windowMs = 1600;
+    private long windowMs = 1800;
 
-    private int currentCount = 0;
+    private int patternIndex = 0;
     private long lastPressTime = 0;
     private TriggerListener listener;
 
@@ -36,77 +43,66 @@ public class AivaVolumeKeyHandler {
         this.listener = listener;
     }
 
-    public void configure(boolean enabled, String button, int pressCount) {
-        String nextButton = button != null ? button : "volume_up";
-        int nextPressCount = Math.max(2, Math.min(5, pressCount));
-        // Reset the press sequence only when the config actually changes.
-        // configure() runs on every key event (via reloadFromPrefs), so an
-        // unconditional reset() here wiped the counter and the shortcut
-        // could never reach pressCount.
-        boolean changed = this.enabled != enabled
-            || !this.button.equals(nextButton)
-            || this.pressCount != nextPressCount;
-        this.enabled = enabled;
-        this.button = nextButton;
-        this.pressCount = nextPressCount;
-        if (changed) {
+    public void configure(boolean enabled) {
+        // Reset the sequence only on an actual state change — configure()
+        // runs on every key event via reloadFromPrefs.
+        if (this.enabled != enabled) {
             reset();
         }
+        this.enabled = enabled;
     }
 
     public void reloadFromPrefs(Context context) {
         if (context == null) return;
         SharedPreferences prefs = context.getApplicationContext()
             .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        configure(
-            prefs.getBoolean(KEY_ENABLED, false),
-            prefs.getString(KEY_BUTTON, "volume_up"),
-            prefs.getInt(KEY_PRESS_COUNT, 3)
-        );
+        configure(prefs.getBoolean(KEY_ENABLED, false));
     }
 
     public void reset() {
-        currentCount = 0;
+        patternIndex = 0;
         lastPressTime = 0;
     }
 
-    private boolean matchesButton(int keyCode, String button) {
-        if ("volume_down".equals(button)) {
-            return keyCode == KeyEvent.KEYCODE_VOLUME_DOWN;
-        }
-        return keyCode == KeyEvent.KEYCODE_VOLUME_UP;
-    }
-
+    /**
+     * Returns true only for the final press that completes the pattern —
+     * the launch itself happens through the TriggerListener. Every other
+     * press is left to the system so volume control keeps working.
+     */
     public boolean handleKeyEvent(Context context, int keyCode, KeyEvent event) {
         reloadFromPrefs(context);
         if (!enabled || event == null || event.getAction() != KeyEvent.ACTION_DOWN) {
             return false;
         }
-
-        if (!matchesButton(keyCode, button)) {
+        if (keyCode != KeyEvent.KEYCODE_VOLUME_UP && keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) {
             return false;
         }
-
-        // Auto-repeat while the button is held must not count as extra presses.
         if (event.getRepeatCount() != 0) {
-            return true;
+            // Holding a button is normal volume ramping, not part of the pattern.
+            reset();
+            return false;
         }
 
         long now = System.currentTimeMillis();
         if (now - lastPressTime > windowMs) {
-            currentCount = 0;
+            patternIndex = 0;
         }
         lastPressTime = now;
-        currentCount++;
 
-        if (currentCount >= pressCount) {
-            currentCount = 0;
+        if (keyCode == PATTERN[patternIndex]) {
+            patternIndex++;
+        } else {
+            // Volume-up always restarts a potential sequence.
+            patternIndex = keyCode == KeyEvent.KEYCODE_VOLUME_UP ? 1 : 0;
+        }
+
+        if (patternIndex >= PATTERN.length) {
+            reset();
             if (listener != null) {
                 listener.onShortcutTriggered(context);
             }
             return true;
         }
-
-        return true;
+        return false;
     }
 }
