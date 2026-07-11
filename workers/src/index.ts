@@ -715,6 +715,19 @@ app.get('/', async (c) => {
   return c.redirect('/index.html');
 });
 
+// --- Legacy Durable Object stub ---
+// The old VoiceWebSocket DO namespace still exists on the account and the
+// Workers Builds CI deploys via "versions upload", which cannot apply DO
+// migrations — so the class export must stay or every deploy fails with
+// error 10064. To remove it for good: run `npx wrangler deploy` locally once
+// (it applies the delete-class migration from wrangler.jsonc), then delete
+// this stub and the migrations block.
+export class VoiceWebSocket {
+  async fetch(_request: Request) {
+    return new Response('This Durable Object is no longer used', { status: 410 });
+  }
+}
+
 // --- Export ---
 
 export default {
