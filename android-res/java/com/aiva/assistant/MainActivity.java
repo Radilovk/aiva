@@ -17,6 +17,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AivaCalendarPlugin.class);
         registerPlugin(AivaShortcutPlugin.class);
+        registerPlugin(AivaDevicePlugin.class);
         super.onCreate(savedInstanceState);
         AivaVolumeKeyHandler.getInstance().setListener(AivaShortcutLauncher::launchListening);
         handleLaunchIntent(getIntent());

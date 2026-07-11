@@ -2155,11 +2155,41 @@ briefDismissBtn?.addEventListener('click', () => {
   localStorage.setItem('aiva_brief_dismissed', briefCard.dataset.generatedAt || 'unknown');
 });
 
+// --- Device-specific first-run setup (Android APK) ---
+// Засича марката при първото стартиране ("инсталация") и ако телефонът има
+// агресивен battery manager (Xiaomi, Huawei, Oppo...), показва еднократен
+// банер към настройките за автостарт/батерия.
+async function initDeviceBanner() {
+  const banner = document.getElementById('deviceBanner');
+  if (!banner || !window.AIVA_DEVICE?.isAndroid?.()) return;
+  if (localStorage.getItem('aiva_device_banner_done')) return;
+
+  const profile = await window.AIVA_DEVICE.detect();
+  if (!profile) return;
+
+  const needsAttention = profile.needsAutostart || !profile.batteryOptimizationIgnored;
+  if (!needsAttention) {
+    localStorage.setItem('aiva_device_banner_done', '1');
+    return;
+  }
+
+  banner.hidden = false;
+  document.getElementById('deviceBannerOpen')?.addEventListener('click', () => {
+    localStorage.setItem('aiva_device_banner_done', '1');
+    location.href = `${window.AIVA_CONFIG.appUrl('settings.html')}#deviceSetupSection`;
+  });
+  document.getElementById('deviceBannerDismiss')?.addEventListener('click', () => {
+    localStorage.setItem('aiva_device_banner_done', '1');
+    banner.hidden = true;
+  });
+}
+
 applyPreferences();
 renderCalendar();
 loadTasks();
 refreshExternalEvents();
 loadDailyBrief();
+initDeviceBanner();
 
 function tryAutoStartListening() {
   if (isSessionActive || isConnecting) return;

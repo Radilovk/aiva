@@ -67,6 +67,17 @@ if 'USE_EXACT_ALARM' not in content:
     )
     print('✅ Added USE_EXACT_ALARM permission')
 
+# Lets the app show the "ignore battery optimizations" consent dialog, so
+# aggressive OEM battery managers (MIUI, EMUI, ColorOS...) don't kill reminders.
+if 'REQUEST_IGNORE_BATTERY_OPTIMIZATIONS' not in content:
+    content = content.replace(
+        '<application',
+        '    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />\n'
+        '    <application',
+        1,
+    )
+    print('✅ Added REQUEST_IGNORE_BATTERY_OPTIMIZATIONS permission')
+
 RECEIVER = """
         <receiver android:name="com.capacitorjs.plugins.localnotifications.AivaNotificationReceiver"
                   android:exported="false">

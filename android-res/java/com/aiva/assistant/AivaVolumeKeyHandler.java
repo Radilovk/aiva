@@ -26,6 +26,17 @@ public class AivaVolumeKeyHandler {
     private static final long HOLD_EXPIRY_MS = 5000;
     private static final long RETRIGGER_COOLDOWN_MS = 1500;
 
+    // Fallback for phones whose firmware never reports both volume keys held
+    // at once (some OEM builds route the chord to a system gesture): pressing
+    // +, −, +, − in sequence also triggers.
+    private static final int[] SEQ_PATTERN = {
+        KeyEvent.KEYCODE_VOLUME_UP,
+        KeyEvent.KEYCODE_VOLUME_DOWN,
+        KeyEvent.KEYCODE_VOLUME_UP,
+        KeyEvent.KEYCODE_VOLUME_DOWN,
+    };
+    private static final long SEQ_WINDOW_MS = 1800;
+
     private boolean enabled = false;
 
     private boolean upPressed = false;
@@ -33,6 +44,8 @@ public class AivaVolumeKeyHandler {
     private long upPressedAt = 0;
     private long downPressedAt = 0;
     private boolean chordFired = false;
+    private int seqIndex = 0;
+    private long lastSeqPressTime = 0;
     private long lastTriggerTime = 0;
     private TriggerListener listener;
 
@@ -66,6 +79,16 @@ public class AivaVolumeKeyHandler {
         upPressedAt = 0;
         downPressedAt = 0;
         chordFired = false;
+        seqIndex = 0;
+        lastSeqPressTime = 0;
+    }
+
+    private void fire(Context context, long now) {
+        if (now - lastTriggerTime <= RETRIGGER_COOLDOWN_MS) return;
+        lastTriggerTime = now;
+        if (listener != null) {
+            listener.onShortcutTriggered(context);
+        }
     }
 
     private boolean isHeld(boolean pressed, long pressedAt, long now) {
@@ -124,13 +147,25 @@ public class AivaVolumeKeyHandler {
         boolean bothHeld = isHeld(upPressed, upPressedAt, now) && isHeld(downPressed, downPressedAt, now);
         if (bothHeld && !chordFired) {
             chordFired = true;
-            if (now - lastTriggerTime > RETRIGGER_COOLDOWN_MS) {
-                lastTriggerTime = now;
-                if (listener != null) {
-                    listener.onShortcutTriggered(context);
-                }
-            }
+            seqIndex = 0;
+            fire(context, now);
             return true; // consume the completing press
+        }
+
+        // Sequence fallback: +, −, +, − within a short window per press.
+        if (now - lastSeqPressTime > SEQ_WINDOW_MS) {
+            seqIndex = 0;
+        }
+        lastSeqPressTime = now;
+        if (keyCode == SEQ_PATTERN[seqIndex]) {
+            seqIndex++;
+        } else {
+            seqIndex = isUp ? 1 : 0;
+        }
+        if (seqIndex >= SEQ_PATTERN.length) {
+            seqIndex = 0;
+            fire(context, now);
+            return true;
         }
 
         return false;

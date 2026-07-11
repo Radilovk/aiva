@@ -1616,6 +1616,12 @@
       <button class="calendar-banner-btn" id="calendarBannerConnect" type="button" data-i18n="connectCalendar">Свържи</button>
     </div>
 
+    <div class="calendar-banner" id="deviceBanner" hidden>
+      <span data-i18n="deviceBannerText">Настройте телефона си — за надеждни напомняния и бърз достъп</span>
+      <button class="calendar-banner-btn" id="deviceBannerOpen" type="button" data-i18n="deviceBannerBtn">Настрой</button>
+      <button class="calendar-banner-btn" id="deviceBannerDismiss" type="button" aria-label="Скрий">✕</button>
+    </div>
+
     <section class="brief-card" id="briefCard" hidden>
       <div class="brief-card-header">
         <span>🌙 <span data-i18n="briefTitle">Преглед от асистента</span></span>
@@ -1854,6 +1860,7 @@
   <script src="lib/haptics.js"></script>
   <script src="lib/mediaUtils.js"></script>
   <script src="lib/shortcutBridge.js"></script>
+  <script src="lib/deviceProfile.js"></script>
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
