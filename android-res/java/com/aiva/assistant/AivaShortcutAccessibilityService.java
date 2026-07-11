@@ -32,10 +32,11 @@ public class AivaShortcutAccessibilityService extends AccessibilityService {
 
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
-        // handleKeyEvent returns true only when the full pattern completes,
-        // and the launch happens via the TriggerListener. Calling
-        // launchListening here on every consumed press is what used to
-        // start the app after a single volume-up.
+        // The launch happens via the TriggerListener when the +/− chord
+        // completes; handleKeyEvent's return value only controls whether the
+        // key event is consumed. Calling launchListening here on every
+        // consumed press is what used to start the app after a single
+        // volume-up.
         if (AivaVolumeKeyHandler.getInstance().handleKeyEvent(this, event.getKeyCode(), event)) {
             return true;
         }

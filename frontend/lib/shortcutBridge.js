@@ -16,7 +16,7 @@
     const plugin = getPlugin();
     if (!plugin?.configure) return { ok: false, reason: 'unavailable' };
 
-    // Тригерът е фиксирана комбинация: усилване, намаляване, усилване, намаляване
+    // Тригерът е фиксиран: двата бутона за звук (+ и −) натиснати едновременно
     await plugin.configure({ enabled: !!config.enabled });
     return { ok: true };
   }
