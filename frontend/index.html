@@ -1591,6 +1591,22 @@
     @media (display-mode: standalone) {
       .header { padding-top: 0.5rem; }
     }
+
+    [dir="rtl"] .header,
+    [dir="rtl"] .calendar-banner,
+    [dir="rtl"] .brief-card-header,
+    [dir="rtl"] .task-card-header,
+    [dir="rtl"] .modal-header,
+    [dir="rtl"] .calendar-toolbar,
+    [dir="rtl"] .modal-actions {
+      flex-direction: row-reverse;
+    }
+
+    [dir="rtl"] .task-card,
+    [dir="rtl"] .field-label,
+    [dir="rtl"] .modal-title {
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -1607,7 +1623,7 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="calendar-sync-chip" id="calendarSyncChip" type="button" hidden title="Календар">📅 <span data-i18n="calendar">Календар</span></button>
-        <a class="admin-link" href="./settings.html" data-i18n="settings">⚙ Настройки</a>
+        <a class="admin-link" href="./settings.html" data-i18n="settings" data-i18n-prefix="⚙ ">Настройки</a>
       </div>
     </header>
 
@@ -1655,7 +1671,7 @@
         <span></span><span></span><span></span><span></span><span></span>
       </div>
 
-      <div class="status" id="status" role="status" aria-live="polite" data-i18n="tapToRecord">Докоснете за запис</div>
+      <div class="status" id="status" role="status" aria-live="polite" data-i18n="tapToRecord" data-i18n-dynamic>Докоснете за запис</div>
     </section>
 
     <section class="tasks-panel" id="tasksPanel">
@@ -1698,7 +1714,7 @@
   <div class="task-modal" id="taskModal" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
-        <div class="modal-title" id="modalTitle" data-i18n="taskDetails">Детайли за задачата</div>
+        <div class="modal-title" id="modalTitle" data-i18n="taskDetails" data-i18n-dynamic>Детайли за задачата</div>
         <button class="modal-close" id="closeTaskModal" type="button" data-i18n-aria="close" aria-label="Затвори">×</button>
       </div>
 
@@ -1831,13 +1847,13 @@
   <div class="calendar-onboard" id="calendarOnboard" aria-hidden="true">
     <div class="calendar-onboard-card" role="dialog" aria-modal="true" aria-labelledby="calendarOnboardTitle">
       <div class="calendar-onboard-top">
-        <div class="calendar-onboard-title" id="calendarOnboardTitle" data-i18n="calOnboardTitle">📅 Календар</div>
+        <div class="calendar-onboard-title" id="calendarOnboardTitle" data-i18n="calOnboardTitle" data-i18n-prefix="📅 " data-i18n-dynamic>Календар</div>
         <button class="calendar-onboard-ghost" id="calendarOnboardClose" type="button" data-i18n-aria="close" aria-label="Затвори">×</button>
       </div>
-      <p class="calendar-onboard-text" id="calendarOnboardText" data-i18n="calOnboardDefault">Задачите с дата могат да се появяват автоматично в календара ти.</p>
+      <p class="calendar-onboard-text" id="calendarOnboardText" data-i18n="calOnboardDefault" data-i18n-dynamic>Задачите с дата могат да се появяват автоматично в календара ти.</p>
       <div class="calendar-onboard-actions">
-        <button class="calendar-onboard-primary" id="calendarOnboardPrimary" type="button" data-i18n="connectCalendar">Свържи календара</button>
-        <button class="calendar-onboard-secondary" id="calendarOnboardDevice" type="button" data-i18n="onlyThisTask">Само тази задача в календара</button>
+        <button class="calendar-onboard-primary" id="calendarOnboardPrimary" type="button" data-i18n="connectCalendar" data-i18n-dynamic>Свържи календара</button>
+        <button class="calendar-onboard-secondary" id="calendarOnboardDevice" type="button" data-i18n="onlyThisTask" data-i18n-dynamic>Само тази задача в календара</button>
         <button class="calendar-onboard-ghost" id="calendarOnboardLater" type="button" data-i18n="notNowBtn">Не сега</button>
       </div>
     </div>

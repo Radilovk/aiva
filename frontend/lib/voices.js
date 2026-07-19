@@ -48,8 +48,8 @@
 
     const hint = document.getElementById('voiceCountHint');
     if (hint) {
-      const base = window.AIVA_I18N?.t?.('voiceCountHint') || `${BULGARIAN_VOICES.length} voices optimized for Bulgarian`;
-      hint.textContent = base.replace('{count}', String(BULGARIAN_VOICES.length));
+      hint.textContent = window.AIVA_I18N?.tf?.('voiceCountHint', { count: BULGARIAN_VOICES.length })
+        || `${BULGARIAN_VOICES.length} voices optimized for Bulgarian`;
     }
   }
 
