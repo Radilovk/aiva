@@ -460,6 +460,10 @@ function applyPreferences() {
   if (!isSessionActive) {
     setStatus(t('tapToRecord'));
   }
+  if (taskModal.classList.contains('visible')) {
+    const task = taskIdField.value ? getTaskById(taskIdField.value) : null;
+    modalTitle.textContent = task ? t('taskDetails') : t('newTask');
+  }
 }
 
 function setStatus(text, active = false, mode = 'default') {

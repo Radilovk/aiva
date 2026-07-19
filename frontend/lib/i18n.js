@@ -565,7 +565,7 @@
 
   function t(key, lang) {
     const l = lang || currentLang;
-    return STRINGS[l]?.[key] ?? STRINGS.bg[key] ?? STRINGS.en?.[key] ?? key;
+    return STRINGS[l]?.[key] ?? STRINGS.en?.[key] ?? STRINGS.bg[key] ?? key;
   }
 
   function tf(key, vars, lang) {
@@ -586,13 +586,32 @@
     return getLanguageMeta(lang || currentLang).bcp47;
   }
 
+  function parseI18nVars(el) {
+    const raw = el.getAttribute('data-i18n-vars');
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  function resolveI18nText(el, key, lang) {
+    const vars = parseI18nVars(el);
+    const text = vars ? tf(key, vars, lang) : t(key, lang);
+    const prefix = el.getAttribute('data-i18n-prefix') || '';
+    const suffix = el.getAttribute('data-i18n-suffix') || '';
+    return `${prefix}${text}${suffix}`;
+  }
+
   function applyToDocument(root, lang) {
     const l = lang || currentLang;
     setLanguage(l);
     const scope = root || document;
     scope.querySelectorAll('[data-i18n]').forEach((el) => {
+      if (el.hasAttribute('data-i18n-dynamic')) return;
       const key = el.getAttribute('data-i18n');
-      const text = t(key, l);
+      const text = resolveI18nText(el, key, l);
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
         if (el.hasAttribute('data-i18n-placeholder')) {
           el.placeholder = text;

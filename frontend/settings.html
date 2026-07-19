@@ -229,6 +229,21 @@
     @media (max-width: 480px) {
       .row-grid { grid-template-columns: 1fr; }
     }
+
+    [dir="rtl"] .settings-header,
+    [dir="rtl"] .toggle-row,
+    [dir="rtl"] .voice-row,
+    [dir="rtl"] .settings-fixed-bar,
+    [dir="rtl"] .btn-row {
+      flex-direction: row-reverse;
+    }
+
+    [dir="rtl"] .back-link,
+    [dir="rtl"] .field-label,
+    [dir="rtl"] .toggle-label,
+    [dir="rtl"] .section-title {
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -243,7 +258,7 @@
 
     <!-- Profile -->
     <div class="section">
-      <div class="section-title" data-i18n="profile">👤 Профил</div>
+      <div class="section-title" data-i18n="profile" data-i18n-prefix="👤 ">Профил</div>
       <div class="field">
         <span class="field-label" data-i18n="language">Език</span>
         <select id="profileLanguage"></select>
@@ -257,7 +272,7 @@
 
     <!-- Notifications -->
     <div class="section">
-      <div class="section-title" data-i18n="notifications">🔔 Нотификации</div>
+      <div class="section-title" data-i18n="notifications" data-i18n-prefix="🔔 ">Нотификации</div>
       <div class="toggle-row">
         <span class="toggle-label" data-i18n="notifTaskReminders">Напомняния за задачи</span>
         <div class="toggle" id="toggleNotifications"></div>
@@ -299,14 +314,14 @@
 
     <!-- Calendar Sync -->
     <div class="section" id="calendar-sync">
-      <div class="section-title" data-i18n="calSyncTitle">📅 Календар</div>
+      <div class="section-title" data-i18n="calSyncTitle" data-i18n-prefix="📅 ">Календар</div>
       <div class="field" data-calendar-platform="web">
         <span class="field-label" data-i18n="connectCloud">Свържи облачен календар (основен режим)</span>
         <div class="subscribe-actions">
           <button class="btn primary" type="button" id="connectGoogleBtn" data-i18n="connectGoogle">Свържи Google</button>
           <button class="btn primary" type="button" id="connectMicrosoftBtn" data-i18n="connectOutlook">Свържи Outlook</button>
         </div>
-        <p class="sync-note" id="cloudStatusText" data-i18n="cloudDisconnected">Не е свързан облачен календар.</p>
+        <p class="sync-note" id="cloudStatusText" data-i18n="cloudDisconnected" data-i18n-dynamic>Не е свързан облачен календар.</p>
       </div>
       <div class="field" data-calendar-platform="web">
         <span class="field-label" data-i18n="pickCalAfterConnect">Избери календар след свързване</span>
@@ -352,7 +367,7 @@
           </select>
           <button class="btn" type="button" id="saveLocalCalendarBtn" data-i18n="save">Запази</button>
         </div>
-        <p class="sync-note" id="localCalendarStatusText" data-i18n="localCalNotSelected">Не е избран локален календар.</p>
+        <p class="sync-note" id="localCalendarStatusText" data-i18n="localCalNotSelected" data-i18n-dynamic>Не е избран локален календар.</p>
       </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
       <div class="field">
@@ -397,7 +412,7 @@
 
     <!-- Voice Assistant -->
     <div class="section">
-      <div class="section-title" data-i18n="voiceAssistant">🎙 Гласов асистент</div>
+      <div class="section-title" data-i18n="voiceAssistant" data-i18n-prefix="🎙 ">Гласов асистент</div>
       <div class="field">
         <span class="field-label" data-i18n="model">Модел</span>
         <select id="model">
@@ -411,7 +426,7 @@
           <select id="voiceName" size="1"></select>
           <button class="btn" type="button" id="voicePreviewBtn" data-i18n="voicePreview">Прослушай</button>
         </div>
-        <div class="field-hint" id="voiceCountHint" data-i18n="voiceCountHint">12 гласа, оптимизирани за ясен български</div>
+        <div class="field-hint" id="voiceCountHint" data-i18n="voiceCountHint" data-i18n-dynamic>12 гласа, оптимизирани за ясен български</div>
       </div>
       <div class="field">
         <span class="field-label" data-i18n="temperature">Температура (креативност)</span>
@@ -430,7 +445,7 @@
 
     <!-- Hardware Shortcut -->
     <div class="section" id="hardwareShortcutSection">
-      <div class="section-title" data-i18n="hardwareShortcutTitle">📱 Хардуерен бутон</div>
+      <div class="section-title" data-i18n="hardwareShortcutTitle" data-i18n-prefix="📱 ">Хардуерен бутон</div>
       <p class="hardware-shortcut-web-note" id="hardwareShortcutWebNote" data-i18n="hardwareShortcutWebNote">Настройките за физически бутони са налични в Android приложението (APK). Инсталирайте го на телефона си, за да стартирате слушане с бутоните за звук.</p>
       <div class="hardware-shortcut-android-only" id="hardwareShortcutAndroidControls">
         <div class="toggle-row">
@@ -445,11 +460,11 @@
 
     <!-- Device-specific setup (Android APK only) -->
     <div class="section" id="deviceSetupSection" style="display:none">
-      <div class="section-title" data-i18n="deviceSetupTitle">📲 Настройка за вашия телефон</div>
+      <div class="section-title" data-i18n="deviceSetupTitle" data-i18n-prefix="📲 ">Настройка за вашия телефон</div>
       <p class="sync-note" id="deviceSetupInfo"></p>
       <div class="toggle-row">
         <span class="toggle-label" data-i18n="deviceBatteryLabel">Напомняния без ограничения от батерията</span>
-        <button class="btn" type="button" id="batteryOptBtn" data-i18n="deviceBatteryAllowBtn">Разреши</button>
+        <button class="btn" type="button" id="batteryOptBtn" data-i18n="deviceBatteryAllowBtn" data-i18n-dynamic>Разреши</button>
       </div>
       <div class="field" id="autostartField" style="display:none">
         <button class="btn primary" type="button" id="autostartBtn" data-i18n="deviceAutostartBtn">Отвори настройки за автостарт</button>
@@ -459,7 +474,7 @@
 
     <!-- Calendar View -->
     <div class="section">
-      <div class="section-title" data-i18n="calViewTitle">📆 Календар</div>
+      <div class="section-title" data-i18n="calViewTitle" data-i18n-prefix="📆 ">Календар</div>
       <div class="row-grid">
         <div class="field">
           <span class="field-label" data-i18n="defaultViewLabel">Изглед по подразбиране</span>
@@ -494,7 +509,7 @@
 
     <!-- Defaults -->
     <div class="section">
-      <div class="section-title" data-i18n="defaultsTitle">📋 Стойности по подразбиране</div>
+      <div class="section-title" data-i18n="defaultsTitle" data-i18n-prefix="📋 ">Стойности по подразбиране</div>
       <div class="row-grid">
         <div class="field">
           <span class="field-label" data-i18n="defPriority">Приоритет</span>
@@ -528,7 +543,7 @@
 
     <!-- Safety -->
     <div class="section">
-      <div class="section-title" data-i18n="safetyTitle">🛡 Безопасност</div>
+      <div class="section-title" data-i18n="safetyTitle" data-i18n-prefix="🛡 ">Безопасност</div>
       <div class="toggle-row">
         <span class="toggle-label" data-i18n="askDelete">Питай преди изтриване</span>
         <div class="toggle" id="toggleAskDelete"></div>
@@ -545,7 +560,7 @@
 
     <!-- Appearance -->
     <div class="section">
-      <div class="section-title" data-i18n="appearanceTitle">🎨 Външен вид</div>
+      <div class="section-title" data-i18n="appearanceTitle" data-i18n-prefix="🎨 ">Външен вид</div>
       <div class="field">
         <span class="field-label" data-i18n="accentLabel">Акцентен цвят</span>
         <input type="color" id="accentColor">
@@ -558,7 +573,7 @@
 
     <!-- Data -->
     <div class="section">
-      <div class="section-title" data-i18n="dataTitle">💾 Данни</div>
+      <div class="section-title" data-i18n="dataTitle" data-i18n-prefix="💾 ">Данни</div>
       <div class="btn-group">
         <button class="btn" id="exportBtn" type="button" data-i18n="exportBtn">Експорт (JSON)</button>
         <button class="btn" id="importBtn" type="button" data-i18n="importBtnLabel">Импорт</button>
@@ -576,7 +591,7 @@
     </footer>
   </div>
 
-  <div class="saved-toast" id="savedToast" data-i18n="settingsSaved">✓ Настройките са запазени</div>
+  <div class="saved-toast" id="savedToast" data-i18n="settingsSaved" data-i18n-prefix="✓ ">Настройките са запазени</div>
 
   <div class="settings-fixed-bar-wrap">
     <div class="settings-fixed-bar">
@@ -621,9 +636,48 @@
     });
     window.AIVA_VOICE_PREVIEW?.prefetch?.();
 
+    let deviceProfile = null;
+
     function applySettingsLanguage(lang) {
       window.AIVA_I18N.setLanguage(lang);
       window.AIVA_I18N.applyToDocument(document, lang);
+
+      const voiceSelect = document.getElementById('voiceName');
+      const voiceSearch = document.getElementById('voiceSearch');
+      window.AIVA_VOICES.populateVoiceSelect(voiceSelect, voiceSelect?.value, voiceSearch?.value || '');
+
+      if (isAndroidPlatform) {
+        syncAndroidCalendarStatus();
+        refreshDeviceSetupI18n();
+      } else {
+        renderCloudStatus();
+      }
+    }
+
+    function refreshDeviceSetupI18n() {
+      if (!deviceProfile) return;
+      const section = document.getElementById('deviceSetupSection');
+      if (!section || section.style.display === 'none') return;
+
+      document.getElementById('deviceSetupInfo').textContent = tf('deviceSetupDetected', {
+        brand: deviceProfile.manufacturer || deviceProfile.brand || 'Android',
+        model: deviceProfile.model || '',
+        version: deviceProfile.androidVersion || '',
+      });
+
+      const batteryBtn = document.getElementById('batteryOptBtn');
+      if (batteryBtn) {
+        batteryBtn.textContent = deviceProfile.batteryOptimizationIgnored
+          ? t('deviceBatteryAllowed')
+          : t('deviceBatteryAllowBtn');
+        batteryBtn.disabled = !!deviceProfile.batteryOptimizationIgnored;
+      }
+
+      if (deviceProfile.needsAutostart) {
+        document.getElementById('autostartHint').textContent = tf('deviceAutostartHint', {
+          brand: deviceProfile.manufacturer || deviceProfile.brand || 'Android',
+        });
+      }
     }
 
     // --- Populate UI from settings ---
@@ -1234,6 +1288,7 @@
       if (!confirm(t('confirmReset'))) return;
       settings = resetAssistantSettings();
       populateUI();
+      applySettingsLanguage(settings.profile?.language || 'bg');
       await applyHardwareShortcutConfig(settings.hardwareShortcut);
       showSavedToast();
     });
@@ -1267,6 +1322,7 @@
         if (data.settings) {
           settings = saveAssistantSettings(data.settings);
           populateUI();
+          applySettingsLanguage(settings.profile?.language || 'bg');
         }
         if (data.tasks?.length) {
           const userId = getUserId();
@@ -1293,34 +1349,30 @@
       const profile = await window.AIVA_DEVICE.getStatus();
       if (!profile) return;
 
+      deviceProfile = profile;
       section.style.display = '';
-      document.getElementById('deviceSetupInfo').textContent = tf('deviceSetupDetected', {
-        brand: profile.manufacturer || profile.brand || 'Android',
-        model: profile.model || '',
-        version: profile.androidVersion || '',
-      });
+      refreshDeviceSetupI18n();
 
       const batteryBtn = document.getElementById('batteryOptBtn');
       const refreshBattery = (ignored) => {
+        deviceProfile = { ...deviceProfile, batteryOptimizationIgnored: ignored };
         batteryBtn.textContent = ignored ? t('deviceBatteryAllowed') : t('deviceBatteryAllowBtn');
         batteryBtn.disabled = !!ignored;
       };
-      refreshBattery(profile.batteryOptimizationIgnored);
       batteryBtn.addEventListener('click', () => {
         window.AIVA_DEVICE.requestIgnoreBatteryOptimizations();
       });
-      // Статусът се опреснява при връщане от системния диалог
       document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState !== 'visible') return;
         const fresh = await window.AIVA_DEVICE.getStatus();
-        if (fresh) refreshBattery(fresh.batteryOptimizationIgnored);
+        if (fresh) {
+          deviceProfile = fresh;
+          refreshBattery(fresh.batteryOptimizationIgnored);
+        }
       });
 
       if (profile.needsAutostart) {
         document.getElementById('autostartField').style.display = '';
-        document.getElementById('autostartHint').textContent = tf('deviceAutostartHint', {
-          brand: profile.manufacturer || profile.brand || 'този телефон',
-        });
         document.getElementById('autostartBtn').addEventListener('click', () => {
           window.AIVA_DEVICE.openAutostartSettings();
         });
