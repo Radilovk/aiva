@@ -18,6 +18,7 @@ const ASSETS = [
   'admin.html',
   'config.js',
   'settings.js',
+  'lib/i18n-boot.js',
   'lib/i18n.js',
   'lib/i18n-extended.js',
   'lib/i18n-privacy.js',

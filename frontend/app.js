@@ -451,12 +451,14 @@ function sortedTasks(items) {
 }
 
 // --- UI helpers ---
-function applyPreferences() {
+function applyPreferences(options = {}) {
   assistantSettings = loadAssistantSettings();
   document.documentElement.style.setProperty('--accent', assistantSettings.appearance.accentColor);
   document.body.classList.toggle('compact-calendar', assistantSettings.appearance.compactCalendar);
   window.AIVA_I18N?.initFromSettings?.(assistantSettings);
-  window.AIVA_I18N?.applyToDocument?.(document, assistantSettings.profile?.language);
+  if (options.i18n !== false) {
+    window.AIVA_I18N?.applyToDocument?.(document, assistantSettings.profile?.language);
+  }
   if (!isSessionActive) {
     setStatus(t('tapToRecord'));
   }
@@ -1798,7 +1800,7 @@ async function connectSession() {
   isConnecting = true;
   recordBtn.disabled = true;
   setStatus(t('connecting'), true);
-  applyPreferences();
+  applyPreferences({ i18n: false });
 
   try {
     if (!navigator.mediaDevices?.getUserMedia) {
