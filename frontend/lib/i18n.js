@@ -604,6 +604,12 @@
     return `${prefix}${text}${suffix}`;
   }
 
+  function markI18nReady() {
+    requestAnimationFrame(function () {
+      document.documentElement.classList.add('i18n-ready');
+    });
+  }
+
   function applyToDocument(root, lang) {
     const l = lang || currentLang;
     setLanguage(l);
@@ -635,6 +641,9 @@
     scope.querySelectorAll('[data-i18n-html]').forEach((el) => {
       el.innerHTML = t(el.getAttribute('data-i18n-html'), l);
     });
+    if (!root || root === document) {
+      markI18nReady();
+    }
   }
 
   function populateLanguageSelect(selectEl, selectedCode) {
