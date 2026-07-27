@@ -450,6 +450,16 @@ function sortedTasks(items) {
   });
 }
 
+function syncProfileToServer() {
+  if (!API_BASE || !userId) return;
+  const lang = assistantSettings.profile?.language || 'bg';
+  fetch(`${API_BASE}/api/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, language: lang }),
+  }).catch(() => {});
+}
+
 // --- UI helpers ---
 function applyPreferences(options = {}) {
   assistantSettings = loadAssistantSettings();
@@ -1453,7 +1463,11 @@ async function loadTasks() {
 
 async function markDone(taskId) {
   try {
-    await fetch(`${API_BASE}/api/tasks/${taskId}/done`, { method: 'PATCH' });
+    await fetch(`${API_BASE}/api/tasks/${taskId}/done`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    });
     if (window.AIVA_CALENDAR_SYNC?.onTaskDone) {
       await window.AIVA_CALENDAR_SYNC.onTaskDone(taskId);
     }
@@ -2075,6 +2089,7 @@ document.addEventListener('keydown', (e) => {
 
 window.addEventListener('aiva:settings-updated', () => {
   applyPreferences();
+  syncProfileToServer();
   renderCalendar();
   window.AIVA_CALENDAR_ONBOARD?.updateHeaderStatus?.();
   window.AIVA_CALENDAR_ONBOARD?.updateBanner?.(tasks.some((t) => t.due_date));
@@ -2191,6 +2206,7 @@ async function initDeviceBanner() {
 }
 
 applyPreferences();
+syncProfileToServer();
 renderCalendar();
 loadTasks();
 refreshExternalEvents();

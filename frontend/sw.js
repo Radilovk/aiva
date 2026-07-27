@@ -141,8 +141,14 @@ self.addEventListener('notificationclick', (event) => {
     const apiBase = (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.github.io'))
       ? 'https://aiva.radilov-k.workers.dev'
       : self.location.origin;
+    const userId = event.notification.data?.user_id;
+    if (!userId) return;
     event.waitUntil(
-      fetch(`${apiBase}/api/tasks/${taskId}/done`, { method: 'PATCH' })
+      fetch(`${apiBase}/api/tasks/${taskId}/done`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      })
     );
     return;
   }

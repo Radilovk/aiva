@@ -200,10 +200,20 @@
     }
   }
 
+  function getUserId() {
+    return localStorage.getItem('aiva_user_id') || localStorage.getItem('kaya_user_id') || '';
+  }
+
   async function markTaskDone(taskId) {
     const apiBase = window.AIVA_CONFIG?.API_BASE || location.origin;
+    const userId = getUserId();
+    if (!userId) return;
     try {
-      await fetch(`${apiBase}/api/tasks/${taskId}/done`, { method: 'PATCH' });
+      await fetch(`${apiBase}/api/tasks/${taskId}/done`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
       await cancelForTask(taskId);
       window.dispatchEvent(new CustomEvent('aiva:task-done-from-notif', { detail: { taskId } }));
     } catch (e) {
@@ -239,7 +249,8 @@
 
     if ('serviceWorker' in navigator && Notification.permission === 'granted') {
       const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
-      scheduled.push({ id, task_id: taskId, content: body, title, at: at.toISOString(), type });
+      const userId = getUserId();
+      scheduled.push({ id, task_id: taskId, user_id: userId, content: body, title, at: at.toISOString(), type });
       localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(scheduled));
       armPreciseTimer();
       return true;
@@ -407,7 +418,7 @@
             tag: `aiva-${entry.id}`,
             icon: window.AIVA_CONFIG?.appUrl?.('icons/icon-192.png') || 'icons/icon-192.png',
             badge: window.AIVA_CONFIG?.appUrl?.('icons/icon-192.png') || 'icons/icon-192.png',
-            data: { task_id: entry.task_id },
+            data: { task_id: entry.task_id, user_id: entry.user_id || getUserId() },
             vibrate: [200, 100, 200],
             actions: [
               { action: 'open', title: t('notifOpen') },

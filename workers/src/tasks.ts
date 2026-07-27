@@ -314,10 +314,15 @@ export interface MarkDoneResult {
   next?: Task;
 }
 
-export async function markTaskDone(db: D1Database, taskId: number): Promise<MarkDoneResult> {
+export async function markTaskDone(db: D1Database, taskId: number, userId: string): Promise<MarkDoneResult> {
   await ensureTaskSchema(db);
 
-  const task = await db.prepare('SELECT * FROM tasks WHERE id = ?').bind(taskId).first<Task>();
+  if (!userId) return { changed: false };
+
+  const task = await db
+    .prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?')
+    .bind(taskId, userId)
+    .first<Task>();
   if (!task) return { changed: false };
 
   await db
