@@ -116,7 +116,12 @@ app.patch('/api/tasks/:id/done', async (c) => {
   if (!Number.isFinite(id)) {
     return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
   }
-  const result = await markTaskDone(c.env.DB, id);
+  const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as { user_id?: string }));
+  const userId = body?.user_id || c.req.query('user_id');
+  if (!userId) {
+    return c.json({ error: 'user_id е задължителен' }, 400);
+  }
+  const result = await markTaskDone(c.env.DB, id, userId);
   if (!result.changed) return c.json({ error: 'Задачата не е намерена' }, 404);
 
   const origin = requestOrigin(new URL(c.req.url));
@@ -688,6 +693,27 @@ app.get('/api/calendar.ics', async (c) => {
   } catch (e) {
     console.error('ICS generation error:', e);
     return c.text('Грешка при генериране на ICS', 500);
+  }
+});
+
+// --- User profile sync (language for server-side briefs) ---
+
+app.post('/api/profile', async (c) => {
+  const body = await c.req.json<{ user_id?: string; language?: string }>().catch(() => null);
+  if (!body?.user_id) {
+    return c.json({ error: 'user_id е задължителен' }, 400);
+  }
+  const language = body.language || 'bg';
+  try {
+    await c.env.SESSIONS.put(
+      `profile:${body.user_id}`,
+      JSON.stringify({ language }),
+      { expirationTtl: 365 * 86400 }
+    );
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Profile sync error:', e);
+    return c.json({ error: 'Грешка при запис на профил' }, 500);
   }
 });
 
