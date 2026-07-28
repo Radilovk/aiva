@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import {
   createTask,
+  countIncompleteTasks,
   deleteTask,
   duplicateTask,
   getIncompleteTasks,
@@ -27,7 +28,12 @@ import {
   startOAuthConnect,
   syncTaskToCloudCalendars,
 } from './calendar';
-import { getSubscription, getTierLimits, TIER_LIMITS } from './subscription';
+import {
+  TIER_LIMITS,
+  getEffectiveSubscription,
+  getStripeCatalog,
+  resolvePlanPriceId,
+} from './subscription';
 import {
   createCheckoutSession,
   createPortalSession,
@@ -62,12 +68,22 @@ function envInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+async function getDailyCount(kv: KVNamespace, key: string): Promise<number> {
+  const val = await kv.get(key);
+  const n = parseInt(val || '', 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
 async function resolveSessionLimit(env: Env, userId: string): Promise<number> {
-  if (env.SUBSCRIPTION_ENFORCED === 'true') {
-    const sub = await getSubscription(env.SESSIONS, userId);
-    return getTierLimits(sub.tier).sessions_per_day;
-  }
-  return envInt(env.MAX_SESSIONS_PER_DAY, DEFAULT_MAX_SESSIONS_PER_DAY);
+  const effective = await getEffectiveSubscription(env, userId, envInt);
+  return effective.limits.sessions_per_day;
+}
+
+function plusRequiredResponse(c: { json: (body: unknown, status?: number) => Response }) {
+  return c.json({
+    error: 'Тази функция изисква KAYA Plus.',
+    code: 'PLUS_REQUIRED',
+  }, 403);
 }
 
 /** Increments a per-day KV counter; returns false when the limit is reached. */
@@ -278,7 +294,10 @@ app.post('/api/token', async (c) => {
   const ip = c.req.header('cf-connecting-ip') || 'unknown';
 
   if (!(await incrementDailyLimit(c.env.SESSIONS, `rate:${userId}`, userLimit))) {
-    return c.json({ error: 'Достигнат е дневният лимит от гласови сесии. Опитайте утре.' }, 429);
+    return c.json({
+      error: 'Достигнат е дневният лимит от гласови сесии. Опитайте утре или надградете до Plus.',
+      code: 'SESSION_LIMIT',
+    }, 429);
   }
   if (!(await incrementDailyLimit(c.env.SESSIONS, `rate:ip:${ip}`, ipLimit))) {
     return c.json({ error: 'Достигнат е дневният лимит от гласови сесии за тази мрежа. Опитайте утре.' }, 429);
@@ -316,10 +335,12 @@ app.post('/api/voice-preview', async (c) => {
     voice_name?: string;
     text?: string;
     language?: string;
-  }>().catch(() => ({} as { voice_name?: string; text?: string; language?: string }));
+    user_id?: string;
+  }>().catch(() => ({} as { voice_name?: string; text?: string; language?: string; user_id?: string }));
 
   const voiceName = /^[A-Za-z][A-Za-z -]{0,30}$/.test(body.voice_name || '') ? body.voice_name! : 'Kore';
   const text = (body.text || 'Здравейте! Аз съм KAYA. С какво мога да ви помогна?').slice(0, 120);
+  const userId = body.user_id || 'anonymous';
 
   // Кеш по глас+текст: гласовете са краен брой, така TTS API се вика веднъж на комбинация
   const cacheKey = `tts:${voiceName}:${await sha256Hex(text)}`;
@@ -328,6 +349,15 @@ app.post('/api/voice-preview', async (c) => {
 
   const previewLimit = envInt(c.env.MAX_PREVIEWS_PER_IP, DEFAULT_MAX_PREVIEWS_PER_IP);
   const ip = c.req.header('cf-connecting-ip') || 'unknown';
+  const effective = await getEffectiveSubscription(c.env, userId, envInt);
+  if (effective.enforced) {
+    const userPreviewKey = `rate:preview:user:${userId}`;
+    const userPreviewCount = await getDailyCount(c.env.SESSIONS, userPreviewKey);
+    if (userPreviewCount >= effective.limits.voice_preview_per_day) {
+      return c.json({ error: 'Достигнат е дневният лимит за аудио примери.', code: 'PREVIEW_LIMIT' }, 429);
+    }
+    await incrementDailyLimit(c.env.SESSIONS, userPreviewKey, effective.limits.voice_preview_per_day + 1);
+  }
   if (!(await incrementDailyLimit(c.env.SESSIONS, `rate:preview:${ip}`, previewLimit))) {
     return c.json({ error: 'Достигнат е дневният лимит за аудио примери. Опитайте утре.' }, 429);
   }
@@ -378,6 +408,10 @@ app.post('/api/voice-preview', async (c) => {
 
 app.get('/api/brief/:user_id', async (c) => {
   const userId = c.req.param('user_id');
+  const effective = await getEffectiveSubscription(c.env, userId, envInt);
+  if (effective.enforced && !effective.limits.daily_brief) {
+    return c.json({ brief: null, locked: true });
+  }
   const brief = await c.env.SESSIONS.get(`brief:${userId}`, 'json');
   return c.json({ brief: brief ?? null });
 });
@@ -402,6 +436,17 @@ app.post('/api/tasks', async (c) => {
 
   if (!body.user_id || !(body.task || body.content)) {
     return c.json({ error: 'user_id и task са задължителни' }, 400);
+  }
+
+  const effective = await getEffectiveSubscription(c.env, body.user_id, envInt);
+  if (effective.enforced) {
+    const activeCount = await countIncompleteTasks(c.env.DB, body.user_id);
+    if (activeCount >= effective.limits.max_active_tasks) {
+      return c.json({
+        error: 'Достигнат е лимитът на активни задачи. Надградете до KAYA Plus.',
+        code: 'TASK_LIMIT',
+      }, 403);
+    }
   }
 
   try {
@@ -449,6 +494,11 @@ app.post('/api/calendar/connect/start', async (c) => {
     return c.json({ error: 'user_id и provider са задължителни' }, 400);
   }
 
+  const effective = await getEffectiveSubscription(c.env, body.user_id, envInt);
+  if (effective.enforced && !effective.limits.cloud_calendar) {
+    return plusRequiredResponse(c);
+  }
+
   try {
     const { url, state } = await startOAuthConnect(
       c.env,
@@ -472,6 +522,11 @@ app.post('/api/calendar/connect/apple', async (c) => {
 
   if (!body.user_id || !body.apple_id || !body.password) {
     return c.json({ error: 'user_id, apple_id и password са задължителни' }, 400);
+  }
+
+  const effective = await getEffectiveSubscription(c.env, body.user_id, envInt);
+  if (effective.enforced && !effective.limits.cloud_calendar) {
+    return plusRequiredResponse(c);
   }
 
   try {
@@ -739,17 +794,25 @@ app.get('/api/subscription', async (c) => {
   const userId = c.req.query('user_id');
   if (!userId) return c.json({ error: 'user_id е задължителен' }, 400);
 
-  const sub = await getSubscription(c.env.SESSIONS, userId);
-  const limits = getTierLimits(sub.tier);
-  const enforced = c.env.SUBSCRIPTION_ENFORCED === 'true';
+  const effective = await getEffectiveSubscription(c.env, userId, envInt);
+  const catalog = getStripeCatalog(c.env);
+  const day = new Date().toISOString().slice(0, 10);
+  const sessionsUsed = await getDailyCount(c.env.SESSIONS, `rate:${userId}:${day}`);
+  const activeTasks = await countIncompleteTasks(c.env.DB, userId);
 
   return c.json({
-    tier: sub.tier,
-    status: sub.status,
-    current_period_end: sub.current_period_end,
-    limits,
-    enforced,
-    catalog: {
+    tier: effective.tier,
+    status: effective.status,
+    current_period_end: effective.current_period_end,
+    limits: effective.limits,
+    enforced: effective.enforced,
+    stripe_configured: effective.stripe_configured,
+    usage: {
+      sessions_today: sessionsUsed,
+      active_tasks: activeTasks,
+    },
+    catalog,
+    tiers: {
       free: { limits: TIER_LIMITS.free },
       plus: { limits: TIER_LIMITS.plus },
       pro: { limits: TIER_LIMITS.pro },
@@ -758,13 +821,19 @@ app.get('/api/subscription', async (c) => {
 });
 
 app.post('/api/stripe/checkout', async (c) => {
-  const body = await c.req.json<{ user_id?: string; price_id?: string }>().catch(() => null);
-  if (!body?.user_id || !body?.price_id) {
-    return c.json({ error: 'user_id и price_id са задължителни' }, 400);
+  const body = await c.req.json<{ user_id?: string; plan?: string; price_id?: string }>().catch(() => null);
+  if (!body?.user_id) {
+    return c.json({ error: 'user_id е задължителен' }, 400);
+  }
+  const priceId = body.plan
+    ? resolvePlanPriceId(body.plan, c.env)
+    : body.price_id;
+  if (!priceId) {
+    return c.json({ error: 'Невалиден план или липсва price_id' }, 400);
   }
   try {
     const origin = requestOrigin(new URL(c.req.url));
-    const { url } = await createCheckoutSession(c.env, body.user_id, body.price_id, origin);
+    const { url } = await createCheckoutSession(c.env, body.user_id, priceId, origin, body.plan);
     return c.json({ url });
   } catch (e) {
     console.error('Stripe checkout error:', e);

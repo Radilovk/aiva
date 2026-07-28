@@ -54,20 +54,29 @@ export async function createCheckoutSession(
   env: StripeEnv,
   userId: string,
   priceId: string,
-  origin: string
+  origin: string,
+  planId?: string
 ): Promise<{ url: string }> {
   const successUrl = `${appOrigin(env, origin)}/settings.html?billing=success`;
   const cancelUrl = `${appOrigin(env, origin)}/settings.html?billing=cancel`;
+  const isLifetime = priceId === env.STRIPE_PRICE_PRO_LIFETIME;
 
-  const session = await stripeRequest(env, '/checkout/sessions', {
-    mode: priceId === env.STRIPE_PRICE_PRO_LIFETIME ? 'payment' : 'subscription',
+  const body: Record<string, unknown> = {
+    mode: isLifetime ? 'payment' : 'subscription',
     'line_items[0][price]': priceId,
     'line_items[0][quantity]': 1,
     client_reference_id: userId,
     success_url: successUrl,
     cancel_url: cancelUrl,
     allow_promotion_codes: 'true',
-  });
+    billing_address_collection: 'auto',
+  };
+
+  if (!isLifetime && planId === 'plus_yearly') {
+    body['subscription_data[trial_period_days]'] = 7;
+  }
+
+  const session = await stripeRequest(env, '/checkout/sessions', body);
 
   if (!session.url) throw new Error('Липсва Checkout URL');
   return { url: session.url };

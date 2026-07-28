@@ -67,6 +67,7 @@
         voice_name: opts.voiceName,
         text: getPreviewPhrase(opts.language),
         language: opts.language || 'bg',
+        user_id: getUserId(),
       }),
     });
     const data = await res.json();

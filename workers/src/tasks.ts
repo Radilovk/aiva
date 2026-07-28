@@ -353,6 +353,15 @@ export async function markTaskDone(db: D1Database, taskId: number, userId: strin
   return { changed: true, task: { ...task, done: 1 }, next };
 }
 
+export async function countIncompleteTasks(db: D1Database, userId: string): Promise<number> {
+  await ensureTaskSchema(db);
+  const row = await db
+    .prepare('SELECT COUNT(*) as c FROM tasks WHERE user_id = ? AND done = 0')
+    .bind(userId)
+    .first<{ c: number }>();
+  return Number(row?.c ?? 0);
+}
+
 export async function registerUser(db: D1Database, userId: string, appToken: string): Promise<void> {
   await db
     .prepare(
