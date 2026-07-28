@@ -27,14 +27,22 @@ import {
   startOAuthConnect,
   syncTaskToCloudCalendars,
 } from './calendar';
+import { getSubscription, getTierLimits, TIER_LIMITS } from './subscription';
+import {
+  createCheckoutSession,
+  createPortalSession,
+  handleStripeWebhook,
+  type StripeEnv,
+} from './stripe';
 
-interface Env {
+interface Env extends StripeEnv {
   DB: D1Database;
   SESSIONS: KVNamespace;
   GEMINI_API_KEY: string;
   MAX_SESSIONS_PER_DAY?: string;
   MAX_SESSIONS_PER_IP?: string;
   MAX_PREVIEWS_PER_IP?: string;
+  SUBSCRIPTION_ENFORCED?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_REDIRECT_URI?: string;
@@ -52,6 +60,14 @@ const DEFAULT_MAX_PREVIEWS_PER_IP = 10;
 function envInt(value: string | undefined, fallback: number): number {
   const parsed = parseInt(value || '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+async function resolveSessionLimit(env: Env, userId: string): Promise<number> {
+  if (env.SUBSCRIPTION_ENFORCED === 'true') {
+    const sub = await getSubscription(env.SESSIONS, userId);
+    return getTierLimits(sub.tier).sessions_per_day;
+  }
+  return envInt(env.MAX_SESSIONS_PER_DAY, DEFAULT_MAX_SESSIONS_PER_DAY);
 }
 
 /** Increments a per-day KV counter; returns false when the limit is reached. */
@@ -257,7 +273,7 @@ app.post('/api/token', async (c) => {
   const userId = body?.user_id || 'anonymous';
 
   // Двоен дневен лимит: по потребител + по IP (user_id идва от клиента и може да се ротира)
-  const userLimit = envInt(c.env.MAX_SESSIONS_PER_DAY, DEFAULT_MAX_SESSIONS_PER_DAY);
+  const userLimit = await resolveSessionLimit(c.env, userId);
   const ipLimit = envInt(c.env.MAX_SESSIONS_PER_IP, DEFAULT_MAX_SESSIONS_PER_IP);
   const ip = c.req.header('cf-connecting-ip') || 'unknown';
 
@@ -714,6 +730,70 @@ app.post('/api/profile', async (c) => {
   } catch (e) {
     console.error('Profile sync error:', e);
     return c.json({ error: 'Грешка при запис на профил' }, 500);
+  }
+});
+
+// --- Subscription & Stripe (see docs/MONETIZATION.md) ---
+
+app.get('/api/subscription', async (c) => {
+  const userId = c.req.query('user_id');
+  if (!userId) return c.json({ error: 'user_id е задължителен' }, 400);
+
+  const sub = await getSubscription(c.env.SESSIONS, userId);
+  const limits = getTierLimits(sub.tier);
+  const enforced = c.env.SUBSCRIPTION_ENFORCED === 'true';
+
+  return c.json({
+    tier: sub.tier,
+    status: sub.status,
+    current_period_end: sub.current_period_end,
+    limits,
+    enforced,
+    catalog: {
+      free: { limits: TIER_LIMITS.free },
+      plus: { limits: TIER_LIMITS.plus },
+      pro: { limits: TIER_LIMITS.pro },
+    },
+  });
+});
+
+app.post('/api/stripe/checkout', async (c) => {
+  const body = await c.req.json<{ user_id?: string; price_id?: string }>().catch(() => null);
+  if (!body?.user_id || !body?.price_id) {
+    return c.json({ error: 'user_id и price_id са задължителни' }, 400);
+  }
+  try {
+    const origin = requestOrigin(new URL(c.req.url));
+    const { url } = await createCheckoutSession(c.env, body.user_id, body.price_id, origin);
+    return c.json({ url });
+  } catch (e) {
+    console.error('Stripe checkout error:', e);
+    return c.json({ error: (e as Error).message || 'Грешка при Checkout' }, 500);
+  }
+});
+
+app.post('/api/stripe/portal', async (c) => {
+  const body = await c.req.json<{ user_id?: string }>().catch(() => null);
+  if (!body?.user_id) return c.json({ error: 'user_id е задължителен' }, 400);
+  try {
+    const origin = requestOrigin(new URL(c.req.url));
+    const { url } = await createPortalSession(c.env, body.user_id, origin);
+    return c.json({ url });
+  } catch (e) {
+    console.error('Stripe portal error:', e);
+    return c.json({ error: (e as Error).message || 'Грешка при Portal' }, 500);
+  }
+});
+
+app.post('/api/stripe/webhook', async (c) => {
+  const signature = c.req.header('stripe-signature') || '';
+  const payload = await c.req.text();
+  try {
+    await handleStripeWebhook(c.env, payload, signature);
+    return c.json({ received: true });
+  } catch (e) {
+    console.error('Stripe webhook error:', e);
+    return c.json({ error: (e as Error).message || 'Webhook failed' }, 400);
   }
 });
 
