@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <script src="lib/i18n-boot.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#050508">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="stylesheet" href="icons/brand.css">
+  <title>KAYA — Общи условия</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050508;
+      --surface: rgba(255, 255, 255, 0.03);
+      --border: rgba(255, 255, 255, 0.06);
+      --text: #f0f0f2;
+      --text-secondary: rgba(255, 255, 255, 0.45);
+      --accent: #ff3b5c;
+      --radius: 20px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 20px;
+      line-height: 1.65;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; gap: 12px; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    p, li { font-size: 0.92rem; color: rgba(255,255,255,.85); margin-bottom: 12px; }
+    ul { padding-left: 20px; margin-bottom: 16px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+    .back-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+    }
+    .meta { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 20px; }
+    footer { margin-top: 32px; text-align: center; font-size: 0.8rem; color: var(--text-secondary); }
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>KAYA — Общи условия</h1>
+      <a class="back-link" href="index.html">← Начало</a>
+    </header>
+    <div class="card">
+      <p class="meta">Последна актуализация: 28 юли 2026 · Terms of Service & Subscription Terms</p>
+
+      <h2>1. Доставчик и услуга</h2>
+      <p>
+        Услугата KAYA („Приложението“) е гласов асистент за задачи и календар, достъпен като уеб приложение и Android APK.
+        Оператор на услугата: <strong>Radilov K</strong> (контакт: чрез репозиторито / поддръжка на проекта).
+        Използването на Приложението се урежда от тези Общи условия и от <a href="privacy.html">Политиката за поверителност</a>.
+      </p>
+
+      <h2>2. Приемане</h2>
+      <p>
+        С инсталиране, регистрация или ползване на Приложението потвърждавате, че сте навършили 16 години
+        (или имате съгласие на родител) и приемате тези условия. Ако не сте съгласни, не използвайте услугата.
+      </p>
+
+      <h2>3. Планове и абонаменти</h2>
+      <ul>
+        <li><strong>Free</strong> — безплатен план с ограничени гласови сесии и функции (виж приложението).</li>
+        <li><strong>KAYA Plus</strong> — абонамент (месечен или годишен) с разширени лимити и облачен календар.</li>
+        <li><strong>KAYA Pro</strong> (ако е наличен) — разширен план или еднократно плащане (lifetime), както е показано при покупка.</li>
+      </ul>
+      <p>
+        Цените, валута и включените функции са показани в Приложението преди плащане.
+        Абонаментите се таксуват предварително чрез <strong>Stripe</strong> и се подновяват автоматично до отказ.
+      </p>
+
+      <h2>4. Плащане и данъци</h2>
+      <p>
+        Плащанията се обработват от Stripe Payments Europe Ltd. (или местен Stripe доставчик).
+        Ние не съхраняваме пълни номера на карти. Фактурите и касови бележки се изпращат от Stripe на имейла, посочен при плащане.
+        Цените могат да включват или не включват ДДС — както е посочено при Checkout.
+      </p>
+
+      <h2 id="refunds">5. Отказ, възстановяване и право на отказ (ЕС)</h2>
+      <ul>
+        <li><strong>Отказ от абонамент:</strong> по всяко време чрез „Управление на абонамента“ в Настройки (Stripe Customer Portal). Достъпът до Plus остава до края на платения период.</li>
+        <li><strong>7-дневен пробен период</strong> (само годишен Plus, ако е предложен): ако не откажете преди изтичане, започва таксуване.</li>
+        <li><strong>14-дневно право на отказ</strong> (ЕС/България): при първа покупка на абонамент можете да поискате пълно възстановяване в 14 дни от покупката, ако не сте използвали съществената част от услугата (напр. повече от 5 гласови сесии в Plus). Пишете на оператора с user_id и дата на покупка.</li>
+        <li><strong>Еднократни плащания (lifetime):</strong> възстановяване в 14 дни само ако услугата не е била съществено използвана.</li>
+      </ul>
+
+      <h2>6. Промени в цени и планове</h2>
+      <p>
+        Можем да променим цени или лимити на Free плана с предизвестие в Приложението.
+        Промени в абонаментни цени за активни абонати важат от следващия период на подновяване, с уведомление по имейл (чрез Stripe) поне 30 дни преди това, когато е приложимо.
+      </p>
+
+      <h2>7. Позволено ползване</h2>
+      <p>Забранено е: злоупотреба с API (ботове, споделяне на акаунт за заобикаляне на лимити), незаконно съдържание, reverse engineering на сървърната част, или използване, което нарушава правата на трети страни или политиките на Google Gemini API.</p>
+
+      <h2>8. AI и отговорност</h2>
+      <p>
+        KAYA използва изкуствен интелект (Google Gemini). Отговорите могат да са неточни.
+        Не разчитайте на Приложението за медицински, правни или финансови решения без проверка.
+        Операторът не носи отговорност за действия, предприети само на база съвети на асистента.
+      </p>
+
+      <h2>9. Наличност и лимити</h2>
+      <p>
+        Услугата се предоставя „както е“. Можем да въведем технически лимити (гласови сесии/ден) за защита на инфраструктурата.
+        Планирани прекъсвания за поддръжка са възможни.
+      </p>
+
+      <h2>10. Приложимо право</h2>
+      <p>
+        За потребители в България и ЕС: приложимо е правото на Република България, с м imperative consumer protection provisions of your country of residence where applicable.
+        Спорове: първо опит за решение по имейл; за потребители в ЕС — платформата за ОРС на ЕК.
+      </p>
+
+      <h2>11. English summary</h2>
+      <p>
+        KAYA is a voice task assistant with optional paid plans (Plus/Pro) billed via Stripe.
+        Subscriptions renew until cancelled in the Customer Portal. EU consumers have a 14-day withdrawal right for unused digital services.
+        See <a href="privacy.html">Privacy Policy</a> for data processing. Operator: Radilov K.
+      </p>
+    </div>
+    <footer>
+      <a href="privacy.html">Privacy Policy</a> · <a href="settings.html">Settings</a>
+    </footer>
+  </div>
+</body>
+</html>

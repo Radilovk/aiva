@@ -1477,6 +1477,13 @@ async function markDone(taskId) {
   }
 }
 
+function showSubscriptionPaywall(data) {
+  const code = data?.code;
+  if (code && window.AIVA_SUBSCRIPTION?.showPaywall) {
+    window.AIVA_SUBSCRIPTION.showPaywall(code);
+  }
+}
+
 async function persistTask(args) {
   const defaults = assistantSettings.defaults;
   const res = await fetch(`${API_BASE}/api/tasks`, {
@@ -1497,7 +1504,10 @@ async function persistTask(args) {
     }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || t('errSave'));
+  if (!res.ok) {
+    showSubscriptionPaywall(data);
+    throw new Error(data.error || t('errSave'));
+  }
   showToast(data.task);
   await loadTasks();
   if (window.AIVA_CALENDAR_SYNC) {
@@ -1535,7 +1545,10 @@ async function saveTaskFromForm() {
     body: JSON.stringify(id ? payload : { ...payload, task: payload.content }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || t('errSave'));
+  if (!res.ok) {
+    showSubscriptionPaywall(data);
+    throw new Error(data.error || t('errSave'));
+  }
   await loadTasks();
   showToast(data.task);
   if (window.AIVA_CALENDAR_SYNC) {
@@ -1804,7 +1817,12 @@ async function fetchToken() {
     body: JSON.stringify({ user_id: userId }),
   });
   const data = await parseJsonResponse(res, 'Грешка при заявка за токен');
-  if (!res.ok) throw new Error(data.error || tf('errInvalidResponse', { status: res.status }));
+  if (!res.ok) {
+    if (data.code === 'SESSION_LIMIT') {
+      window.AIVA_SUBSCRIPTION?.showPaywall?.('SESSION_LIMIT');
+    }
+    throw new Error(data.error || tf('errInvalidResponse', { status: res.status }));
+  }
   if (!data.token) throw new Error(t('errToken'));
   return data.token;
 }
@@ -1825,6 +1843,7 @@ async function connectSession() {
     const calendarEvents = await loadCalendarEventsForAssistant();
 
     const token = await fetchToken();
+    const subData = await window.AIVA_SUBSCRIPTION?.fetchSubscription?.() ?? null;
     const model = assistantSettings.model || LIVE_MODEL;
 
     client = new GeminiLiveAPI(token, model);
@@ -1848,7 +1867,9 @@ async function connectSession() {
     client.responseModalities = assistantSettings.responseModalities;
     client.voiceName = assistantSettings.voiceName;
     client.temperature = assistantSettings.temperature;
-    client.googleGrounding = assistantSettings.googleGrounding;
+    client.googleGrounding =
+      assistantSettings.googleGrounding
+      && window.AIVA_SUBSCRIPTION?.canUseFeature?.(subData, 'google_grounding');
     client.automaticActivityDetection = assistantSettings.automaticActivityDetection;
     client.activityHandling = assistantSettings.activityHandling;
     client.addFunction(new SaveTaskTool());
@@ -2162,6 +2183,7 @@ async function loadDailyBrief() {
     const res = await fetch(`${API_BASE}/api/brief/${encodeURIComponent(userId)}`);
     if (!res.ok) return;
     const data = await res.json();
+    if (data.locked) return;
     const brief = data.brief;
     if (!brief?.text) return;
     if (localStorage.getItem('aiva_brief_dismissed') === brief.generated_at) return;
@@ -2212,6 +2234,27 @@ loadTasks();
 refreshExternalEvents();
 loadDailyBrief();
 initDeviceBanner();
+initPaywallUi();
+
+function initPaywallUi() {
+  document.getElementById('paywallDismissBtn')?.addEventListener('click', () => {
+    window.AIVA_SUBSCRIPTION?.hidePaywall?.();
+  });
+  document.getElementById('paywallMonthlyBtn')?.addEventListener('click', async () => {
+    try {
+      await window.AIVA_SUBSCRIPTION?.openCheckout?.('plus_monthly');
+    } catch (e) {
+      showErrorToast(e.message);
+    }
+  });
+  document.getElementById('paywallYearlyBtn')?.addEventListener('click', async () => {
+    try {
+      await window.AIVA_SUBSCRIPTION?.openCheckout?.('plus_yearly');
+    } catch (e) {
+      showErrorToast(e.message);
+    }
+  });
+}
 
 function tryAutoStartListening() {
   if (isSessionActive || isConnecting) return;

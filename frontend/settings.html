@@ -227,6 +227,83 @@
       color: var(--accent);
     }
 
+    .footer-link:hover {
+      color: var(--accent);
+    }
+
+    .plan-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .plan-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .plan-card.is-current {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(255, 59, 92, 0.25);
+    }
+
+    .plan-card h3 {
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+
+    .plan-price {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin: 8px 0;
+    }
+
+    .plan-features {
+      list-style: none;
+      margin: 12px 0;
+      padding: 0;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+
+    .plan-features li {
+      margin-bottom: 6px;
+    }
+
+    .billing-usage {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .billing-note {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 12px;
+      line-height: 1.45;
+    }
+
+    .paywall-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.72);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .paywall-modal.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
     @media (max-width: 480px) {
       .row-grid { grid-template-columns: 1fr; }
     }
@@ -559,6 +636,23 @@
       </div>
     </div>
 
+    <!-- Subscription / Billing -->
+    <div class="section" id="billingSection">
+      <div class="section-title" data-i18n="billingTitle" data-i18n-prefix="⭐ ">Абонамент</div>
+      <p class="field-hint" data-i18n="billingSubtitle">Повече гласови сесии, облачен календар и дневен AI преглед.</p>
+      <div class="billing-usage" id="billingUsage"></div>
+      <div class="plan-grid" id="billingPlanGrid"></div>
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn primary" type="button" id="billingManageBtn" data-i18n="billingManage" hidden>Управление на абонамента</button>
+      </div>
+      <p class="billing-note" id="billingNote" data-i18n="billingTermsNote">С абонамента приемате Условията и Политиката за поверителност.</p>
+      <p class="billing-note">
+        <a href="terms.html" class="footer-link" data-i18n="termsLink">Общи условия</a>
+        ·
+        <a href="terms.html#refunds" class="footer-link" data-i18n="refundLink">Политика за възстановяване</a>
+      </p>
+    </div>
+
     <!-- Appearance -->
     <div class="section">
       <div class="section-title" data-i18n="appearanceTitle" data-i18n-prefix="🎨 ">Външен вид</div>
@@ -589,10 +683,24 @@
 
     <footer class="settings-footer">
       <a href="privacy.html" class="footer-link" data-i18n="privacyLink">Декларация за поверителност (Privacy Policy)</a>
+      ·
+      <a href="terms.html" class="footer-link" data-i18n="termsLink">Общи условия</a>
     </footer>
   </div>
 
   <div class="saved-toast" id="savedToast" data-i18n="settingsSaved" data-i18n-prefix="✓ ">Настройките са запазени</div>
+
+  <div class="paywall-modal" id="paywallModal" aria-hidden="true">
+    <div class="plan-card" role="dialog">
+      <h3 data-i18n="paywallTitle">Надградете до KAYA Plus</h3>
+      <p id="paywallReason" data-i18n="paywallCloudCal">Облачен календар изисква KAYA Plus.</p>
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn primary" type="button" id="paywallYearlyBtn" data-i18n="paywallCtaYearly">Plus — годишен</button>
+        <button class="btn" type="button" id="paywallMonthlyBtn" data-i18n="paywallCtaMonthly">Plus — месечен</button>
+        <button class="btn" type="button" id="paywallDismissBtn" data-i18n="paywallLater">Не сега</button>
+      </div>
+    </div>
+  </div>
 
   <div class="settings-fixed-bar-wrap">
     <div class="settings-fixed-bar">
@@ -605,6 +713,8 @@
   <script src="settings.js"></script>
   <script src="lib/i18n.js"></script>
   <script src="lib/i18n-extended.js"></script>
+  <script src="lib/i18n-billing.js"></script>
+  <script src="lib/subscription.js"></script>
   <script src="lib/voices.js"></script>
   <script src="lib/geminilive.js"></script>
   <script src="lib/mediaUtils.js"></script>
@@ -918,6 +1028,11 @@
 
     async function startCloudConnect(provider) {
       if (isAndroidPlatform) return;
+      const sub = await window.AIVA_SUBSCRIPTION?.fetchSubscription?.(true);
+      if (sub?.enforced && !window.AIVA_SUBSCRIPTION?.canUseFeature?.(sub, 'cloud_calendar')) {
+        window.AIVA_SUBSCRIPTION?.showPaywall?.('PLUS_REQUIRED');
+        return;
+      }
       const userId = getUserId();
       if (!userId) {
         alert(t('errNoUserId'));
@@ -935,6 +1050,10 @@
       });
       const data = await res.json();
       if (!res.ok || !data.url) {
+        if (data.code === 'PLUS_REQUIRED') {
+          window.AIVA_SUBSCRIPTION?.showPaywall?.('PLUS_REQUIRED');
+          return;
+        }
         alert(data.error || t('errOAuthStart'));
         return;
       }
@@ -1363,12 +1482,116 @@
       }
     }
 
+    async function initBilling() {
+      const usageEl = document.getElementById('billingUsage');
+      const grid = document.getElementById('billingPlanGrid');
+      const manageBtn = document.getElementById('billingManageBtn');
+      const noteEl = document.getElementById('billingNote');
+      if (!grid || !window.AIVA_SUBSCRIPTION) return;
+
+      const data = await window.AIVA_SUBSCRIPTION.fetchSubscription(true);
+      if (!data) return;
+
+      const tier = data.tier || 'free';
+      const limits = data.limits || {};
+      const usage = data.usage || {};
+
+      if (usageEl) {
+        usageEl.textContent = `${tf('billingUsageSessions', {
+          used: usage.sessions_today || 0,
+          max: limits.sessions_per_day || 0,
+        })} · ${tf('billingUsageTasks', {
+          used: usage.active_tasks || 0,
+          max: limits.max_active_tasks >= 10000 ? '∞' : limits.max_active_tasks,
+        })}`;
+      }
+
+      if (!data.stripe_configured && noteEl) {
+        noteEl.textContent = t('billingNotConfigured');
+      }
+
+      grid.innerHTML = '';
+
+      const freeCard = document.createElement('div');
+      freeCard.className = `plan-card${tier === 'free' ? ' is-current' : ''}`;
+      freeCard.innerHTML = `
+        <h3>${t('planFree')}</h3>
+        <ul class="plan-features">
+          <li>${tf('billingFeatureSessions', { count: data.tiers?.free?.limits?.sessions_per_day || 5 })}</li>
+          <li>${tf('billingFeatureTasks', { count: data.tiers?.free?.limits?.max_active_tasks || 50 })}</li>
+        </ul>
+      `;
+      grid.appendChild(freeCard);
+
+      const catalog = data.catalog?.plans || [];
+      for (const plan of catalog) {
+        const card = document.createElement('div');
+        const isCurrent = tier === plan.tier && tier !== 'free';
+        card.className = `plan-card${isCurrent ? ' is-current' : ''}`;
+        const price = window.AIVA_SUBSCRIPTION.formatMoney(plan.amount_cents, plan.currency);
+        const interval = plan.interval === 'month'
+          ? t('billingPerMonth')
+          : plan.interval === 'year'
+            ? t('billingPerYear')
+            : t('billingOnce');
+        const trial = plan.trial_days ? ` · ${t('billingYearlyTrial')}` : '';
+        card.innerHTML = `
+          <h3>${t('planPlus')}${plan.interval === 'year' ? ' — ' + t('billingYearlySave') : ''}</h3>
+          <div class="plan-price">${price}<span style="font-size:0.8rem;font-weight:400">${interval}</span></div>
+          <ul class="plan-features">
+            <li>${tf('billingFeatureSessions', { count: data.tiers?.plus?.limits?.sessions_per_day || 40 })}</li>
+            <li>${t('billingFeatureTasksUnlimited')}</li>
+            <li>${t('billingFeatureCloudCal')}</li>
+            <li>${t('billingFeatureBrief')}</li>
+          </ul>
+          ${isCurrent ? '' : `<button class="btn primary" type="button" data-plan="${plan.id}">${t('billingUpgrade')}${trial}</button>`}
+        `;
+        grid.appendChild(card);
+        const btn = card.querySelector('button[data-plan]');
+        if (btn) {
+          btn.addEventListener('click', async () => {
+            try {
+              await window.AIVA_SUBSCRIPTION.openCheckout(plan.id);
+            } catch (e) {
+              alert(e.message || 'Checkout error');
+            }
+          });
+        }
+      }
+
+      if (manageBtn && window.AIVA_SUBSCRIPTION.hasPlus(data)) {
+        manageBtn.hidden = false;
+        manageBtn.onclick = async () => {
+          try {
+            await window.AIVA_SUBSCRIPTION.openPortal();
+          } catch (e) {
+            alert(e.message || 'Portal error');
+          }
+        };
+      }
+
+      const params = new URLSearchParams(location.search);
+      if (params.get('billing') === 'success') {
+        showSavedToast();
+        if (noteEl) noteEl.textContent = t('billingSuccess');
+        history.replaceState({}, '', location.pathname);
+        await window.AIVA_SUBSCRIPTION.fetchSubscription(true);
+      } else if (params.get('billing') === 'cancel') {
+        if (noteEl) noteEl.textContent = t('billingCancel');
+        history.replaceState({}, '', location.pathname);
+      }
+    }
+
     (async () => {
       applyCalendarPlatformUI();
       if (!isAndroidPlatform) {
         await handleCloudOauthCallback();
       }
       populateUI();
+      await initBilling();
+      document.getElementById('paywallDismissBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.hidePaywall?.());
+      document.getElementById('paywallMonthlyBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.openCheckout?.('plus_monthly'));
+      document.getElementById('paywallYearlyBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.openCheckout?.('plus_yearly'));
       if (isAndroidPlatform) {
         await applyHardwareShortcutConfig(settings.hardwareShortcut);
         syncAndroidCalendarStatus();

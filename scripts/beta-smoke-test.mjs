@@ -177,6 +177,39 @@ function testIcsUtils() {
   }
 }
 
+async function testBillingI18n() {
+  console.log('\n[billing]');
+  const ctx = loadIifeModule(join(FRONTEND, 'lib/i18n.js'));
+  vm.runInContext(readFileSync(join(FRONTEND, 'lib/i18n-billing.js'), 'utf8'), ctx, {
+    filename: 'i18n-billing.js',
+  });
+  vm.runInContext(readFileSync(join(FRONTEND, 'lib/subscription.js'), 'utf8'), ctx, {
+    filename: 'subscription.js',
+  });
+  const i18n = ctx.window.AIVA_I18N;
+  const sub = ctx.window.AIVA_SUBSCRIPTION;
+  if (!sub) {
+    fail('AIVA_SUBSCRIPTION loads');
+    return;
+  }
+  ok('AIVA_SUBSCRIPTION loads');
+
+  const billingKeys = ['billingTitle', 'paywallTitle', 'paywallSessionLimit', 'termsLink'];
+  for (const key of billingKeys) {
+    if (!i18n?.t?.(key)) fail(`billing i18n key ${key}`);
+    else ok(`billing i18n key ${key}`);
+  }
+
+  if (!sub.canUseFeature({ enforced: false }, 'cloud_calendar')) fail('canUseFeature when not enforced');
+  else ok('canUseFeature allows all when not enforced');
+
+  if (sub.canUseFeature({ enforced: true, limits: { cloud_calendar: false } }, 'cloud_calendar')) {
+    fail('canUseFeature blocks cloud_calendar on free');
+  } else {
+    ok('canUseFeature blocks cloud_calendar on free when enforced');
+  }
+}
+
 async function testLiveApi() {
   console.log('\n[api]');
   const testUser = `beta-smoke-${Date.now()}`;
@@ -257,6 +290,20 @@ async function testLiveApi() {
       if (!text.includes('VCALENDAR')) fail('ICS content');
       else ok('GET /api/calendar.ics returns VCALENDAR');
     }
+
+    const subRes = await fetch(`${API_BASE}/api/subscription?user_id=${encodeURIComponent(testUser)}`);
+    if (!subRes.ok) {
+      if (subRes.status === 404) ok('GET /api/subscription (endpoint pending worker deploy)');
+      else fail('GET /api/subscription', String(subRes.status));
+    } else {
+      const subData = await subRes.json();
+      const required = ['tier', 'status', 'limits', 'enforced', 'usage', 'catalog', 'tiers'];
+      const missing = required.filter((k) => subData[k] === undefined);
+      if (missing.length) fail('subscription response shape', missing.join(', '));
+      else ok('GET /api/subscription returns full shape');
+      if (subData.tiers?.free?.limits?.sessions_per_day) ok('subscription includes tier limits');
+      else fail('subscription tier limits');
+    }
   } catch (e) {
     fail('API connectivity', e.message);
   }
@@ -268,6 +315,7 @@ async function main() {
 
   testSettings();
   testIcsUtils();
+  await testBillingI18n();
   await testI18n();
   await testLiveApi();
 

@@ -32,7 +32,12 @@
   "vars": {
     "MAX_SESSIONS_PER_DAY": "15",
     "MAX_SESSIONS_PER_IP": "40",
-    "MAX_PREVIEWS_PER_IP": "10"
+    "MAX_PREVIEWS_PER_IP": "10",
+    "SUBSCRIPTION_ENFORCED": "false",
+    "APP_URL": "https://aiva.radilov-k.workers.dev",
+    "STRIPE_PRICE_PLUS_MONTHLY": "",
+    "STRIPE_PRICE_PLUS_YEARLY": "",
+    "STRIPE_PRICE_PRO_LIFETIME": ""
   },
   "migrations": [
     {
