@@ -193,7 +193,7 @@ export function getStripeCatalog(env: {
     plans.push({
       id: 'plus_monthly',
       price_id: env.STRIPE_PRICE_PLUS_MONTHLY,
-      name: 'KAYA Plus',
+      name: 'KASY Plus',
       amount_cents: 699,
       currency: 'eur',
       interval: 'month',
@@ -204,7 +204,7 @@ export function getStripeCatalog(env: {
     plans.push({
       id: 'plus_yearly',
       price_id: env.STRIPE_PRICE_PLUS_YEARLY,
-      name: 'KAYA Plus',
+      name: 'KASY Plus',
       amount_cents: 4999,
       currency: 'eur',
       interval: 'year',
@@ -216,7 +216,7 @@ export function getStripeCatalog(env: {
     plans.push({
       id: 'pro_lifetime',
       price_id: env.STRIPE_PRICE_PRO_LIFETIME,
-      name: 'KAYA Pro Lifetime',
+      name: 'KASY Pro Lifetime',
       amount_cents: 14900,
       currency: 'eur',
       interval: 'once',

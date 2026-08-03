@@ -16,7 +16,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
  * Detects the phone maker and exposes the OEM-specific switches that keep
- * KAYA working when the app is closed: battery-optimization exemption and
+ * KASY working when the app is closed: battery-optimization exemption and
  * the vendor auto-start / background-launch screens. Heavily customized
  * Android builds (MIUI, EMUI, ColorOS, FuntouchOS, ...) kill background
  * apps by default, which silently breaks reminders and the volume shortcut.

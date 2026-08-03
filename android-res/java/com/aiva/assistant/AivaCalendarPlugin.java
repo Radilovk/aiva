@@ -192,7 +192,7 @@ public class AivaCalendarPlugin extends Plugin {
     public void addEvent(PluginCall call) {
         if (!ensureCalendarPermission(call)) return;
 
-        String title = call.getString("title", "KAYA задача");
+        String title = call.getString("title", "KASY задача");
         String description = call.getString("description", "");
         String location = call.getString("location", "");
         long startTime = call.getLong("startTime", 0L);
@@ -256,7 +256,7 @@ public class AivaCalendarPlugin extends Plugin {
         }
 
         long eventId = Long.parseLong(eventIdStr);
-        String title = call.getString("title", "KAYA задача");
+        String title = call.getString("title", "KASY задача");
         String description = call.getString("description", "");
         String location = call.getString("location", "");
         long startTime = call.getLong("startTime", 0L);

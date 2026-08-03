@@ -174,7 +174,7 @@
       'PRODID:-//AIVA//Task Calendar//BG',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      `X-WR-CALNAME:${escapeICS(options.calendarName || 'KAYA Задачи')}`,
+      `X-WR-CALNAME:${escapeICS(options.calendarName || 'KASY Задачи')}`,
     ];
 
     if (options.includeRefresh) {
@@ -211,7 +211,7 @@
 
     const params = new URLSearchParams({
       action: 'TEMPLATE',
-      text: task.content || 'KAYA задача',
+      text: task.content || 'KASY задача',
       dates: `${fmt(parsed.start)}/${fmt(parsed.end)}`,
       ctz: 'Europe/Sofia',
     });

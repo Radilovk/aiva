@@ -111,7 +111,7 @@
     if (!parsed) throw new Error('Задачата няма валидна дата');
     return {
       calendarId,
-      title: task.content || 'KAYA задача',
+      title: task.content || 'KASY задача',
       description: task.notes || '',
       location: task.location || '',
       startDate: parsed.start.toISOString(),

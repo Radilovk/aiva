@@ -35,7 +35,7 @@
   }
 
   function getPreviewPhrase(language) {
-    return window.AIVA_I18N?.t?.('voicePreviewPhrase') || 'Hello, I am KAYA.';
+    return window.AIVA_I18N?.t?.('voicePreviewPhrase') || 'Hello, I am KASY, your AI Secretary.';
   }
 
   async function ensurePreviewPlayer() {

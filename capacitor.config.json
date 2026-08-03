@@ -1,6 +1,6 @@
 {
   "appId": "com.aiva.assistant",
-  "appName": "KAYA",
+  "appName": "KASY",
   "webDir": "capacitor-shell",
   "server": {
     "androidScheme": "https",

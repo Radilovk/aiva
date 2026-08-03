@@ -1,5 +1,5 @@
 /**
- * Creates KAYA Stripe products/prices. Run once per Stripe account (test or live).
+ * Creates KASY Stripe products/prices. Run once per Stripe account (test or live).
  *
  *   export STRIPE_SECRET_KEY=sk_test_...
  *   node scripts/stripe-setup.mjs
@@ -30,7 +30,7 @@ async function stripe(path, body = {}) {
 
 async function main() {
   const plusProduct = await stripe('/products', {
-    name: 'KAYA Plus',
+    name: 'KASY Plus',
     description: 'Voice sessions, cloud calendar, daily AI brief',
   });
 
@@ -49,8 +49,8 @@ async function main() {
   });
 
   const proProduct = await stripe('/products', {
-    name: 'KAYA Pro Lifetime',
-    description: 'Lifetime access to KAYA Pro features',
+    name: 'KASY Pro Lifetime',
+    description: 'Lifetime access to KASY Pro features',
   });
 
   const proLifetime = await stripe('/prices', {

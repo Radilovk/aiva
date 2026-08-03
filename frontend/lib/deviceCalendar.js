@@ -30,7 +30,7 @@
     try {
       const file = new File([blob], fileName, { type: 'text/calendar' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: task.content || 'KAYA задача' });
+        await navigator.share({ files: [file], title: task.content || 'KASY задача' });
         return 'shared';
       }
     } catch (e) {

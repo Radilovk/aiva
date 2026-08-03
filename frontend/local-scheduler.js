@@ -413,7 +413,7 @@
       const at = new Date(entry.at);
       if (at <= now && !quietNow) {
         navigator.serviceWorker.ready.then((reg) => {
-          reg.showNotification(entry.title || '📋 KAYA', {
+          reg.showNotification(entry.title || '📋 KASY', {
             body: entry.content,
             tag: `aiva-${entry.id}`,
             icon: window.AIVA_CONFIG?.appUrl?.('icons/icon-192.png') || 'icons/icon-192.png',

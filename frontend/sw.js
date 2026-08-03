@@ -1,5 +1,5 @@
 /**
- * KAYA Service Worker — offline caching + push notifications
+ * KASY Service Worker — offline caching + push notifications
  */
 const SW_BASE = (() => {
   const path = self.location.pathname.replace(/\/?sw\.js(?:\?.*)?$/, '');
@@ -111,7 +111,7 @@ self.addEventListener('fetch', (event) => {
 
 // Push notification handler
 self.addEventListener('push', (event) => {
-  let data = { title: 'KAYA', body: 'You have a reminder', tag: 'aiva-reminder' };
+  let data = { title: 'KASY', body: 'You have a reminder', tag: 'aiva-reminder' };
   try {
     if (event.data) data = Object.assign(data, event.data.json());
   } catch (_e) {

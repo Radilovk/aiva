@@ -1,5 +1,5 @@
 /**
- * AIVA — voice task assistant with calendar task management (Bulgarian)
+ * KASY — AI Secretary (voice task assistant with calendar)
  */
 
 const { API_BASE, LIVE_MODEL } = window.AIVA_CONFIG;

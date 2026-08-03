@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Generate KAYA brand assets — refined voice-assistant visual identity.
- * Run: node scripts/generate-kaya-brand.mjs
+ * Generate KASY brand assets — refined voice-assistant visual identity.
+ * Run: node scripts/generate-kasy-brand.mjs
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -205,7 +205,7 @@ async function renderOg() {
 
   ctx.fillStyle = C.text;
   ctx.font = '600 88px Inter, Arial, sans-serif';
-  ctx.fillText('KAYA', 520, 300);
+  ctx.fillText('KASY', 520, 300);
   ctx.fillStyle = 'rgba(255,255,255,0.58)';
   ctx.font = '300 32px Inter, Arial, sans-serif';
   ctx.fillText('Гласов асистент за задачи и календар', 522, 352);
@@ -215,7 +215,7 @@ async function renderOg() {
 
 async function writeSvg() {
   const mark = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="KAYA">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="KASY">
   <defs>
     <radialGradient id="bg" cx="50%" cy="34%" r="72%">
       <stop offset="0%" stop-color="#14101a"/>
@@ -256,7 +256,7 @@ async function writeSvg() {
 </svg>`;
 
   const full = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 160" role="img" aria-label="KAYA logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 160" role="img" aria-label="KASY logo">
   <g transform="translate(8, 8) scale(0.28)">
     <rect x="56" y="56" width="400" height="400" rx="112" fill="#12121c" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
     <rect x="188" y="236" width="18" height="60" rx="9" fill="#ff7a93"/>
@@ -266,7 +266,7 @@ async function writeSvg() {
     <rect x="292" y="236" width="18" height="60" rx="9" fill="#ff7a93"/>
     <circle cx="256" cy="266" r="18" fill="#ff3b5c"/>
   </g>
-  <text x="148" y="98" fill="#f3f3f6" font-family="Inter, Arial, sans-serif" font-size="56" font-weight="600" letter-spacing="10">KAYA</text>
+  <text x="148" y="98" fill="#f3f3f6" font-family="Inter, Arial, sans-serif" font-size="56" font-weight="600" letter-spacing="10">KASY</text>
 </svg>`;
 
   await writeFile(join(OUT, 'logo-mark.svg'), mark);

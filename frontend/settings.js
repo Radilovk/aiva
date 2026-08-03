@@ -11,7 +11,7 @@
       userName: '',
       onboardingComplete: false,
     },
-    systemInstructions: `Ти си KAYA — личен гласов асистент за задачи.
+    systemInstructions: `Ти си KASY — AI Secretary, личен гласов асистент за задачи.
 
 ПРАВИЛА:
 - Слушаш ТОНА на гласа, не само думите
