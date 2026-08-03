@@ -859,8 +859,8 @@
     }
 
     function getUserId() {
-      // Migrates legacy aiva_/kaya_ user_id keys via KASY_STORAGE
-      return window.KASY_STORAGE?.getUserId?.() || window.AIVA_CONFIG?.getUserId?.() || '';
+      // app.js записва идентификатора като 'aiva_user_id'; 'kaya_user_id' е стар ключ
+      return localStorage.getItem('aiva_user_id') || localStorage.getItem('kaya_user_id') || '';
     }
 
     function applyCalendarPlatformUI() {
@@ -1058,7 +1058,7 @@
         return;
       }
 
-      localStorage.setItem('kasy_cloud_pending_provider', provider);
+      localStorage.setItem('kaya_cloud_pending_provider', provider);
       location.href = data.url;
     }
 
@@ -1068,8 +1068,7 @@
       const state = new URLSearchParams(location.search).get('state');
       if (!code || !state) return;
 
-      const provider = localStorage.getItem('kasy_cloud_pending_provider')
-        || localStorage.getItem('kaya_cloud_pending_provider');
+      const provider = localStorage.getItem('kaya_cloud_pending_provider');
       const userId = getUserId();
       if (!provider || !userId) return;
 
@@ -1089,7 +1088,6 @@
         alert(data.error || t('errCalConnect'));
       }
 
-      localStorage.removeItem('kasy_cloud_pending_provider');
       localStorage.removeItem('kaya_cloud_pending_provider');
       history.replaceState({}, document.title, location.pathname + location.hash);
     }

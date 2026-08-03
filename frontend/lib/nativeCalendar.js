@@ -7,30 +7,7 @@
  *   Web          → Google Calendar deep link + ICS download
  */
 (function () {
-  const SYNC_MAP_SUFFIX = 'native_calendar_map';
-
-  function readSyncMapRaw() {
-    return window.KASY_STORAGE?.get?.(SYNC_MAP_SUFFIX)
-      || localStorage.getItem(`kasy_${SYNC_MAP_SUFFIX}`)
-      || localStorage.getItem(`aiva_${SYNC_MAP_SUFFIX}`);
-  }
-
-  function writeSyncMapRaw(value) {
-    if (window.KASY_STORAGE?.set) window.KASY_STORAGE.set(SYNC_MAP_SUFFIX, value);
-    else localStorage.setItem(`kasy_${SYNC_MAP_SUFFIX}`, value);
-  }
-
-  function loadSyncMap() {
-    try {
-      return JSON.parse(readSyncMapRaw() || '{}');
-    } catch {
-      return {};
-    }
-  }
-
-  function saveSyncMap(map) {
-    writeSyncMapRaw(JSON.stringify(map));
-  }
+  const SYNC_MAP_KEY = 'aiva_native_calendar_map';
 
   function isNative() {
     return !!window.Capacitor?.isNativePlatform?.();
@@ -59,6 +36,18 @@
       reminderMinutes: settings.notifications?.reminderMinutes ?? 15,
       remindAtStart: settings.notifications?.remindAtStart !== false,
     };
+  }
+
+  function loadSyncMap() {
+    try {
+      return JSON.parse(localStorage.getItem(SYNC_MAP_KEY) || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  function saveSyncMap(map) {
+    localStorage.setItem(SYNC_MAP_KEY, JSON.stringify(map));
   }
 
   function getNativePlugin() {

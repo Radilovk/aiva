@@ -2,24 +2,8 @@
  * Intuitive calendar + notification setup — shown in-context when it matters.
  */
 (function () {
-  const DISMISS_SUFFIX = 'calendar_dismissed_until';
+  const DISMISS_KEY = 'aiva_calendar_dismissed_until';
   const DISMISS_DAYS = 14;
-
-  function readDismiss() {
-    return window.KASY_STORAGE?.get?.(DISMISS_SUFFIX)
-      || localStorage.getItem(`kasy_${DISMISS_SUFFIX}`)
-      || localStorage.getItem(`aiva_${DISMISS_SUFFIX}`);
-  }
-
-  function writeDismiss(value) {
-    if (window.KASY_STORAGE?.set) window.KASY_STORAGE.set(DISMISS_SUFFIX, value);
-    else localStorage.setItem(`kasy_${DISMISS_SUFFIX}`, value);
-  }
-
-  function removeDismiss() {
-    if (window.KASY_STORAGE?.remove) window.KASY_STORAGE.remove(DISMISS_SUFFIX);
-    else localStorage.removeItem(`kasy_${DISMISS_SUFFIX}`);
-  }
 
   function t(key) {
     return window.AIVA_I18N?.t?.(key) ?? key;
@@ -69,17 +53,17 @@
   }
 
   function isDismissed() {
-    const until = readDismiss();
+    const until = localStorage.getItem(DISMISS_KEY);
     if (!until) return false;
     return Date.now() < Number(until);
   }
 
   function dismissTemporarily() {
-    writeDismiss(String(Date.now() + DISMISS_DAYS * 86400000));
+    localStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_DAYS * 86400000));
   }
 
   function clearDismiss() {
-    removeDismiss();
+    localStorage.removeItem(DISMISS_KEY);
   }
 
   function saveCalendarSettings(patch) {

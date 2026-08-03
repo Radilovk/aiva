@@ -1,5 +1,5 @@
 /**
- * KASY Calendar Sync
+ * AIVA Calendar Sync
  *
  * Cross-platform sync modes:
  *   subscribe  — ICS webcal feed (Google / Apple / Outlook)
@@ -14,7 +14,7 @@
   }
 
   function getUserId() {
-    return window.KASY_STORAGE?.getUserId?.() || window.AIVA_CONFIG?.getUserId?.() || '';
+    return localStorage.getItem('aiva_user_id') || '';
   }
 
   function getReminderMinutes() {

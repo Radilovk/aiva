@@ -1,5 +1,5 @@
 /**
- * KASY Local Notification Scheduler
+ * AIVA Local Notification Scheduler
  * Capacitor LocalNotifications in APK mode, Service Worker fallback in PWA.
  * Supports quiet hours, advance + at-time reminders, snooze, and action buttons.
  */
@@ -12,23 +12,9 @@
     return window.AIVA_I18N?.tf?.(key, vars) ?? t(key);
   }
 
-  const ls = window.KASY_STORAGE;
-
-  function lsGet(suffix) {
-    return ls?.get?.(suffix)
-      || localStorage.getItem(`kasy_${suffix}`)
-      || localStorage.getItem(`aiva_${suffix}`)
-      || localStorage.getItem(`kaya_${suffix}`);
-  }
-
-  function lsSet(suffix, value) {
-    if (ls?.set) ls.set(suffix, value);
-    else localStorage.setItem(`kasy_${suffix}`, value);
-  }
-
   function getNotificationChannel() {
     return {
-      id: 'kasy_tasks',
+      id: 'aiva_tasks',
       name: t('channelTasks'),
       description: t('channelTasksDesc'),
       importance: 4,
@@ -39,7 +25,7 @@
 
   function getSnoozeChannel() {
     return {
-      id: 'kasy_snooze',
+      id: 'aiva_snooze',
       name: t('channelSnooze'),
       description: t('channelSnoozeDesc'),
       importance: 4,
@@ -146,7 +132,7 @@
 
     let scheduled = [];
     try {
-      scheduled = JSON.parse(lsGet('scheduled_notifs') || '[]');
+      scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
     } catch (_e) { /* повреден запис — таймерът просто не се навива */ }
     if (!scheduled.length) return;
 
@@ -215,7 +201,7 @@
   }
 
   function getUserId() {
-    return window.KASY_STORAGE?.getUserId?.() || window.AIVA_CONFIG?.getUserId?.() || '';
+    return localStorage.getItem('aiva_user_id') || localStorage.getItem('kaya_user_id') || '';
   }
 
   async function markTaskDone(taskId) {
@@ -247,7 +233,7 @@
           body,
           schedule: { at, allowWhileIdle: true },
           channelId: channelId || getNotificationChannel().id,
-          actionTypeId: 'kasy_task_reminder',
+          actionTypeId: 'aiva_task_reminder',
           extra: { task_id: taskId, content: body, type },
           sound: getSettings().sound !== false ? 'default' : undefined,
           actions: [
@@ -262,10 +248,10 @@
     }
 
     if ('serviceWorker' in navigator && Notification.permission === 'granted') {
-      const scheduled = JSON.parse(lsGet('scheduled_notifs') || '[]');
+      const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
       const userId = getUserId();
       scheduled.push({ id, task_id: taskId, user_id: userId, content: body, title, at: at.toISOString(), type });
-      lsSet('scheduled_notifs', JSON.stringify(scheduled));
+      localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(scheduled));
       armPreciseTimer();
       return true;
     }
@@ -329,9 +315,9 @@
       await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) });
       ids.forEach((id) => scheduledIds.delete(id));
     }
-    const scheduled = JSON.parse(lsGet('scheduled_notifs') || '[]');
+    const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
     const filtered = scheduled.filter((n) => String(n.task_id) !== String(taskId));
-    lsSet('scheduled_notifs', JSON.stringify(filtered));
+    localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(filtered));
     armPreciseTimer();
   }
 
@@ -343,7 +329,7 @@
       }
     }
     scheduledIds.clear();
-    lsSet('scheduled_notifs', '[]');
+    localStorage.setItem('aiva_scheduled_notifs', '[]');
     localStorage.setItem(FP_KEY, '{}');
     armPreciseTimer();
   }
@@ -352,7 +338,7 @@
   // Fingerprint на всяка задача (дата/час/настройки на напомнянето). При
   // рефреш се (пре)насрочват само нови/променени задачи и се отменят само
   // изчезнали — без cancelAll/reschedule лавина от alarm заявки към OS.
-  const FP_KEY = 'kasy_notif_fingerprints';
+  const FP_KEY = 'aiva_notif_fingerprints';
 
   function taskFingerprint(task, advanceMin, remindAtStart) {
     return [task.due_date, task.due_time || '', advanceMin, remindAtStart ? 1 : 0, task.content].join('|');
@@ -360,9 +346,7 @@
 
   function readFingerprints() {
     try {
-      const parsed = JSON.parse(
-        localStorage.getItem(FP_KEY) || localStorage.getItem('aiva_notif_fingerprints') || '{}'
-      );
+      const parsed = JSON.parse(localStorage.getItem(FP_KEY) || '{}');
       return parsed && typeof parsed === 'object' ? parsed : {};
     } catch (_e) {
       return {};
@@ -418,7 +402,7 @@
   function checkScheduledNotifications() {
     if (!('serviceWorker' in navigator) || Notification.permission !== 'granted') return;
 
-    const scheduled = JSON.parse(lsGet('scheduled_notifs') || '[]');
+    const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
     const now = new Date();
     // Тихите часове се проверяват спрямо "сега" — иначе запис, чийто час е
     // попаднал в тих период, оставаше блокиран завинаги.
@@ -431,7 +415,7 @@
         navigator.serviceWorker.ready.then((reg) => {
           reg.showNotification(entry.title || '📋 KASY', {
             body: entry.content,
-            tag: `kasy-${entry.id}`,
+            tag: `aiva-${entry.id}`,
             icon: window.AIVA_CONFIG?.appUrl?.('icons/icon-192.png') || 'icons/icon-192.png',
             badge: window.AIVA_CONFIG?.appUrl?.('icons/icon-192.png') || 'icons/icon-192.png',
             data: { task_id: entry.task_id, user_id: entry.user_id || getUserId() },
@@ -451,7 +435,7 @@
       }
     }
 
-    lsSet('scheduled_notifs', JSON.stringify(remaining));
+    localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(remaining));
   }
 
   /** Returns upcoming tasks within the next N hours for UI display. */

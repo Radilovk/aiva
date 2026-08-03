@@ -11,9 +11,7 @@
   }
 
   function getUserId() {
-    return window.KASY_STORAGE?.getUserId?.()
-      || window.AIVA_CONFIG?.getUserId?.()
-      || '';
+    return localStorage.getItem('aiva_user_id') || localStorage.getItem('kaya_user_id') || '';
   }
 
   function getApiBase() {

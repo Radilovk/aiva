@@ -1,23 +1,6 @@
 (function () {
-  const ls = window.KASY_STORAGE;
-  const LOCAL_CALENDAR_SUFFIX = 'local_calendar_id';
-  const EVENT_MAP_SUFFIX = 'local_calendar_event_map';
-
-  function readLs(suffix) {
-    return ls?.get?.(suffix)
-      || localStorage.getItem(`kasy_${suffix}`)
-      || localStorage.getItem(`aiva_${suffix}`);
-  }
-
-  function writeLs(suffix, value) {
-    if (ls?.set) ls.set(suffix, value);
-    else localStorage.setItem(`kasy_${suffix}`, value);
-  }
-
-  function removeLs(suffix) {
-    if (ls?.remove) ls.remove(suffix);
-    else localStorage.removeItem(`kasy_${suffix}`);
-  }
+  const LOCAL_CALENDAR_ID_KEY = 'aiva_local_calendar_id';
+  const EVENT_MAP_KEY = 'aiva_local_calendar_event_map';
 
   function getPlatform() {
     return window.Capacitor?.getPlatform?.() || 'web';
@@ -38,27 +21,27 @@
   }
 
   function getSelectedCalendarId() {
-    return readLs(LOCAL_CALENDAR_SUFFIX) || '';
+    return localStorage.getItem(LOCAL_CALENDAR_ID_KEY) || '';
   }
 
   function setSelectedCalendarId(calendarId) {
     if (!calendarId) {
-      removeLs(LOCAL_CALENDAR_SUFFIX);
+      localStorage.removeItem(LOCAL_CALENDAR_ID_KEY);
       return;
     }
-    writeLs(LOCAL_CALENDAR_SUFFIX, String(calendarId));
+    localStorage.setItem(LOCAL_CALENDAR_ID_KEY, String(calendarId));
   }
 
   function loadEventMap() {
     try {
-      return JSON.parse(readLs(EVENT_MAP_SUFFIX) || '{}');
+      return JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
     } catch {
       return {};
     }
   }
 
   function saveEventMap(map) {
-    writeLs(EVENT_MAP_SUFFIX, JSON.stringify(map));
+    localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
   }
 
   function hasLocalEvent(taskId) {

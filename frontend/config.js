@@ -38,43 +38,11 @@
     return location.origin;
   }
 
-  /** Read localStorage with migration from legacy aiva_/kaya_ keys. */
-  function storageGet(suffix) {
-    return localStorage.getItem(`kasy_${suffix}`)
-      || localStorage.getItem(`aiva_${suffix}`)
-      || localStorage.getItem(`kaya_${suffix}`);
-  }
-
-  function storageSet(suffix, value) {
-    localStorage.setItem(`kasy_${suffix}`, value);
-  }
-
-  function storageRemove(suffix) {
-    localStorage.removeItem(`kasy_${suffix}`);
-  }
-
-  function getOrCreateUserId() {
-    let id = storageGet('user_id');
-    if (!id) {
-      id = 'user_' + crypto.randomUUID();
-    }
-    storageSet('user_id', id);
-    return id;
-  }
-
-  window.KASY_STORAGE = {
-    get: storageGet,
-    set: storageSet,
-    remove: storageRemove,
-    getUserId: getOrCreateUserId,
-  };
-
   window.AIVA_CONFIG = {
     API_BASE: resolveApiBase(),
     LIVE_MODEL: 'gemini-3.1-flash-live-preview',
     WORKER_ORIGIN,
     APP_BASE: resolveAppBasePath(),
     appUrl,
-    getUserId: getOrCreateUserId,
   };
 })();

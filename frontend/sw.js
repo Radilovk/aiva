@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'kasy-v1';
+const CACHE_NAME = 'aiva-v18';
 const ASSETS = [
   'index.html',
   'settings.html',
@@ -111,7 +111,7 @@ self.addEventListener('fetch', (event) => {
 
 // Push notification handler
 self.addEventListener('push', (event) => {
-  let data = { title: 'KASY', body: 'You have a reminder', tag: 'kasy-reminder' };
+  let data = { title: 'KASY', body: 'You have a reminder', tag: 'aiva-reminder' };
   try {
     if (event.data) data = Object.assign(data, event.data.json());
   } catch (_e) {
