@@ -1,6 +1,23 @@
 (function () {
-  const LOCAL_CALENDAR_ID_KEY = 'aiva_local_calendar_id';
-  const EVENT_MAP_KEY = 'aiva_local_calendar_event_map';
+  const ls = window.KASY_STORAGE;
+  const LOCAL_CALENDAR_SUFFIX = 'local_calendar_id';
+  const EVENT_MAP_SUFFIX = 'local_calendar_event_map';
+
+  function readLs(suffix) {
+    return ls?.get?.(suffix)
+      || localStorage.getItem(`kasy_${suffix}`)
+      || localStorage.getItem(`aiva_${suffix}`);
+  }
+
+  function writeLs(suffix, value) {
+    if (ls?.set) ls.set(suffix, value);
+    else localStorage.setItem(`kasy_${suffix}`, value);
+  }
+
+  function removeLs(suffix) {
+    if (ls?.remove) ls.remove(suffix);
+    else localStorage.removeItem(`kasy_${suffix}`);
+  }
 
   function getPlatform() {
     return window.Capacitor?.getPlatform?.() || 'web';
@@ -21,27 +38,27 @@
   }
 
   function getSelectedCalendarId() {
-    return localStorage.getItem(LOCAL_CALENDAR_ID_KEY) || '';
+    return readLs(LOCAL_CALENDAR_SUFFIX) || '';
   }
 
   function setSelectedCalendarId(calendarId) {
     if (!calendarId) {
-      localStorage.removeItem(LOCAL_CALENDAR_ID_KEY);
+      removeLs(LOCAL_CALENDAR_SUFFIX);
       return;
     }
-    localStorage.setItem(LOCAL_CALENDAR_ID_KEY, String(calendarId));
+    writeLs(LOCAL_CALENDAR_SUFFIX, String(calendarId));
   }
 
   function loadEventMap() {
     try {
-      return JSON.parse(localStorage.getItem(EVENT_MAP_KEY) || '{}');
+      return JSON.parse(readLs(EVENT_MAP_SUFFIX) || '{}');
     } catch {
       return {};
     }
   }
 
   function saveEventMap(map) {
-    localStorage.setItem(EVENT_MAP_KEY, JSON.stringify(map));
+    writeLs(EVENT_MAP_SUFFIX, JSON.stringify(map));
   }
 
   function hasLocalEvent(taskId) {
@@ -111,7 +128,7 @@
     if (!parsed) throw new Error('Задачата няма валидна дата');
     return {
       calendarId,
-      title: task.content || 'KAYA задача',
+      title: task.content || 'KASY задача',
       description: task.notes || '',
       location: task.location || '',
       startDate: parsed.start.toISOString(),

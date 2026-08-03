@@ -1,5 +1,5 @@
 /**
- * AIVA Calendar Sync
+ * KASY Calendar Sync
  *
  * Cross-platform sync modes:
  *   subscribe  — ICS webcal feed (Google / Apple / Outlook)
@@ -14,7 +14,7 @@
   }
 
   function getUserId() {
-    return localStorage.getItem('aiva_user_id') || '';
+    return window.KASY_STORAGE?.getUserId?.() || window.AIVA_CONFIG?.getUserId?.() || '';
   }
 
   function getReminderMinutes() {
@@ -40,7 +40,7 @@
 
   function getOutlookSubscribeUrl(userId) {
     const feed = getFeedUrl(userId);
-    return `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(feed)}&name=${encodeURIComponent('KAYA Задачи')}`;
+    return `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(feed)}&name=${encodeURIComponent('KASY Задачи')}`;
   }
 
   function getSamsungSubscribeUrl(userId) {
@@ -70,7 +70,7 @@
     const opts = {
       reminderMinutes: getReminderMinutes(),
       remindAtStart: window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications?.remindAtStart !== false,
-      calendarName: 'KAYA Задачи',
+      calendarName: 'KASY Задачи',
       includeRefresh: true,
     };
     return window.AIVA_ICS?.buildMultiICS(tasks, opts) || null;
@@ -81,7 +81,7 @@
     const file = new File([blob], fileName, { type: 'text/calendar' });
 
     if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: title || 'KAYA задачи' });
+      await navigator.share({ files: [file], title: title || 'KASY задачи' });
       return 'shared';
     }
 
@@ -99,7 +99,7 @@
   async function exportAllToDevice(tasks) {
     const ics = buildMultiEventICS(tasks);
     if (!ics) throw new Error('Няма задачи с дата за експорт');
-    return shareICS(ics, 'aiva-tasks.ics', 'KAYA — всички задачи');
+    return shareICS(ics, 'aiva-tasks.ics', 'KASY — всички задачи');
   }
 
   function getSyncSettings() {

@@ -1,7 +1,7 @@
 {
-  "name": "KAYA — Гласов Асистент",
-  "short_name": "KAYA",
-  "description": "Гласов асистент за задачи с календар",
+  "name": "KASY — AI Secretary",
+  "short_name": "KASY",
+  "description": "AI Secretary for tasks and calendar — voice-first personal assistant",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",

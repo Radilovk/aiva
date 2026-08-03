@@ -1,9 +1,9 @@
 /**
- * Shared local settings for the AIVA assistant and calendar UI.
- * Values are intentionally client-side so admins can tune the next Live API session instantly.
+ * Shared local settings for the KASY AI Secretary assistant and calendar UI.
  */
 (function () {
-  const SETTINGS_KEY = 'aiva_assistant_settings_v1';
+  const SETTINGS_KEY = 'kasy_assistant_settings_v1';
+  const LEGACY_SETTINGS_KEY = 'aiva_assistant_settings_v1';
 
   const DEFAULT_ASSISTANT_SETTINGS = {
     profile: {
@@ -11,7 +11,7 @@
       userName: '',
       onboardingComplete: false,
     },
-    systemInstructions: `Ти си KAYA — личен гласов асистент за задачи.
+    systemInstructions: `Ти си KASY — AI Secretary, личен гласов асистент за задачи.
 
 ПРАВИЛА:
 - Слушаш ТОНА на гласа, не само думите
@@ -163,7 +163,7 @@
 
   function loadAssistantSettings() {
     try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
+      const raw = localStorage.getItem(SETTINGS_KEY) || localStorage.getItem(LEGACY_SETTINGS_KEY);
       if (!raw) return normalizeSettings(null);
       const parsed = JSON.parse(raw);
       const normalized = normalizeSettings(parsed);
@@ -172,7 +172,7 @@
       }
       return normalized;
     } catch (e) {
-      console.warn('AIVA settings reset after invalid localStorage payload:', e);
+      console.warn('KASY settings reset after invalid localStorage payload:', e);
       return normalizeSettings(null);
     }
   }
@@ -186,6 +186,7 @@
 
   function resetAssistantSettings() {
     localStorage.removeItem(SETTINGS_KEY);
+    localStorage.removeItem(LEGACY_SETTINGS_KEY);
     const settings = loadAssistantSettings();
     window.dispatchEvent(new CustomEvent('aiva:settings-updated', { detail: settings }));
     return settings;

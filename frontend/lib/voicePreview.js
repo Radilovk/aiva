@@ -8,8 +8,8 @@
   let cachedTokenExpiresAt = 0;
 
   function getUserId() {
-    return localStorage.getItem('aiva_user_id')
-      || localStorage.getItem('kaya_user_id')
+    return window.KASY_STORAGE?.getUserId?.()
+      || window.AIVA_CONFIG?.getUserId?.()
       || '';
   }
 
@@ -35,7 +35,7 @@
   }
 
   function getPreviewPhrase(language) {
-    return window.AIVA_I18N?.t?.('voicePreviewPhrase') || 'Hello, I am KAYA.';
+    return window.AIVA_I18N?.t?.('voicePreviewPhrase') || 'Hello, I am KASY, your AI Secretary.';
   }
 
   async function ensurePreviewPlayer() {

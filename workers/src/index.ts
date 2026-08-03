@@ -81,7 +81,7 @@ async function resolveSessionLimit(env: Env, userId: string): Promise<number> {
 
 function plusRequiredResponse(c: { json: (body: unknown, status?: number) => Response }) {
   return c.json({
-    error: 'Тази функция изисква KAYA Plus.',
+    error: 'Тази функция изисква KASY Plus.',
     code: 'PLUS_REQUIRED',
   }, 403);
 }
@@ -339,7 +339,7 @@ app.post('/api/voice-preview', async (c) => {
   }>().catch(() => ({} as { voice_name?: string; text?: string; language?: string; user_id?: string }));
 
   const voiceName = /^[A-Za-z][A-Za-z -]{0,30}$/.test(body.voice_name || '') ? body.voice_name! : 'Kore';
-  const text = (body.text || 'Здравейте! Аз съм KAYA. С какво мога да ви помогна?').slice(0, 120);
+  const text = (body.text || 'Здравейте! Аз съм KASY, вашият AI Secretary. С какво мога да ви помогна?').slice(0, 120);
   const userId = body.user_id || 'anonymous';
 
   // Кеш по глас+текст: гласовете са краен брой, така TTS API се вика веднъж на комбинация
@@ -443,7 +443,7 @@ app.post('/api/tasks', async (c) => {
     const activeCount = await countIncompleteTasks(c.env.DB, body.user_id);
     if (activeCount >= effective.limits.max_active_tasks) {
       return c.json({
-        error: 'Достигнат е лимитът на активни задачи. Надградете до KAYA Plus.',
+        error: 'Достигнат е лимитът на активни задачи. Надградете до KASY Plus.',
         code: 'TASK_LIMIT',
       }, 403);
     }
@@ -700,7 +700,7 @@ app.get('/api/calendar.ics', async (c) => {
       'PRODID:-//AIVA//Task Calendar//BG',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      'X-WR-CALNAME:KAYA Задачи',
+      'X-WR-CALNAME:KASY Задачи',
       'X-WR-TIMEZONE:Europe/Sofia',
       'REFRESH-INTERVAL;VALUE=DURATION:PT15M',
       'X-PUBLISHED-TTL:PT15M',

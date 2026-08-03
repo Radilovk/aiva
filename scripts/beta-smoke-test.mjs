@@ -310,7 +310,7 @@ async function testLiveApi() {
 }
 
 async function main() {
-  console.log('KAYA beta smoke tests');
+  console.log('KASY beta smoke tests');
   console.log(`API: ${API_BASE}`);
 
   testSettings();

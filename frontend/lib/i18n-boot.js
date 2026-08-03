@@ -3,7 +3,8 @@
  * Hides body until translations are applied to avoid language flash (FOUC).
  */
 (function () {
-  var STORAGE_KEY = 'aiva_assistant_settings_v1';
+  var STORAGE_KEY = 'kasy_assistant_settings_v1';
+  var LEGACY_KEY = 'aiva_assistant_settings_v1';
   var RTL_LANGS = { ar: true };
 
   var style = document.createElement('style');
@@ -12,7 +13,7 @@
   (document.head || document.documentElement).appendChild(style);
 
   try {
-    var raw = localStorage.getItem(STORAGE_KEY);
+    var raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_KEY);
     var lang = 'bg';
     if (raw) {
       var data = JSON.parse(raw);

@@ -1,6 +1,6 @@
-# KAYA — Гласов мениджър на задачи (Bulgarian Voice Task Manager)
+# KASY — AI Secretary
 
-AI-powered voice task manager that listens in Bulgarian, detects emotion from voice tone, and saves tasks intelligently.
+AI-powered voice secretary for tasks and calendar — listens in multiple languages, detects emotion from voice tone, and manages your schedule intelligently.
 
 ## Architecture
 

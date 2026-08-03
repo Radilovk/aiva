@@ -1,5 +1,5 @@
 /**
- * AIVA — voice task assistant with calendar task management (Bulgarian)
+ * KASY — AI Secretary (voice task assistant with calendar)
  */
 
 const { API_BASE, LIVE_MODEL } = window.AIVA_CONFIG;
@@ -17,17 +17,9 @@ function getLocale() {
   return window.AIVA_I18N?.getLocale?.() ?? 'bg-BG';
 }
 
-// --- User ID ---
-function getUserId() {
-  let id = localStorage.getItem('aiva_user_id');
-  if (!id) {
-    id = 'user_' + crypto.randomUUID();
-    localStorage.setItem('aiva_user_id', id);
-  }
-  return id;
-}
-
-const userId = getUserId();
+// --- User ID (migrates legacy aiva_/kaya_ keys) ---
+const storage = window.KASY_STORAGE;
+const userId = window.AIVA_CONFIG.getUserId();
 
 // --- DOM ---
 const recordBtn = document.getElementById('recordBtn');
@@ -68,11 +60,11 @@ let isConnecting = false;
 let assistantSettings = loadAssistantSettings();
 
 // Offline-first: render the last known task list instantly, then refresh from network
-const TASKS_CACHE_KEY = 'aiva_tasks_cache';
+const TASKS_CACHE_KEY = 'kasy_tasks_cache';
 
 function readCachedTasks() {
   try {
-    const cached = JSON.parse(localStorage.getItem(TASKS_CACHE_KEY) || '[]');
+    const cached = JSON.parse(storage.get('tasks_cache') || localStorage.getItem(TASKS_CACHE_KEY) || '[]');
     return Array.isArray(cached) ? cached : [];
   } catch (_e) {
     return [];
@@ -1429,8 +1421,8 @@ async function loadTasks() {
     // Условно опресняване: с ETag от последния отговор сървърът връща празен
     // 304, когато нищо не е променено — кешът остава валиден без трансфер.
     const headers = {};
-    const lastEtag = localStorage.getItem('aiva_tasks_etag');
-    if (lastEtag && localStorage.getItem(TASKS_CACHE_KEY) !== null) {
+    const lastEtag = storage.get('tasks_etag');
+    if (lastEtag && (storage.get('tasks_cache') || localStorage.getItem(TASKS_CACHE_KEY)) !== null) {
       headers['If-None-Match'] = lastEtag;
     }
 
@@ -1443,10 +1435,11 @@ async function loadTasks() {
     const data = await res.json();
     tasks = data.tasks || [];
     try {
+      storage.set('tasks_cache', JSON.stringify(tasks));
       localStorage.setItem(TASKS_CACHE_KEY, JSON.stringify(tasks));
       const etag = res.headers.get('etag');
-      if (etag) localStorage.setItem('aiva_tasks_etag', etag);
-      else localStorage.removeItem('aiva_tasks_etag');
+      if (etag) storage.set('tasks_etag', etag);
+      else storage.remove('tasks_etag');
     } catch (_e) { /* пълен storage — кешът е best-effort */ }
     renderCalendar();
     if (window.AIVA_CALENDAR_ONBOARD) {
@@ -1799,12 +1792,12 @@ function sendSessionGreeting() {
 
   // Проактивен бриф: при първата сесия за деня асистентът обобщава днешните задачи
   const todayIso = toISODate(new Date());
-  if (localStorage.getItem('aiva_last_brief_date') !== todayIso) {
+  if (storage.get('last_brief_date') !== todayIso) {
     const todaysTasks = tasks.filter((task) => task.due_date === todayIso);
     if (todaysTasks.length) {
       prompt += ` ${tf('morningBriefPrompt', { count: todaysTasks.length })}`;
     }
-    localStorage.setItem('aiva_last_brief_date', todayIso);
+    storage.set('last_brief_date', todayIso);
   }
 
   client.sendTextMessage(prompt);
@@ -2186,7 +2179,7 @@ async function loadDailyBrief() {
     if (data.locked) return;
     const brief = data.brief;
     if (!brief?.text) return;
-    if (localStorage.getItem('aiva_brief_dismissed') === brief.generated_at) return;
+    if (storage.get('brief_dismissed') === brief.generated_at) return;
     briefText.textContent = brief.text;
     briefCard.dataset.generatedAt = brief.generated_at || '';
     briefCard.hidden = false;
@@ -2195,7 +2188,7 @@ async function loadDailyBrief() {
 
 briefDismissBtn?.addEventListener('click', () => {
   briefCard.hidden = true;
-  localStorage.setItem('aiva_brief_dismissed', briefCard.dataset.generatedAt || 'unknown');
+  storage.set('brief_dismissed', briefCard.dataset.generatedAt || 'unknown');
 });
 
 // --- Device-specific first-run setup (Android APK) ---
@@ -2205,24 +2198,24 @@ briefDismissBtn?.addEventListener('click', () => {
 async function initDeviceBanner() {
   const banner = document.getElementById('deviceBanner');
   if (!banner || !window.AIVA_DEVICE?.isAndroid?.()) return;
-  if (localStorage.getItem('aiva_device_banner_done')) return;
+  if (storage.get('device_banner_done')) return;
 
   const profile = await window.AIVA_DEVICE.detect();
   if (!profile) return;
 
   const needsAttention = profile.needsAutostart || !profile.batteryOptimizationIgnored;
   if (!needsAttention) {
-    localStorage.setItem('aiva_device_banner_done', '1');
+    storage.set('device_banner_done', '1');
     return;
   }
 
   banner.hidden = false;
   document.getElementById('deviceBannerOpen')?.addEventListener('click', () => {
-    localStorage.setItem('aiva_device_banner_done', '1');
+    storage.set('device_banner_done', '1');
     location.href = `${window.AIVA_CONFIG.appUrl('settings.html')}#deviceSetupSection`;
   });
   document.getElementById('deviceBannerDismiss')?.addEventListener('click', () => {
-    localStorage.setItem('aiva_device_banner_done', '1');
+    storage.set('device_banner_done', '1');
     banner.hidden = true;
   });
 }

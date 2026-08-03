@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 import android.view.KeyEvent;
 
 /**
- * Detects the KAYA listening shortcut: volume up + volume down pressed
+ * Detects the KASY listening shortcut: volume up + volume down pressed
  * together (a chord). A single simultaneous press triggers — that never
  * happens during normal volume use, where only one button is down at a
  * time. The short press also stays clear of the system accessibility

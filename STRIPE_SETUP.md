@@ -1,4 +1,4 @@
-# Stripe setup — KAYA (≈10 минути)
+# Stripe setup — KASY (≈10 минути)
 
 Следвайте **само тези стъпки**. Останалата интеграция (API, UI, правни страници, лимити) е в кода.
 
@@ -18,9 +18,9 @@ node scripts/stripe-setup.mjs
 ```
 
 Скриптът създава:
-- KAYA Plus Monthly — €6.99/мес
-- KAYA Plus Yearly — €49.99/год (7-day trial)
-- KAYA Pro Lifetime — €149 еднократно (опционално)
+- KASY Plus Monthly — €6.99/мес
+- KASY Plus Yearly — €49.99/год (7-day trial)
+- KASY Pro Lifetime — €149 еднократно (опционално)
 
 Копирайте изведените `STRIPE_PRICE_*` в `wrangler.jsonc` → `vars`.
 

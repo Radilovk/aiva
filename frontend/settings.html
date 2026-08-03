@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="icons/brand.css">
-  <title>KAYA — Настройки</title>
+  <title>KASY — AI Secretary · Настройки</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -473,7 +473,7 @@
         <div class="subscribe-actions">
           <button class="btn" type="button" id="exportAllIcsBtn" data-i18n="importAllIcs">Импортирай всички задачи (.ics)</button>
         </div>
-        <p class="sync-note" data-i18n="subscribeHint">След абониране календарът обновява задачите автоматично (обикновено на 15–60 мин). При промяна в KAYA събитието се актуализира в календара.</p>
+        <p class="sync-note" data-i18n="subscribeHint">След абониране календарът обновява задачите автоматично (обикновено на 15–60 мин). При промяна в KASY събитието се актуализира в календара.</p>
       </div>
       <div class="field" id="manualSection" style="display:none">
         <div class="toggle-row">
@@ -530,9 +530,9 @@
           <span class="toggle-label" data-i18n="hardwareShortcutEnabled">Включи бърз достъп: + и − едновременно</span>
           <div class="toggle" id="toggleShortcutEnabled"></div>
         </div>
-        <p class="field-hint" data-i18n="hardwareShortcutHint">Натисни двата бутона за звук (усилване + намаляване) едновременно → KAYA се отваря и започва да слуша. Кратко натискане — без задържане. Ако телефонът не отчита двата бутона заедно, натисни последователно + − + −. За затворено приложение или заключен екран — включете услугата по-долу.</p>
+        <p class="field-hint" data-i18n="hardwareShortcutHint">Натисни двата бутона за звук (усилване + намаляване) едновременно → KASY се отваря и започва да слуша. Кратко натискане — без задържане. Ако телефонът не отчита двата бутона заедно, натисни последователно + − + −. За затворено приложение или заключен екран — включете услугата по-долу.</p>
         <button class="btn primary" type="button" id="openA11yBtn" data-i18n="hardwareShortcutOpenA11y">Включи фонов режим (достъпност)</button>
-        <p class="field-hint" data-i18n="hardwareShortcutBackgroundHint">Задължително за работа при затворено приложение и заключен екран. Натиснете бутона и активирайте услугата KAYA в настройките за достъпност.</p>
+        <p class="field-hint" data-i18n="hardwareShortcutBackgroundHint">Задължително за работа при затворено приложение и заключен екран. Натиснете бутона и активирайте услугата KASY в настройките за достъпност.</p>
       </div>
     </div>
 
@@ -692,8 +692,8 @@
 
   <div class="paywall-modal" id="paywallModal" aria-hidden="true">
     <div class="plan-card" role="dialog">
-      <h3 data-i18n="paywallTitle">Надградете до KAYA Plus</h3>
-      <p id="paywallReason" data-i18n="paywallCloudCal">Облачен календар изисква KAYA Plus.</p>
+      <h3 data-i18n="paywallTitle">Надградете до KASY Plus</h3>
+      <p id="paywallReason" data-i18n="paywallCloudCal">Облачен календар изисква KASY Plus.</p>
       <div class="btn-group" style="margin-top:12px">
         <button class="btn primary" type="button" id="paywallYearlyBtn" data-i18n="paywallCtaYearly">Plus — годишен</button>
         <button class="btn" type="button" id="paywallMonthlyBtn" data-i18n="paywallCtaMonthly">Plus — месечен</button>
@@ -859,8 +859,8 @@
     }
 
     function getUserId() {
-      // app.js записва идентификатора като 'aiva_user_id'; 'kaya_user_id' е стар ключ
-      return localStorage.getItem('aiva_user_id') || localStorage.getItem('kaya_user_id') || '';
+      // Migrates legacy aiva_/kaya_ user_id keys via KASY_STORAGE
+      return window.KASY_STORAGE?.getUserId?.() || window.AIVA_CONFIG?.getUserId?.() || '';
     }
 
     function applyCalendarPlatformUI() {
@@ -1058,7 +1058,7 @@
         return;
       }
 
-      localStorage.setItem('kaya_cloud_pending_provider', provider);
+      localStorage.setItem('kasy_cloud_pending_provider', provider);
       location.href = data.url;
     }
 
@@ -1068,7 +1068,8 @@
       const state = new URLSearchParams(location.search).get('state');
       if (!code || !state) return;
 
-      const provider = localStorage.getItem('kaya_cloud_pending_provider');
+      const provider = localStorage.getItem('kasy_cloud_pending_provider')
+        || localStorage.getItem('kaya_cloud_pending_provider');
       const userId = getUserId();
       if (!provider || !userId) return;
 
@@ -1088,6 +1089,7 @@
         alert(data.error || t('errCalConnect'));
       }
 
+      localStorage.removeItem('kasy_cloud_pending_provider');
       localStorage.removeItem('kaya_cloud_pending_provider');
       history.replaceState({}, document.title, location.pathname + location.hash);
     }
@@ -1404,7 +1406,7 @@
         const blob = new Blob([JSON.stringify({ settings, tasks: data.tasks || [] }, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `kaya-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `kasy-backup-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(a.href);
       } catch (e) {

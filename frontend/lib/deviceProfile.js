@@ -4,7 +4,18 @@
  * reminders and the volume shortcut keep working when the app is closed.
  */
 (function () {
-  const CACHE_KEY = 'aiva_device_profile_v1';
+  const CACHE_SUFFIX = 'device_profile_v1';
+
+  function readCache() {
+    return window.KASY_STORAGE?.get?.(CACHE_SUFFIX)
+      || localStorage.getItem(`kasy_${CACHE_SUFFIX}`)
+      || localStorage.getItem(`aiva_${CACHE_SUFFIX}`);
+  }
+
+  function writeCache(value) {
+    if (window.KASY_STORAGE?.set) window.KASY_STORAGE.set(CACHE_SUFFIX, value);
+    else localStorage.setItem(`kasy_${CACHE_SUFFIX}`, value);
+  }
 
   function getPlugin() {
     return window.Capacitor?.Plugins?.AivaDevice || null;
@@ -19,7 +30,7 @@
     if (!plugin?.getDeviceProfile) return null;
     try {
       const profile = await plugin.getDeviceProfile();
-      if (profile?.profile) localStorage.setItem(CACHE_KEY, JSON.stringify(profile));
+      if (profile?.profile) writeCache(JSON.stringify(profile));
       return profile;
     } catch (_e) {
       return null;
@@ -30,7 +41,7 @@
   async function detect() {
     if (!isAndroid()) return null;
     try {
-      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      const cached = JSON.parse(readCache() || 'null');
       if (cached?.profile) return cached;
     } catch (_e) { /* повреден кеш — засичаме наново */ }
     return fetchProfile();

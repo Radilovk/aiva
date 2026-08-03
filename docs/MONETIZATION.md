@@ -1,4 +1,4 @@
-# KAYA — монетизация и Stripe интеграция
+# KASY — монетизация и Stripe интеграция
 
 ## Статус на тестове (след deploy)
 
@@ -12,7 +12,7 @@ node scripts/beta-smoke-test.mjs
 
 ## Позициониране (маркетинг)
 
-**KAYA не е todo app.** Това е **гласов личен асистент за задачи и календар** — говориш, той разбира тона, създава задачи, синхронизира календара и напомня.
+**KASY не е todo app.** Това е **гласов личен асистент за задачи и календар** — говориш, той разбира тона, създава задачи, синхронизира календара и напомня.
 
 **Целева аудитория (приоритет):**
 
@@ -23,18 +23,18 @@ node scripts/beta-smoke-test.mjs
 
 **Обещание (value proposition):**
 
-> „Говори. KAYA слуша, планира и напомня — календарът и задачите се движат сами.“
+> „Говори. KASY слуша, планира и напомня — календарът и задачите се движат сами.“
 
 **Конкурентно поле:**
 
-| Продукт | Сила | Слабост спрямо KAYA |
+| Продукт | Сила | Слабост спрямо KASY |
 |---------|------|---------------------|
 | Todoist / TickTick | Задачи, интеграции | Няма жив гласов диалог |
 | Google Assistant / Siri | Глас | Слаби задачи + календар workflow |
 | Motion / Reclaim | AI планиране | Скъпо, без локален APK UX |
 | ChatGPT voice | Генерален AI | Няма календар, няма напомняния |
 
-**KAYA продава:** *скорост + емоционален интелект + календар в едно*, не „още един списък“.
+**KASY продава:** *скорост + емоционален интелект + календар в едно*, не „още един списък“.
 
 ---
 
@@ -42,7 +42,7 @@ node scripts/beta-smoke-test.mjs
 
 Три нива — ясни, без объркване. **Не повече от 3 плана** на старта.
 
-### 1. KAYA Free (Starter)
+### 1. KASY Free (Starter)
 
 **Цена:** €0  
 **Цел:** Вирусен вход, habit formation, демо на гласа.
@@ -62,7 +62,7 @@ node scripts/beta-smoke-test.mjs
 
 **Защо тези лимити:** 5 гласови сесии = достатъчно да „усетиш магията“, но power user ще удари paywall за 2–3 дни. Основният разход е Gemini Live — лимитът пази margin.
 
-### 2. KAYA Plus (основен платен план)
+### 2. KASY Plus (основен платен план)
 
 **Цена (препоръчително за launch):**
 
@@ -87,7 +87,7 @@ node scripts/beta-smoke-test.mjs
 
 **Messaging:** „Неограничен глас + пълен календар“ — не „премахваме реклами“ (няма реклами).
 
-### 3. KAYA Pro (power users / early adopters)
+### 3. KASY Pro (power users / early adopters)
 
 **Цена:**
 
@@ -127,7 +127,7 @@ node scripts/beta-smoke-test.mjs
 
 ---
 
-## Stripe — техническа интеграция (KAYA + Cloudflare Worker)
+## Stripe — техническа интеграция (KASY + Cloudflare Worker)
 
 В този repo **няма готов Stripe модул**. Шаблонът по-долу съвпада с типичен BioCode/NutriPlan worker pattern и може да се адаптира от съществуващ Stripe код (ако имате в друг repo).
 
@@ -135,9 +135,9 @@ node scripts/beta-smoke-test.mjs
 
 | Product | Price ID (пример) | Тип |
 |---------|-------------------|-----|
-| KAYA Plus Monthly | `price_plus_monthly` | recurring monthly |
-| KAYA Plus Yearly | `price_plus_yearly` | recurring yearly |
-| KAYA Pro Lifetime | `price_pro_lifetime` | one-time (optional) |
+| KASY Plus Monthly | `price_plus_monthly` | recurring monthly |
+| KASY Plus Yearly | `price_plus_yearly` | recurring yearly |
+| KASY Pro Lifetime | `price_pro_lifetime` | one-time (optional) |
 
 ### Worker endpoints
 
@@ -206,7 +206,7 @@ const userLimit = TIER_LIMITS[tier].sessions_per_day;
 
 1. **Launch offer:** годишен Plus −30% за първите 200 абоната
 2. **Lifetime Pro** само за APK early adopters (email list)
-3. **Контент:** „5 неща които казваш на KAYA вместо да пишеш в календара“ (BG + EN)
+3. **Контент:** „5 неща които казваш на KASY вместо да пишеш в календара“ (BG + EN)
 4. **Referral (v2):** +7 дни Plus при покана на приятел (Stripe coupon)
 
 **KPI:**
@@ -227,7 +227,7 @@ const userLimit = TIER_LIMITS[tier].sessions_per_day;
 
 ---
 
-## Референция: какво вече има в KAYA (за gating)
+## Референция: какво вече има в KASY (за gating)
 
 | Ресурс | Къде се контролира |
 |--------|-------------------|
