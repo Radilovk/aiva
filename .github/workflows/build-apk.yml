@@ -9,6 +9,8 @@ on:
       - 'capacitor.config.json'
       - 'android-res/**'
       - 'scripts/generate-android-apk-assets.mjs'
+      - 'scripts/apply-brand-package.mjs'
+      - 'scripts/generate-kasy-brand.mjs'
       - 'scripts/process-kasy-brand-assets.mjs'
       - '.github/workflows/build-apk.yml'
 

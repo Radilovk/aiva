@@ -2,3 +2,5 @@
 *.png
 *.jpg
 *.jpeg
+!kasyico.png
+!kasyspl.png
