@@ -19,12 +19,15 @@
   --radius-sm: 16px;
   --radius-xs: 12px;
   --top-h: 52px;
-  --dock-h: 56px;
-  --cta-h: 60px;
+  --dock-h: 48px;
+  --cta-h: 52px;
+  --chrome-pad: 10px;
+  --chrome-gap: 8px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --chrome-h: calc(var(--chrome-pad) * 2 + var(--dock-h) + var(--chrome-gap) + var(--cta-h) + var(--safe-bottom));
   --page-pad: 20px;
-  --bottom-space: calc(var(--dock-h) + var(--cta-h) + var(--safe-bottom) + 16px);
+  --bottom-space: calc(var(--chrome-h) + 12px);
 }
 
 *, *::before, *::after {
@@ -842,24 +845,37 @@ body::before {
   color: rgba(255,255,255,0.3);
 }
 
-/* ── Bottom dock (thumb zone nav) ── */
-.bottom-dock {
+/* ── Bottom chrome: dock + CTA unified ── */
+.bottom-chrome {
   position: fixed;
-  bottom: calc(var(--cta-h) + var(--safe-bottom));
-  left: 12px;
-  right: 12px;
-  z-index: 60;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chrome-gap);
+  padding: var(--chrome-pad) var(--page-pad) calc(var(--chrome-pad) + var(--safe-bottom));
+  background: rgba(8, 8, 14, 0.96);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.bottom-dock {
+  position: static;
+  left: auto;
+  right: auto;
   display: flex;
   align-items: center;
   justify-content: space-around;
   height: var(--dock-h);
-  padding: 0 8px;
-  border-radius: 20px;
-  background: rgba(12, 12, 20, 0.88);
-  backdrop-filter: blur(24px) saturate(1.5);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  padding: 0 4px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: none;
 }
 
 .dock-link {
@@ -894,27 +910,14 @@ body::before {
   color: var(--accent);
 }
 
-/* ── Sticky CTA (thumb zone) ── */
-.sticky-cta {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 70;
-  padding: 10px var(--page-pad) calc(10px + var(--safe-bottom));
-  background: linear-gradient(180deg, transparent 0%, rgba(5,5,8,0.92) 30%, rgba(5,5,8,0.98) 100%);
-  pointer-events: none;
-}
-
-.sticky-cta .cta-btn {
-  pointer-events: auto;
+.bottom-chrome .cta-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   width: 100%;
-  min-height: 52px;
-  border-radius: 16px;
+  min-height: var(--cta-h);
+  border-radius: 14px;
   border: none;
   background: linear-gradient(135deg, var(--accent) 0%, #ff6b85 100%);
   color: #fff;
@@ -922,11 +925,11 @@ body::before {
   font-size: 1rem;
   font-weight: 600;
   text-decoration: none;
-  box-shadow: 0 8px 28px var(--accent-glow);
+  box-shadow: 0 6px 20px rgba(255, 59, 92, 0.35);
   transition: transform 0.15s;
 }
 
-.sticky-cta .cta-btn:active {
+.bottom-chrome .cta-btn:active {
   transform: scale(0.98);
 }
 
@@ -979,7 +982,7 @@ body::before {
   }
 
   .bottom-dock,
-  .sticky-cta {
+  .bottom-chrome {
     display: none;
   }
 
