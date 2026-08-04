@@ -67,17 +67,22 @@ async function writeSplashAssets() {
   }
 }
 
-async function writeColors() {
+async function writeBrandColors() {
   const valuesDir = join(OUT, 'values');
   await mkdir(valuesDir, { recursive: true });
   const colors = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="splash_background">#050508</color>
-    <color name="ic_launcher_background">#050508</color>
 </resources>
 `;
   await writeFile(join(valuesDir, 'colors.xml'), colors);
-  console.log('  ✓ values/colors.xml');
+  const launcherBg = `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#050508</color>
+</resources>
+`;
+  await writeFile(join(valuesDir, 'ic_launcher_background.xml'), launcherBg);
+  console.log('  ✓ values/colors.xml + ic_launcher_background.xml');
 }
 
 async function writeAdaptiveIconXml() {
@@ -104,7 +109,7 @@ async function main() {
   console.log(`Android branding → ${OUT}`);
   await writeLauncherIcons();
   await writeSplashAssets();
-  await writeColors();
+  await writeBrandColors();
   await writeAdaptiveIconXml();
   await copyNotificationIcon();
   console.log('Done.');
