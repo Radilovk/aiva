@@ -1,5 +1,5 @@
 /**
- * KASY landing page — nav, FAQ, scroll reveal, language picker.
+ * KASY landing — mobile-first interactions (2026 patterns).
  */
 (function () {
   const STORAGE_KEY = 'aiva_assistant_settings_v1';
@@ -21,8 +21,7 @@
   }
 
   function getLang() {
-    const settings = loadSettings();
-    return settings.profile?.language || 'bg';
+    return loadSettings().profile?.language || 'bg';
   }
 
   function applyLang(lang) {
@@ -34,88 +33,84 @@
     }
   }
 
-  function initNav() {
-    const nav = document.getElementById('landingNav');
-    const toggle = document.getElementById('navToggle');
-    const mobileMenu = document.getElementById('mobileMenu');
-
-    function onScroll() {
-      if (nav) nav.classList.toggle('scrolled', window.scrollY > 20);
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-
-    if (toggle && mobileMenu) {
-      toggle.addEventListener('click', () => {
-        const open = mobileMenu.classList.toggle('open');
-        toggle.classList.toggle('open', open);
-        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-
-      mobileMenu.querySelectorAll('.nav-link').forEach((link) => {
-        link.addEventListener('click', () => {
-          mobileMenu.classList.remove('open');
-          toggle.classList.remove('open');
-          toggle.setAttribute('aria-expanded', 'false');
-        });
-      });
-    }
+  function initTopBar() {
+    const bar = document.getElementById('topBar');
+    if (!bar) return;
+    window.addEventListener('scroll', () => {
+      bar.classList.toggle('scrolled', window.scrollY > 8);
+    }, { passive: true });
   }
 
   function initFaq() {
     document.querySelectorAll('.faq-item').forEach((item) => {
-      const btn = item.querySelector('.faq-question');
+      const btn = item.querySelector('.faq-q');
       if (!btn) return;
       btn.addEventListener('click', () => {
-        const wasOpen = item.classList.contains('open');
+        const open = item.classList.contains('open');
         document.querySelectorAll('.faq-item.open').forEach((el) => el.classList.remove('open'));
-        if (!wasOpen) item.classList.add('open');
+        if (!open) item.classList.add('open');
       });
     });
   }
 
-  function initReveal() {
-    const els = document.querySelectorAll('.reveal');
-    if (!els.length) return;
+  function initSnapDots() {
+    const scroll = document.getElementById('featuresSnap');
+    const dotsWrap = document.getElementById('featuresDots');
+    if (!scroll || !dotsWrap) return;
 
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      els.forEach((el) => el.classList.add('visible'));
-      return;
-    }
+    const cards = scroll.querySelectorAll('.snap-card');
+    if (!cards.length) return;
+
+    cards.forEach((_, i) => {
+      const dot = document.createElement('span');
+      dot.className = 'snap-dot' + (i === 0 ? ' active' : '');
+      dotsWrap.appendChild(dot);
+    });
+
+    const dots = dotsWrap.querySelectorAll('.snap-dot');
+
+    scroll.addEventListener('scroll', () => {
+      const idx = Math.round(scroll.scrollLeft / (cards[0].offsetWidth + 12));
+      dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+    }, { passive: true });
+  }
+
+  function initDockHighlight() {
+    const links = document.querySelectorAll('.dock-link[data-section]');
+    const sections = ['features', 'pricing', 'faq'].map((id) => document.getElementById(id)).filter(Boolean);
+    if (!links.length || !sections.length) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('visible');
-            observer.unobserve(entry.target);
-          }
+          if (!entry.isIntersecting) return;
+          const id = entry.target.id;
+          links.forEach((link) => {
+            link.classList.toggle('active', link.getAttribute('data-section') === id);
+          });
         });
       },
-      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+      { rootMargin: '-40% 0px -45% 0px', threshold: 0 }
     );
 
-    els.forEach((el) => observer.observe(el));
+    sections.forEach((s) => observer.observe(s));
   }
 
   function initLangSelect() {
     const select = document.getElementById('langSelect');
     if (!select || !window.AIVA_I18N) return;
-
     window.AIVA_I18N.populateLanguageSelect(select, getLang());
-
     select.addEventListener('change', () => {
-      const lang = select.value;
-      saveLanguage(lang);
-      applyLang(lang);
+      saveLanguage(select.value);
+      applyLang(select.value);
     });
   }
 
   function init() {
-    initNav();
+    initTopBar();
     initFaq();
-    initReveal();
+    initSnapDots();
+    initDockHighlight();
     initLangSelect();
     applyLang(getLang());
   }
