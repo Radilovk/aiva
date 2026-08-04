@@ -1,0 +1,4 @@
+# Large master PNGs — keep locally; commit processed output in frontend/icons/
+*.png
+*.jpg
+*.jpeg

@@ -543,17 +543,39 @@
       height: 88px;
       border-radius: 50%;
       border: none;
-      background: var(--accent);
+      background: transparent;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
       z-index: 3;
+      padding: 0;
       transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
                   box-shadow 0.3s ease;
-      box-shadow: 0 0 0 0 var(--accent-glow),
-                  0 4px 24px rgba(255, 59, 92, 0.3);
+      box-shadow: 0 4px 24px rgba(255, 59, 92, 0.25);
+    }
+
+    .record-btn .listen-face {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+
+    .record-btn.live .listen-face {
+      animation: listen-face-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes listen-face-pulse {
+      0%, 100% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.05); filter: brightness(1.1); }
+    }
+
+    .record-btn.live {
+      box-shadow: 0 0 0 0 var(--accent-glow), 0 4px 40px rgba(255, 59, 92, 0.5);
     }
 
     .record-btn:hover {
@@ -571,10 +593,7 @@
     }
 
     .record-btn svg {
-      width: 28px;
-      height: 28px;
-      fill: white;
-      transition: opacity 0.2s;
+      display: none;
     }
 
     .record-btn .icon-stop {
@@ -588,10 +607,40 @@
     .record-btn.recording svg { display: none; }
     .record-btn.recording .icon-stop { display: block; }
 
+    .record-btn.recording .listen-face {
+      opacity: 0.35;
+      animation: none;
+      filter: brightness(0.85);
+    }
+
     .record-btn.recording {
-      box-shadow: 0 0 0 0 var(--accent-glow),
-                  0 4px 40px rgba(255, 59, 92, 0.5);
-      animation: btn-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      animation: none;
+    }
+
+    /* App splash (first paint) */
+    .app-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: #050508;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.4s ease, visibility 0.4s;
+    }
+
+    .app-splash picture,
+    .app-splash img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center top;
+    }
+
+    .app-splash.hide {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
     }
 
     @keyframes btn-pulse {
@@ -611,12 +660,14 @@
     .orbit-1 { width: 120px; height: 120px; }
     .orbit-2 { width: 150px; height: 150px; }
 
-    .record-btn.recording ~ .orbit-1 {
+    .record-btn.recording ~ .orbit-1,
+    .record-btn.live ~ .orbit-1 {
       animation: orbit-spin 3s linear infinite;
       border-color: rgba(255, 59, 92, 0.2);
     }
 
-    .record-btn.recording ~ .orbit-2 {
+    .record-btn.recording ~ .orbit-2,
+    .record-btn.live ~ .orbit-2 {
       animation: orbit-spin 5s linear infinite reverse;
       border-color: rgba(255, 59, 92, 0.12);
     }
@@ -1662,11 +1713,17 @@
   </style>
 </head>
 <body>
+  <div id="appSplash" class="app-splash" aria-hidden="false">
+    <picture>
+      <source type="image/webp" media="(max-width: 768px)" srcset="icons/splash-portrait-720.webp">
+      <img src="icons/splash-portrait-1080.webp" alt="" width="1080" height="1920" decoding="async">
+    </picture>
+  </div>
   <div class="app">
     <header class="header">
       <div class="brand">
         <div class="brand-lockup">
-          <img class="brand-mark" src="icons/logo-mark.svg" alt="" width="42" height="42">
+          <img class="brand-mark" src="icons/icon-192.webp" alt="" width="42" height="42">
           <div class="brand-text">
             <div class="brand-wordmark logo">KASY</div>
             <div class="tagline brand-tagline" data-i18n="tagline">AI Secretary</div>
@@ -1709,11 +1766,11 @@
     <section class="voice-section">
       <div class="record-wrapper">
         <button class="record-btn" id="recordBtn" data-i18n-aria="record" aria-label="Запис">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-          </svg>
-          <span class="icon-stop"></span>
+          <picture>
+            <source type="image/webp" srcset="icons/listen-88.webp">
+            <img class="listen-face" src="icons/listen-88.png" alt="" width="88" height="88" decoding="async">
+          </picture>
+          <span class="icon-stop" aria-hidden="true"></span>
         </button>
         <div class="orbit orbit-1"></div>
         <div class="orbit orbit-2"></div>

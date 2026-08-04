@@ -17,6 +17,34 @@ function getLocale() {
   return window.AIVA_I18N?.getLocale?.() ?? 'bg-BG';
 }
 
+function setRecordBtnLive(live) {
+  recordBtn?.classList.toggle('live', live);
+}
+
+function dismissAppSplash() {
+  const splash = document.getElementById('appSplash');
+  if (!splash || splash.classList.contains('hide')) return;
+  splash.classList.add('hide');
+  splash.setAttribute('aria-hidden', 'true');
+  setTimeout(() => splash.remove(), 450);
+}
+
+function initAppSplash() {
+  const dismiss = () => dismissAppSplash();
+  if (document.documentElement.classList.contains('i18n-ready')) {
+    requestAnimationFrame(dismiss);
+  } else {
+    const obs = new MutationObserver(() => {
+      if (document.documentElement.classList.contains('i18n-ready')) {
+        obs.disconnect();
+        requestAnimationFrame(dismiss);
+      }
+    });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  }
+  setTimeout(dismiss, 3200);
+}
+
 // --- User ID ---
 function getUserId() {
   let id = localStorage.getItem('aiva_user_id');
@@ -1831,6 +1859,7 @@ async function connectSession() {
   if (isConnecting || isSessionActive) return;
   isConnecting = true;
   recordBtn.disabled = true;
+  setRecordBtnLive(true);
   setStatus(t('connecting'), true);
   applyPreferences({ i18n: false });
 
@@ -1931,6 +1960,7 @@ function disconnectSession() {
   assistantTranscriptBuffer = '';
   assistantTurnComplete = false;
   recordBtn.classList.remove('recording');
+  setRecordBtnLive(false);
   recordBtn.disabled = false;
   waveform.classList.remove('active');
   statusEl.classList.remove('assistant-speech');
@@ -2235,6 +2265,7 @@ refreshExternalEvents();
 loadDailyBrief();
 initDeviceBanner();
 initPaywallUi();
+initAppSplash();
 
 function initPaywallUi() {
   document.getElementById('paywallDismissBtn')?.addEventListener('click', () => {
