@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <script src="lib/i18n-boot.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#050508">
+  <meta name="description" content="KASY — voice-first AI secretary for tasks and calendar. Speak naturally, get emotion-aware responses, sync calendars, and smart reminders.">
+  <meta property="og:title" content="KASY — AI Secretary">
+  <meta property="og:description" content="Speak. KASY listens, plans, and reminds — your voice-first AI secretary for tasks and calendar.">
+  <meta property="og:image" content="icons/og-image.png">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="icons/brand.css">
+  <link rel="stylesheet" href="landing.css">
+  <title>KASY — AI Secretary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="landing-wrap">
+    <header class="landing-nav" id="landingNav">
+      <div class="container nav-inner">
+        <a href="landing.html" class="nav-brand brand-lockup">
+          <img class="brand-mark" src="icons/logo-mark.svg" alt="" width="36" height="36">
+          <div class="brand-text">
+            <div class="brand-wordmark">KASY</div>
+          </div>
+        </a>
+
+        <nav class="nav-links" aria-label="Main">
+          <a class="nav-link" href="#features" data-i18n="landingNavFeatures">Features</a>
+          <a class="nav-link" href="#how" data-i18n="landingNavHow">How it works</a>
+          <a class="nav-link" href="#pricing" data-i18n="landingNavPricing">Pricing</a>
+          <a class="nav-link" href="#faq" data-i18n="landingNavFaq">FAQ</a>
+        </nav>
+
+        <div class="nav-actions">
+          <select id="langSelect" class="lang-select" aria-label="Language"></select>
+          <a class="btn btn-primary nav-cta" href="index.html" data-i18n="landingCtaTry">Try KASY free</a>
+          <button class="nav-toggle" id="navToggle" type="button" aria-label="Menu" aria-expanded="false">
+            <span></span><span></span><span></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="mobile-menu" id="mobileMenu" aria-label="Mobile">
+      <a class="nav-link" href="#features" data-i18n="landingNavFeatures">Features</a>
+      <a class="nav-link" href="#how" data-i18n="landingNavHow">How it works</a>
+      <a class="nav-link" href="#pricing" data-i18n="landingNavPricing">Pricing</a>
+      <a class="nav-link" href="#faq" data-i18n="landingNavFaq">FAQ</a>
+      <a class="btn btn-primary" href="index.html" data-i18n="landingCtaTry">Try KASY free</a>
+    </nav>
+
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-content reveal">
+          <div class="hero-badge">
+            <span class="hero-badge-dot"></span>
+            <span data-i18n="landingHeroBadge">Voice-first AI secretary</span>
+          </div>
+          <h1>
+            <span data-i18n="landingHeroTitle">Speak. KASY listens, plans, and reminds.</span>
+          </h1>
+          <p class="hero-sub" data-i18n="landingHeroSubtitle">
+            Your voice-first AI secretary for tasks and calendar. Say it once — KASY handles the rest.
+          </p>
+          <div class="hero-ctas">
+            <a class="btn btn-primary btn-lg" href="index.html" data-i18n="landingHeroCta">Start for free</a>
+            <a class="btn btn-ghost btn-lg" href="#how" data-i18n="landingHeroCtaSecondary">See how it works</a>
+          </div>
+          <div class="hero-stats">
+            <span class="stat-pill">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              <span data-i18n="landingStatVoice">Live voice AI</span>
+            </span>
+            <span class="stat-pill success">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span data-i18n="landingStatCalendar">Calendar sync</span>
+            </span>
+            <span class="stat-pill">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <span data-i18n="landingStatLanguages">9 languages</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="hero-visual reveal">
+          <div class="hero-card">
+            <div class="hero-float-card top-right" data-i18n="landingFloatTask">Meeting at 3pm — added</div>
+            <div class="hero-float-card bottom-left" data-i18n="landingFloatReminder">Reminder set ✓</div>
+            <div class="record-wrapper">
+              <a href="index.html" aria-label="Open KASY app">
+                <picture>
+                  <source srcset="icons/listen-120.webp" type="image/webp">
+                  <img class="hero-listen" src="icons/listen-120.png" alt="" width="130" height="130">
+                </picture>
+              </a>
+              <div class="orbit orbit-1"></div>
+              <div class="orbit orbit-2"></div>
+              <div class="orbit orbit-3"></div>
+            </div>
+            <div class="waveform" aria-hidden="true">
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+            </div>
+            <p class="hero-card-label" data-i18n="landingListenLabel">Natural voice — tap to try in app</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-header reveal">
+          <h2 data-i18n="landingFeaturesTitle">Not another todo list</h2>
+          <p data-i18n="landingFeaturesSubtitle">KASY is a voice secretary that understands tone, syncs your calendar, and keeps you on track.</p>
+        </div>
+        <div class="features-grid">
+          <article class="feature-card reveal">
+            <div class="feature-icon rose">🎙</div>
+            <h3 data-i18n="landingFeat1Title">Natural voice</h3>
+            <p data-i18n="landingFeat1Body">Talk naturally — create, edit, and complete tasks without typing.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon violet">💜</div>
+            <h3 data-i18n="landingFeat2Title">Emotion-aware</h3>
+            <p data-i18n="landingFeat2Body">KASY reads your tone and adapts responses for a human feel.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon teal">📅</div>
+            <h3 data-i18n="landingFeat3Title">Calendar in sync</h3>
+            <p data-i18n="landingFeat3Body">Google, Outlook, iCloud — tasks become events with reminders.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon rose">🌙</div>
+            <h3 data-i18n="landingFeat4Title">Evening AI brief</h3>
+            <p data-i18n="landingFeat4Body">End-of-day review of tomorrow — reschedule by voice.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon violet">🌍</div>
+            <h3 data-i18n="landingFeat5Title">9 languages</h3>
+            <p data-i18n="landingFeat5Body">Interface and assistant in English, Bulgarian, and 7 more.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon teal">🔔</div>
+            <h3 data-i18n="landingFeat6Title">Smart reminders</h3>
+            <p data-i18n="landingFeat6Body">Local notifications on Android APK and PWA — even when closed.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="how">
+      <div class="container">
+        <div class="section-header reveal">
+          <h2 data-i18n="landingHowTitle">How it works</h2>
+          <p data-i18n="landingHowSubtitle">Three steps to a lighter mind</p>
+        </div>
+        <div class="steps">
+          <article class="step-card reveal">
+            <div class="step-num">1</div>
+            <h3 data-i18n="landingHow1Title">Tap and speak</h3>
+            <p data-i18n="landingHow1Body">Tell KASY what's on your mind — meetings, errands, deadlines.</p>
+          </article>
+          <article class="step-card reveal">
+            <div class="step-num">2</div>
+            <h3 data-i18n="landingHow2Title">KASY plans</h3>
+            <p data-i18n="landingHow2Body">Tasks are extracted, calendar events created, reminders set.</p>
+          </article>
+          <article class="step-card reveal">
+            <div class="step-num">3</div>
+            <h3 data-i18n="landingHow3Title">Forget it</h3>
+            <p data-i18n="landingHow3Body">KASY reminds you. Your calendar stays in sync automatically.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="compare">
+      <div class="container">
+        <div class="section-header reveal">
+          <h2 data-i18n="landingCompareTitle">Why KASY?</h2>
+          <p data-i18n="landingCompareSubtitle">Speed, emotion, and calendar in one — not another list app.</p>
+        </div>
+        <div class="compare-wrap reveal">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th data-i18n="landingCompareFeature">Feature</th>
+                <th class="highlight" data-i18n="landingCompareKasy">KASY</th>
+                <th data-i18n="landingCompareTodoist">Todoist</th>
+                <th data-i18n="landingCompareSiri">Siri / Assistant</th>
+                <th data-i18n="landingCompareMotion">Motion</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-i18n="landingCompareRowVoice">Live voice dialog</td>
+                <td class="check">✓</td>
+                <td class="cross">—</td>
+                <td class="check">✓</td>
+                <td class="cross">—</td>
+              </tr>
+              <tr>
+                <td data-i18n="landingCompareRowCalendar">Tasks + calendar workflow</td>
+                <td class="check">✓</td>
+                <td class="cross">—</td>
+                <td class="cross">—</td>
+                <td class="check">✓</td>
+              </tr>
+              <tr>
+                <td data-i18n="landingCompareRowEmotion">Emotion-aware AI</td>
+                <td class="check">✓</td>
+                <td class="cross">—</td>
+                <td class="cross">—</td>
+                <td class="cross">—</td>
+              </tr>
+              <tr>
+                <td data-i18n="landingCompareRowApk">Native Android APK</td>
+                <td class="check">✓</td>
+                <td class="cross">—</td>
+                <td class="cross">—</td>
+                <td class="cross">—</td>
+              </tr>
+              <tr>
+                <td data-i18n="landingCompareRowPrice">Affordable Plus plan</td>
+                <td class="check">✓</td>
+                <td class="check">✓</td>
+                <td class="check">✓</td>
+                <td class="cross">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="compare-mobile reveal">
+          <div class="compare-mobile-card">
+            <h4 class="highlight" data-i18n="landingCompareKasy">KASY</h4>
+            <ul>
+              <li>✓ <span data-i18n="landingCompareRowVoice">Live voice dialog</span></li>
+              <li>✓ <span data-i18n="landingCompareRowCalendar">Tasks + calendar workflow</span></li>
+              <li>✓ <span data-i18n="landingCompareRowEmotion">Emotion-aware AI</span></li>
+              <li>✓ <span data-i18n="landingCompareRowApk">Native Android APK</span></li>
+              <li>✓ <span data-i18n="landingCompareRowPrice">Affordable Plus plan</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="pricing">
+      <div class="container">
+        <div class="section-header reveal">
+          <h2 data-i18n="landingPricingTitle">Simple pricing</h2>
+          <p data-i18n="landingPricingSubtitle">Start free. Upgrade when voice becomes your superpower.</p>
+        </div>
+        <div class="pricing-grid">
+          <article class="pricing-card reveal">
+            <h3 data-i18n="landingPlanFree">Free</h3>
+            <div class="pricing-price" data-i18n="landingPlanFreePrice">€0</div>
+            <div class="pricing-period" data-i18n="landingPlanFreePeriod">forever</div>
+            <ul class="pricing-features">
+              <li data-i18n="landingPlanFreeFeat1">5 voice sessions per day</li>
+              <li data-i18n="landingPlanFreeFeat2">Up to 50 active tasks</li>
+              <li data-i18n="landingPlanFreeFeat3">Calendar UI + local reminders</li>
+              <li data-i18n="landingPlanFreeFeat4">ICS read-only sync</li>
+            </ul>
+            <a class="btn" href="index.html" data-i18n="landingPlanCtaFree">Get started</a>
+          </article>
+          <article class="pricing-card featured reveal">
+            <span class="pricing-badge" data-i18n="landingPlanPopular">Most popular</span>
+            <h3 data-i18n="landingPlanPlus">Plus</h3>
+            <div class="pricing-price"><span data-i18n="landingPlanPlusPrice">€6.99</span></div>
+            <div class="pricing-period" data-i18n="landingPlanPlusPeriod">/month</div>
+            <div class="pricing-yearly" data-i18n="landingPlanPlusYearly">or €49.99/year</div>
+            <ul class="pricing-features">
+              <li data-i18n="landingPlanPlusFeat1">40 voice sessions per day</li>
+              <li data-i18n="landingPlanPlusFeat2">Unlimited tasks</li>
+              <li data-i18n="landingPlanPlusFeat3">Google, Outlook, iCloud write</li>
+              <li data-i18n="landingPlanPlusFeat4">Daily evening AI brief</li>
+              <li data-i18n="landingPlanPlusFeat5">Google Grounding + priority</li>
+            </ul>
+            <a class="btn btn-primary" href="index.html" data-i18n="landingPlanCtaPlus">Upgrade to Plus</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="container">
+        <div class="section-header reveal">
+          <h2 data-i18n="landingFaqTitle">Questions</h2>
+        </div>
+        <div class="faq-list">
+          <div class="faq-item reveal">
+            <button type="button" class="faq-question">
+              <span data-i18n="landingFaq1Q">Is KASY a todo app?</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="faq-answer"><p data-i18n="landingFaq1A"></p></div>
+          </div>
+          <div class="faq-item reveal">
+            <button type="button" class="faq-question">
+              <span data-i18n="landingFaq2Q">Do I need to pay to try it?</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="faq-answer"><p data-i18n="landingFaq2A"></p></div>
+          </div>
+          <div class="faq-item reveal">
+            <button type="button" class="faq-question">
+              <span data-i18n="landingFaq3Q">Which calendars are supported?</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="faq-answer"><p data-i18n="landingFaq3A"></p></div>
+          </div>
+          <div class="faq-item reveal">
+            <button type="button" class="faq-question">
+              <span data-i18n="landingFaq4Q">Is my data private?</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="faq-answer"><p data-i18n="landingFaq4A"></p></div>
+          </div>
+          <div class="faq-item reveal">
+            <button type="button" class="faq-question">
+              <span data-i18n="landingFaq5Q">Is there an Android app?</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="faq-answer"><p data-i18n="landingFaq5A"></p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-strip">
+      <div class="container">
+        <div class="cta-box reveal">
+          <h2 data-i18n="landingFinalCtaTitle">Ready to speak your schedule?</h2>
+          <p data-i18n="landingFinalCtaBody">Join KASY — say it once, forget the rest.</p>
+          <a class="btn btn-primary btn-lg" href="index.html" data-i18n="landingHeroCta">Start for free</a>
+        </div>
+      </div>
+    </section>
+
+    <footer class="landing-footer">
+      <div class="container footer-inner">
+        <a href="landing.html" class="nav-brand brand-lockup">
+          <img class="brand-mark" src="icons/logo-mark.svg" alt="" width="32" height="32">
+          <div class="brand-text">
+            <div class="brand-wordmark" style="font-size:1rem;letter-spacing:3px;">KASY</div>
+          </div>
+        </a>
+        <div class="footer-links">
+          <a href="privacy.html" data-i18n="landingFooterPrivacy">Privacy</a>
+          <a href="terms.html" data-i18n="landingFooterTerms">Terms</a>
+          <a href="index.html" data-i18n="landingCtaTry">Try KASY free</a>
+        </div>
+        <div class="footer-copy" data-i18n="landingFooterCopyright">© 2026 KASY Assistant</div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="lib/i18n.js"></script>
+  <script src="lib/i18n-landing.js"></script>
+  <script src="landing.js"></script>
+</body>
+</html>

@@ -887,7 +887,7 @@ app.post('/api/push/subscribe', async (c) => {
 // --- Static file serving for frontend ---
 
 app.get('/', async (c) => {
-  return c.redirect('/index.html');
+  return c.redirect('/landing.html');
 });
 
 // --- Legacy Durable Object stub ---
