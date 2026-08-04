@@ -12,7 +12,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const pkg = (process.argv[2] || process.env.BRAND_PACKAGE || 'A').toUpperCase();
 
 function run(script) {
   return new Promise((resolve, reject) => {
@@ -25,14 +24,27 @@ function run(script) {
 }
 
 async function main() {
+  const pkg = (process.argv[2] || process.env.BRAND_PACKAGE || '').toUpperCase();
   if (pkg === 'B') {
     const { runPackageB } = await import('./process-kasy-brand-assets.mjs');
     await runPackageB();
-  } else if (pkg === 'A') {
+    return;
+  }
+  if (pkg === 'A') {
     await run('generate-kasy-brand.mjs');
+    return;
+  }
+  // Auto: prefer Package B when user art is present
+  const { existsSync } = await import('node:fs');
+  const bIcon = ['brand-assets/source/kasyico.png', 'kasyico.png'].find((p) =>
+    existsSync(join(ROOT, p))
+  );
+  if (bIcon) {
+    console.log(`Found ${bIcon} — applying Package B`);
+    const { runPackageB } = await import('./process-kasy-brand-assets.mjs');
+    await runPackageB();
   } else {
-    console.error('Usage: apply-brand-package.mjs [A|B]');
-    process.exit(1);
+    await run('generate-kasy-brand.mjs');
   }
 }
 

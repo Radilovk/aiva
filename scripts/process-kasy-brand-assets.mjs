@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * Package B — process user-provided kasyico.png + kasyspl.png → frontend/icons.
- * Place files in brand-assets/source/ then: node scripts/apply-brand-package.mjs B
+ * Package B — process kasyico.png + kasyspl.png → frontend/icons.
+ * Sources: brand-assets/source/, repo root, or Cursor artifacts.
  */
 import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { cropToSquareArt, renderIconSquare, renderMaskable } from './lib/kasy-icon-prep.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -31,7 +32,7 @@ async function exists(path) {
 }
 
 async function resolveSource(candidates, label) {
-  const dirs = [SOURCE_DIR, ARTIFACTS_DIR];
+  const dirs = [SOURCE_DIR, ROOT, ARTIFACTS_DIR];
   for (const dir of dirs) {
     for (const name of candidates) {
       const p = join(dir, name);
@@ -42,16 +43,18 @@ async function resolveSource(candidates, label) {
     }
   }
   throw new Error(
-    `Missing ${label}. Place one of [${candidates.join(', ')}] in brand-assets/source/`
+    `Missing ${label}. Place one of [${candidates.join(', ')}] in repo root or brand-assets/source/`
   );
 }
 
-async function writePngWebp(styledSharp, pngPath, webpPath, webpQuality = 82) {
-  const png = await styledSharp.png({ compressionLevel: 9, effort: 10 }).toBuffer();
-  await writeFile(pngPath, png);
-  const webp = await sharp(png).webp({ quality: webpQuality, effort: 6 }).toBuffer();
+async function writePngWebp(pngBuf, baseName, webpQuality = 82) {
+  const pngPath = join(ICONS, `${baseName}.png`);
+  const webpPath = join(ICONS, `${baseName}.webp`);
+  await writeFile(pngPath, pngBuf);
+  const webp = await sharp(pngBuf).webp({ quality: webpQuality, effort: 6 }).toBuffer();
   await writeFile(webpPath, webp);
-  return png;
+  await writeFile(join(PACKAGE_OUT, `${baseName}.png`), pngBuf);
+  return pngBuf;
 }
 
 async function archiveSource(src, destName) {
@@ -59,43 +62,35 @@ async function archiveSource(src, destName) {
   await copyFile(src, join(PACKAGE_OUT, destName));
 }
 
-async function squareIcon(input, size, outName, { padding = 0, fit = 'cover' } = {}) {
-  let pipeline = sharp(input);
-  if (padding > 0) {
-    const pad = Math.round(size * padding);
-    pipeline = pipeline.resize(size - pad * 2, size - pad * 2, { fit, position: 'centre' })
-      .extend({
-        top: pad, bottom: pad, left: pad, right: pad,
-        background: { r: 5, g: 5, b: 8, alpha: 1 },
-      });
-  } else {
-    pipeline = pipeline.resize(size, size, { fit, position: 'centre' });
-  }
-  const base = join(ICONS, outName.replace(/\.png$/, ''));
-  const png = await writePngWebp(pipeline, `${base}.png`, `${base}.webp`);
-  await writeFile(join(PACKAGE_OUT, `${outName.replace(/\.png$/, '')}-${size}.png`), png);
-  console.log(`  ✓ ${outName} (${size}px)`);
+async function squareIcon(input, size, outName, { fill = 0.86, transparent = false } = {}) {
+  const buf = await renderIconSquare(input, { size, fill, transparent }).then((p) => p.toBuffer());
+  await writePngWebp(buf, outName.replace(/\.png$/, ''));
+  console.log(`  ✓ ${outName} (${size}px, fill ${Math.round(fill * 100)}%)`);
 }
 
 async function portraitSplash(input, width, height, outName) {
   const webp = await sharp(input).resize(width, height, { fit: 'cover', position: 'centre' })
     .webp({ quality: 78, effort: 6 }).toBuffer();
-  const base = join(ICONS, outName.replace(/\.(png|webp)$/, ''));
-  await writeFile(`${base}.webp`, webp);
-  await writeFile(join(PACKAGE_OUT, `${outName}.webp`), webp);
-  console.log(`  ✓ ${outName}.webp (${width}x${height})`);
+  const base = outName.replace(/\.(png|webp)$/, '');
+  await writeFile(join(ICONS, `${base}.webp`), webp);
+  await writeFile(join(PACKAGE_OUT, `${base}.webp`), webp);
+  console.log(`  ✓ ${base}.webp (${width}x${height})`);
 }
 
 async function listenButton(input, displaySize) {
   const pixelSize = displaySize * 2;
-  const pipeline = sharp(input).resize(pixelSize, pixelSize, { fit: 'cover', position: 'centre' });
-  const base = join(ICONS, `listen-${displaySize}`);
-  await writePngWebp(pipeline, `${base}.png`, `${base}.webp`, 85);
+  const art = await cropToSquareArt(input);
+  const buf = await art
+    .resize(pixelSize, pixelSize, { fit: 'cover' })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+  await writePngWebp(buf, `listen-${displaySize}`, 85);
   console.log(`  ✓ listen-${displaySize}`);
 }
 
 async function notificationIcon(input) {
-  const buf = await sharp(input).resize(96, 96, { fit: 'cover', position: 'centre' })
+  const art = await cropToSquareArt(input);
+  const buf = await art.resize(96, 96, { fit: 'cover' })
     .grayscale().normalize().png({ compressionLevel: 9 }).toBuffer();
   await writeFile(join(ICONS, 'ic-stat-notification.png'), buf);
   await writeFile(join(ANDROID, 'ic_stat_aiva.png'), buf);
@@ -103,9 +98,9 @@ async function notificationIcon(input) {
 }
 
 async function ogImage(splashInput) {
-  const base = join(ICONS, 'og-image');
-  const pipeline = sharp(splashInput).resize(1200, 630, { fit: 'cover', position: 'centre' });
-  await writePngWebp(pipeline, `${base}.png`, `${base}.webp`, 80);
+  const png = await sharp(splashInput).resize(1200, 630, { fit: 'cover', position: 'centre' })
+    .png({ compressionLevel: 9 }).toBuffer();
+  await writePngWebp(png, 'og-image', 80);
   console.log('  ✓ og-image');
 }
 
@@ -132,12 +127,14 @@ export async function runPackageB() {
   await archiveSource(iconSrc, 'kasyico.png');
   await archiveSource(splashSrc, 'kasyspl.png');
 
-  console.log('Icons:');
-  await squareIcon(iconSrc, 32, 'favicon-32.png', { padding: 0.04 });
-  await squareIcon(iconSrc, 192, 'icon-192.png');
-  await squareIcon(iconSrc, 512, 'icon-512.png');
-  await squareIcon(iconSrc, 180, 'apple-touch-icon.png');
-  await squareIcon(listenSrc, 512, 'maskable-512.png', { padding: 0.12, fit: 'contain' });
+  console.log('Icons (alpha-trim + scaled fill):');
+  await squareIcon(iconSrc, 32, 'favicon-32.png', { fill: 0.9 });
+  await squareIcon(iconSrc, 192, 'icon-192.png', { fill: 0.86 });
+  await squareIcon(iconSrc, 512, 'icon-512.png', { fill: 0.86 });
+  await squareIcon(iconSrc, 180, 'apple-touch-icon.png', { fill: 0.86 });
+  const maskBuf = await renderMaskable(listenSrc, 512).then((p) => p.toBuffer());
+  await writePngWebp(maskBuf, 'maskable-512');
+  console.log('  ✓ maskable-512.png (safe zone)');
 
   console.log('Listen button:');
   for (const s of [120, 88, 44]) await listenButton(listenSrc, s);
