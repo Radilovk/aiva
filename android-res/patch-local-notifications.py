@@ -159,4 +159,29 @@ if os.path.exists(STRINGS_SRC):
     shutil.copy2(STRINGS_SRC, STRINGS_DST)
     print('✅ Copied AIVA strings resource')
 
+# Ensure launch theme uses KASY splash drawable (native splash before WebView)
+STYLES = 'android/app/src/main/res/values/styles.xml'
+if os.path.exists(STYLES):
+    with open(STYLES, 'r') as f:
+        styles = f.read()
+    splash_items = (
+        '<item name="android:background">@drawable/splash</item>\n'
+        '        <item name="android:windowBackground">@drawable/splash</item>'
+    )
+    if 'AppTheme.NoActionBarLaunch' in styles and '@drawable/splash' not in styles:
+        styles = styles.replace(
+            '<style name="AppTheme.NoActionBarLaunch"',
+            '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar"',
+            1,
+        )
+        styles = styles.replace(
+            '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">',
+            '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">\n        '
+            + splash_items,
+            1,
+        )
+        with open(STYLES, 'w') as f:
+            f.write(styles)
+        print('✅ Patched launch theme with splash drawable')
+
 print('✅ Android patches applied successfully')

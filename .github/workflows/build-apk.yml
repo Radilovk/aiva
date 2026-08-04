@@ -8,6 +8,8 @@ on:
       - 'frontend/**'
       - 'capacitor.config.json'
       - 'android-res/**'
+      - 'scripts/generate-android-apk-assets.mjs'
+      - 'scripts/process-kasy-brand-assets.mjs'
       - '.github/workflows/build-apk.yml'
 
 jobs:
@@ -39,7 +41,7 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android \
             @capacitor/local-notifications @capacitor/preferences @capacitor/haptics \
-            @capacitor/app
+            @capacitor/app @capacitor/splash-screen
 
       - name: Build Capacitor web shell
         run: |
@@ -82,24 +84,8 @@ jobs:
       - name: Copy ProGuard rules
         run: cp android-res/proguard-rules.pro android/app/proguard-rules.pro
 
-      - name: Generate icons
-        run: |
-          # Use the PWA icons for the APK as well
-          MIPMAP_BASE="android/app/src/main/res"
-          for SIZE_DIR in mipmap-mdpi:48 mipmap-hdpi:72 mipmap-xhdpi:96 mipmap-xxhdpi:144 mipmap-xxxhdpi:192; do
-            DIR=$(echo $SIZE_DIR | cut -d: -f1)
-            SIZE=$(echo $SIZE_DIR | cut -d: -f2)
-            mkdir -p "$MIPMAP_BASE/$DIR"
-            python3 -c "
-          from PIL import Image
-          img = Image.open('frontend/icons/icon-512.png')
-          img = img.resize(($SIZE, $SIZE), Image.LANCZOS)
-          img.save('$MIPMAP_BASE/$DIR/ic_launcher.png')
-          img.save('$MIPMAP_BASE/$DIR/ic_launcher_round.png')
-          " 2>/dev/null || cp frontend/icons/icon-192.png "$MIPMAP_BASE/$DIR/ic_launcher.png"
-          done
-          mkdir -p "$MIPMAP_BASE/drawable"
-          cp android-res/drawable/ic_stat_aiva.png "$MIPMAP_BASE/drawable/ic_stat_aiva.png"
+      - name: Generate launcher icons and native splash
+        run: node scripts/generate-android-apk-assets.mjs android/app/src/main/res
 
       - name: Build APK
         working-directory: android
@@ -110,7 +96,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AIVA-debug
+          name: KASY-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Create GitHub Release
@@ -119,8 +105,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v-$(date +%Y%m%d%H%M)-$(git rev-parse --short HEAD)"
-          cp android/app/build/outputs/apk/debug/app-debug.apk AIVA.apk
-          gh release create "$TAG" AIVA.apk \
-            --title "AIVA $TAG" \
+          cp android/app/build/outputs/apk/debug/app-debug.apk KASY.apk
+          gh release create "$TAG" KASY.apk \
+            --title "KASY $TAG" \
             --notes "Автоматичен build от commit $(git rev-parse --short HEAD)" \
             --latest

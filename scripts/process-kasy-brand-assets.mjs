@@ -103,8 +103,11 @@ async function androidSplash(splashInput) {
 async function main() {
   let sourceDir = SOURCE_DIR;
   const names = ['kasy-icon-source.png', 'kasy-splash-source.png', 'kasy-listen-source.png'];
-  const missingInSource = names.filter((n) => !await exists(join(SOURCE_DIR, n)));
-  if (missingInSource.length && await exists(join(ARTIFACTS_DIR, names[0]))) {
+  let hasAllInSource = true;
+  for (const n of names) {
+    if (!(await exists(join(SOURCE_DIR, n)))) hasAllInSource = false;
+  }
+  if (!hasAllInSource && await exists(join(ARTIFACTS_DIR, names[0]))) {
     sourceDir = ARTIFACTS_DIR;
     console.log(`Using Cursor attachments: ${ARTIFACTS_DIR}`);
   }
@@ -132,6 +135,7 @@ async function main() {
   await squareIcon(listenSrc, 512, 'maskable-512.png', { padding: 0.12, fit: 'contain' });
 
   console.log('Listen button (from kasy-listen-source):');
+  await listenButton(listenSrc, 120);
   await listenButton(listenSrc, 88);
   await listenButton(listenSrc, 44);
 
