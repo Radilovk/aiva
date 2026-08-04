@@ -2,12 +2,9 @@
 /**
  * Resize & compress KASY brand sources → frontend/icons + android splash.
  *
- * Place sources in brand-assets/source/ (or pass SOURCE_DIR env):
- *   kasy-icon-source.png   — app icon / mascot
- *   kasy-splash-source.png — splash portrait
- *   kasy-listen-source.png — circular listen button
- *
- *   node scripts/process-kasy-brand-assets.mjs
+ * Place sources in brand-assets/source/ or attach in Cursor (saved under
+ * /opt/cursor/artifacts/assets/ as kasy-icon-source.png, kasy-splash-source.png,
+ * kasy-listen-source.png). Run: node scripts/process-kasy-brand-assets.mjs
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -17,6 +14,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
+const ARTIFACTS_DIR = '/opt/cursor/artifacts/assets';
 const SOURCE_DIR = process.env.SOURCE_DIR || join(ROOT, 'brand-assets', 'source');
 const ICONS = join(ROOT, 'frontend', 'icons');
 const ANDROID = join(ROOT, 'android-res', 'drawable');
@@ -103,9 +101,17 @@ async function androidSplash(splashInput) {
 }
 
 async function main() {
-  const iconSrc = join(SOURCE_DIR, 'kasy-icon-source.png');
-  const splashSrc = join(SOURCE_DIR, 'kasy-splash-source.png');
-  const listenSrc = join(SOURCE_DIR, 'kasy-listen-source.png');
+  let sourceDir = SOURCE_DIR;
+  const names = ['kasy-icon-source.png', 'kasy-splash-source.png', 'kasy-listen-source.png'];
+  const missingInSource = names.filter((n) => !await exists(join(SOURCE_DIR, n)));
+  if (missingInSource.length && await exists(join(ARTIFACTS_DIR, names[0]))) {
+    sourceDir = ARTIFACTS_DIR;
+    console.log(`Using Cursor attachments: ${ARTIFACTS_DIR}`);
+  }
+
+  const iconSrc = join(sourceDir, 'kasy-icon-source.png');
+  const splashSrc = join(sourceDir, 'kasy-splash-source.png');
+  const listenSrc = join(sourceDir, 'kasy-listen-source.png');
 
   for (const p of [iconSrc, splashSrc, listenSrc]) {
     if (!await exists(p)) {
