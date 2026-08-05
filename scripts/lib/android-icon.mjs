@@ -1,5 +1,5 @@
 /**
- * Android launcher icons — same fit as PWA (contain on square, alpha preserved).
+ * Android launcher icons — flat PWA look on #050508, padded for adaptive masks.
  */
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -10,6 +10,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
 export const APK_BG = '#050508';
+/** Slightly inset so squircle/circle masks do not clip headset edges. */
+export const APK_ICON_FILL = 0.86;
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 
 function parseBg(hex) {
@@ -21,25 +23,28 @@ function parseBg(hex) {
   };
 }
 
-async function fitIconOnSquare(input, size, { background }) {
-  const resized = await sharp(input)
-    .resize(size, size, { fit: 'inside', background: TRANSPARENT })
+/** One flat launcher bitmap — same for adaptive foreground and legacy. */
+export function renderApkIcon(input, size, { fill = APK_ICON_FILL } = {}) {
+  const inner = Math.round(size * fill);
+  const resized = sharp(input)
+    .resize(inner, inner, { fit: 'inside', background: TRANSPARENT })
     .png()
     .toBuffer();
-  const meta = await sharp(resized).metadata();
-  const left = Math.floor((size - meta.width) / 2);
-  const top = Math.floor((size - meta.height) / 2);
-  return sharp({
-    create: { width: size, height: size, channels: 4, background },
-  }).composite([{ input: resized, left, top }]);
+
+  return resized.then(async (buf) => {
+    const meta = await sharp(buf).metadata();
+    const left = Math.floor((size - meta.width) / 2);
+    const top = Math.floor((size - meta.height) / 2);
+    return sharp({
+      create: { width: size, height: size, channels: 4, background: parseBg(APK_BG) },
+    }).composite([{ input: buf, left, top }]);
+  });
 }
 
-/** Adaptive foreground — transparent PNG, same scale as PWA icon. */
 export function renderApkForeground(input, size) {
-  return fitIconOnSquare(input, size, { background: TRANSPARENT });
+  return renderApkIcon(input, size);
 }
 
-/** Legacy launcher — icon on app background (install preview / API < 26). */
 export function renderApkLegacy(input, size) {
-  return fitIconOnSquare(input, size, { background: parseBg(APK_BG) });
+  return renderApkIcon(input, size);
 }

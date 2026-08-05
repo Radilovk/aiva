@@ -90,9 +90,9 @@ jobs:
         run: |
           grep -q '#050508' android/app/src/main/res/values/ic_launcher_background.xml
           test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
-          test -f android/app/src/main/res/drawable/splash_art.png
-          grep -q 'splash_art' android/app/src/main/res/drawable/splash.xml
+          ! test -f android/app/src/main/res/drawable/splash_art.png
           ! test -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
+          node scripts/verify-apk-icon-preview.mjs
 
       - name: Build APK
         working-directory: android
