@@ -118,6 +118,15 @@ if 'THEMED_ICON_ENABLED' not in content:
     content = content.replace('<application', THEMED_ICON_META + '    <application', 1)
     print('✅ Disabled launcher themed icon tinting')
 
+# Circular launchers + MIUI install UI use android:roundIcon (API 25+)
+if 'android:roundIcon' not in content and 'android:icon="@mipmap/ic_launcher"' in content:
+    content = content.replace(
+        'android:icon="@mipmap/ic_launcher"',
+        'android:icon="@mipmap/ic_launcher"\n        android:roundIcon="@mipmap/ic_launcher_round"',
+        1,
+    )
+    print('✅ Added android:roundIcon=@mipmap/ic_launcher_round')
+
 with open(MANIFEST, 'w') as f:
     f.write(content)
 
@@ -215,16 +224,16 @@ if os.path.exists(STYLES):
 LAUNCHER_BG = 'android/app/src/main/res/values/ic_launcher_background.xml'
 LAUNCHER_BG_FIX = '''<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#050508</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>
 '''
 if os.path.exists(LAUNCHER_BG):
     with open(LAUNCHER_BG, 'r') as f:
         bg = f.read()
-    if '#050508' not in bg:
+    if '#FFFFFF' not in bg:
         with open(LAUNCHER_BG, 'w') as f:
             f.write(LAUNCHER_BG_FIX)
-        print('✅ ic_launcher_background → #050508 (was white/transparent)')
+        print('✅ ic_launcher_background → #FFFFFF (full-bleed launcher tile)')
 
 VECTOR_FG = 'android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml'
 if os.path.exists(VECTOR_FG):

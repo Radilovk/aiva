@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 /**
- * Verify maskable launcher icon: transparent foreground, art survives squircle mask.
+ * Verify maskable launcher icon: white full-bleed bg, robot in 72dp safe zone.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { renderApkForeground, APK_ICON_FILL } from './lib/android-icon.mjs';
+import {
+  renderApkForeground,
+  renderApkLegacy,
+  APK_FOREGROUND_FILL,
+  APK_ICON_BG,
+} from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,7 +29,7 @@ function squircleMaskSvg(size) {
 
 function isArtPixel(r, g, b, a) {
   if (a < 20) return false;
-  return !(r < 20 && g < 20 && b < 20);
+  return !(r > 240 && g > 240 && b > 240);
 }
 
 async function clippedArtPixels(fgBuf) {
@@ -51,9 +56,11 @@ async function clippedArtPixels(fgBuf) {
 async function main() {
   await mkdir(OUT, { recursive: true });
   const fgBuf = await (await renderApkForeground(ICON, SIZE)).png().toBuffer();
+  const legacyBuf = await (await renderApkLegacy(ICON, SIZE)).png().toBuffer();
   const clipped = await clippedArtPixels(fgBuf);
-  await writeFile(join(OUT, 'apk-maskable-icon.png'), fgBuf);
-  console.log(`Maskable icon preview → ${OUT}/apk-maskable-icon.png (fill ${APK_ICON_FILL.toFixed(3)})`);
+  await writeFile(join(OUT, 'apk-foreground.png'), fgBuf);
+  await writeFile(join(OUT, 'apk-legacy-icon.png'), legacyBuf);
+  console.log(`Icon preview → ${OUT}/ (bg ${APK_ICON_BG}, fill ${APK_FOREGROUND_FILL.toFixed(3)})`);
   console.log(`Squircle clipped art pixels: ${clipped}`);
   if (clipped > 0) {
     throw new Error(`Art clipped by squircle mask (${clipped}px)`);

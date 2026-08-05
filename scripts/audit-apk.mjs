@@ -56,7 +56,7 @@ async function main() {
     ['no splash drawable in APK', !(await readFile(join(OUT, 'decoded', 'res', 'drawable', 'splash.xml'), 'utf8').catch(() => null))],
     ['no Capacitor vector fg', !(await readFile(join(OUT, 'decoded', 'res', 'drawable-v24', 'ic_launcher_foreground.xml'), 'utf8').catch(() => null))],
     ['themed icon disabled', /THEMED_ICON_ENABLED.*false/.test(manifest)],
-    ['ic_launcher_background #050508', colors.includes('#ff050508') || colors.includes('#050508')],
+    ['ic_launcher_background #FFFFFF', colors.includes('#ffffffff') || colors.includes('#FFFFFF')],
   ];
 
   console.log(`APK audit: ${APK}\n`);
