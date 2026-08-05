@@ -8,10 +8,9 @@ on:
       - 'frontend/**'
       - 'capacitor.config.json'
       - 'android-res/**'
-      - 'scripts/process-kasy-brand-assets.mjs'
+      - 'scripts/process-brand-assets.mjs'
       - 'scripts/generate-android-apk-assets.mjs'
-      - 'scripts/apply-brand-package.mjs'
-      - 'scripts/generate-kasy-brand.mjs'
+      - 'brand-assets/source/**'
       - 'scripts/prepare-capacitor-shell.mjs'
       - '.github/workflows/build-apk.yml'
 
@@ -45,6 +44,9 @@ jobs:
           npm install @capacitor/core @capacitor/cli @capacitor/android \
             @capacitor/local-notifications @capacitor/preferences @capacitor/haptics \
             @capacitor/app @capacitor/splash-screen
+
+      - name: Process brand assets
+        run: node scripts/process-brand-assets.mjs
 
       - name: Build Capacitor web shell
         run: node scripts/prepare-capacitor-shell.mjs
