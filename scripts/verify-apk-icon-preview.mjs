@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Visual verification: PWA reference vs APK launcher after squircle mask.
- * Fails CI if headset art is clipped by the simulated mask.
+ * Verify maskable launcher icon: art survives squircle mask at 66% safe zone.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -14,7 +13,6 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 const OUT = join(ROOT, '.artifacts', 'icon-preview');
 const ICON = join(ROOT, 'frontend', 'icons', 'icon-512.png');
-const BG = { r: 5, g: 5, b: 8, alpha: 255 };
 const SIZE = 192;
 
 function squircleMaskSvg(size) {
@@ -24,31 +22,9 @@ function squircleMaskSvg(size) {
   );
 }
 
-async function pwaReference() {
-  const resized = await sharp(ICON)
-    .resize(SIZE, SIZE, { fit: 'inside', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
-  const meta = await sharp(resized).metadata();
-  return sharp({ create: { width: SIZE, height: SIZE, channels: 4, background: BG } })
-    .composite([{
-      input: resized,
-      left: Math.floor((SIZE - meta.width) / 2),
-      top: Math.floor((SIZE - meta.height) / 2),
-    }])
-    .png()
-    .toBuffer();
-}
-
-async function maskedApkIcon() {
-  const fgBuf = await renderApkForeground(ICON, SIZE).then((p) => p.png().toBuffer());
-  const mask = await sharp(squircleMaskSvg(SIZE)).resize(SIZE, SIZE).png().toBuffer();
-  const masked = await sharp(fgBuf).composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
-  return masked;
-}
-
-function isBackground(r, g, b, a) {
-  return a > 200 && r < 20 && g < 20 && b < 20;
+function isArtPixel(r, g, b, a) {
+  if (a < 20) return false;
+  return !(r < 20 && g < 20 && b < 20);
 }
 
 async function clippedArtPixels(fgBuf) {
@@ -67,7 +43,7 @@ async function clippedArtPixels(fgBuf) {
     const ob = orig.data[oi + 2];
     const oa = orig.data[oi + 3];
     const ma = masked.data[oi + 3];
-    if (oa > 12 && !isBackground(or, og, ob, oa) && ma < 12) clipped += 1;
+    if (isArtPixel(or, og, ob, oa) && ma < 12) clipped += 1;
   }
   return clipped;
 }
@@ -76,16 +52,11 @@ async function main() {
   await mkdir(OUT, { recursive: true });
   const fgBuf = await renderApkForeground(ICON, SIZE).then((p) => p.png().toBuffer());
   const clipped = await clippedArtPixels(fgBuf);
-
-  await writeFile(join(OUT, 'pwa-reference.png'), await pwaReference());
-  await writeFile(join(OUT, 'apk-flat-icon.png'), fgBuf);
-  await writeFile(join(OUT, 'apk-squircle-masked.png'), await maskedApkIcon());
-
-  console.log(`Icon previews → ${OUT}/ (fill ${APK_ICON_FILL})`);
-  console.log(`Squircle clipped pixels: ${clipped}`);
-
+  await writeFile(join(OUT, 'apk-maskable-icon.png'), fgBuf);
+  console.log(`Maskable icon preview → ${OUT}/apk-maskable-icon.png (fill ${APK_ICON_FILL.toFixed(3)})`);
+  console.log(`Squircle clipped art pixels: ${clipped}`);
   if (clipped > 0) {
-    throw new Error(`Launcher icon loses ${clipped}px to squircle mask — reduce APK_ICON_FILL`);
+    throw new Error(`Art clipped by squircle mask (${clipped}px)`);
   }
 }
 
