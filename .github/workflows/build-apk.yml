@@ -86,6 +86,12 @@ jobs:
       - name: Generate launcher icons and native splash
         run: node scripts/generate-android-apk-assets.mjs android/app/src/main/res
 
+      - name: Verify launcher icon resources
+        run: |
+          grep -q '#050508' android/app/src/main/res/values/ic_launcher_background.xml
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+          ! test -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
+
       - name: Build APK
         working-directory: android
         run: |
