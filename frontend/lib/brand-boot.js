@@ -1,11 +1,11 @@
 /**
- * Single brand image for logo, listen button, and launcher icon.
- * Static paths only — no runtime swapping (prevents flash and APK breakage).
+ * Canonical KASY image paths (static — no runtime swapping).
  */
 (function () {
-  const ICON = 'icons/icon-512.webp';
-
   window.AIVA_BRAND = {
-    iconPath: () => ICON,
+    brandPath: () => 'icons/brand.webp',
+    buttonPath: () => 'icons/button.webp',
+    splashPath: () => 'icons/splash.webp',
+    iconPath: () => 'icons/icon-512.webp',
   };
 })();

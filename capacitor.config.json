@@ -12,12 +12,10 @@
       "iconColor": "#ff3b5c"
     },
     "SplashScreen": {
-      "launchShowDuration": 2200,
-      "launchFadeOutDuration": 400,
+      "launchShowDuration": 2000,
+      "launchFadeOutDuration": 350,
       "launchAutoHide": true,
       "backgroundColor": "#050508",
-      "androidSplashResourceName": "splash",
-      "androidScaleType": "CENTER_INSIDE",
       "showSpinner": false,
       "splashFullScreen": true,
       "splashImmersive": true

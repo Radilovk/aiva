@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 /**
- * Android launcher + splash from canonical web assets:
- *   icons/icon-512.webp — launcher icon
- *   icons/splash-portrait-720.webp — native splash (centered, no crop)
+ * Android launcher + splash from frontend/icons/brand.webp + splash.webp
  */
 import { mkdir, writeFile, readdir, rm, unlink, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -14,8 +12,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
 const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res');
-const ICON_SRC = join(ROOT, 'frontend', 'icons', 'icon-512.webp');
-const SPLASH_SRC = join(ROOT, 'frontend', 'icons', 'splash-portrait-720.webp');
+const ICON_SRC = join(ROOT, 'frontend', 'icons', 'brand.webp');
+const SPLASH_SRC = join(ROOT, 'frontend', 'icons', 'splash.webp');
 
 const BRAND_BG = '#050508';
 
@@ -27,6 +25,7 @@ const MIPMAP_SIZES = [
   ['mipmap-xxxhdpi', 192],
 ];
 
+/** Centered bitmap on solid bg — no crop, no tile, no stretch */
 const SPLASH_LAYER_XML = `<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_background"/>
@@ -65,7 +64,7 @@ async function writeLauncherIcons(iconInput) {
     await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
     await writeFile(join(folder, 'ic_launcher_round.png'), legacyBuf);
     await writeFile(join(folder, 'ic_launcher_foreground.png'), fgBuf);
-    console.log(`  ✓ ${dir}/ic_launcher + foreground (${size}px)`);
+    console.log(`  ✓ ${dir}/ic_launcher (${size}px)`);
   }
 }
 
@@ -87,7 +86,7 @@ async function removeDensitySplashes() {
 
 async function writeSplashAssets() {
   if (!await exists(SPLASH_SRC)) {
-    throw new Error(`Missing ${SPLASH_SRC}`);
+    throw new Error(`Missing ${SPLASH_SRC} — run node scripts/process-brand-assets.mjs`);
   }
 
   const androidResDrawable = join(ROOT, 'android-res', 'drawable');
@@ -109,7 +108,7 @@ async function writeSplashAssets() {
       }
     }
   }
-  console.log('  ✓ drawable/splash.xml + splash_art.webp (splash-portrait-720.webp)');
+  console.log('  ✓ drawable/splash.xml + splash_art.webp (splash.webp, centered)');
 
   await removeDensitySplashes();
 }
@@ -123,25 +122,23 @@ async function writeNotificationIcon(iconInput) {
     .png({ compressionLevel: 9 })
     .toBuffer();
   await writeFile(join(OUT, 'drawable', 'ic_stat_aiva.png'), buf);
-  console.log('  ✓ drawable/ic_stat_aiva.png (from icon-512.webp)');
+  console.log('  ✓ drawable/ic_stat_aiva.png');
 }
 
 async function writeBrandColors() {
   const valuesDir = join(OUT, 'values');
   await mkdir(valuesDir, { recursive: true });
-  const colors = `<?xml version="1.0" encoding="utf-8"?>
+  await writeFile(join(valuesDir, 'colors.xml'), `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="splash_background">${BRAND_BG}</color>
 </resources>
-`;
-  await writeFile(join(valuesDir, 'colors.xml'), colors);
-  const launcherBg = `<?xml version="1.0" encoding="utf-8"?>
+`);
+  await writeFile(join(valuesDir, 'ic_launcher_background.xml'), `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">${BRAND_BG}</color>
 </resources>
-`;
-  await writeFile(join(valuesDir, 'ic_launcher_background.xml'), launcherBg);
-  console.log('  ✓ values/colors.xml + ic_launcher_background.xml');
+`);
+  console.log('  ✓ values/colors.xml');
 }
 
 async function writeAdaptiveIconXml() {
@@ -155,16 +152,14 @@ async function writeAdaptiveIconXml() {
 `;
   await writeFile(join(anydpi, 'ic_launcher.xml'), xml);
   await writeFile(join(anydpi, 'ic_launcher_round.xml'), xml);
-  console.log('  ✓ mipmap-anydpi-v26 adaptive icons');
+  console.log('  ✓ adaptive icons');
 }
 
 async function main() {
   if (!await exists(ICON_SRC)) {
-    throw new Error(`Missing ${ICON_SRC}`);
+    throw new Error(`Missing ${ICON_SRC} — run node scripts/process-brand-assets.mjs`);
   }
   console.log(`Android branding → ${OUT}`);
-  console.log(`  Icon: ${ICON_SRC}`);
-  console.log(`  Splash: ${SPLASH_SRC}`);
   await writeLauncherIcons(ICON_SRC);
   await writeSplashAssets();
   await writeBrandColors();

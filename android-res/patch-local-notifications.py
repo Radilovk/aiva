@@ -159,30 +159,52 @@ if os.path.exists(STRINGS_SRC):
     shutil.copy2(STRINGS_SRC, STRINGS_DST)
     print('✅ Copied AIVA strings resource')
 
-# Ensure launch theme uses KASY splash drawable (native splash before WebView)
+# Ensure launch theme: legacy full-screen splash (no Android 12 icon API = no stitch)
 STYLES = 'android/app/src/main/res/values/styles.xml'
 if os.path.exists(STYLES):
     with open(STYLES, 'r') as f:
         styles = f.read()
+
+    if 'Theme.SplashScreen' in styles:
+        styles = styles.replace(
+            'parent="Theme.SplashScreen"',
+            'parent="Theme.AppCompat.DayNight.NoActionBar"',
+        )
+        print('✅ Replaced Theme.SplashScreen with AppCompat (full-screen splash)')
+
     splash_items = (
-        '<item name="android:background">@drawable/splash</item>\n'
-        '        <item name="android:windowBackground">@drawable/splash</item>'
+        '<item name="android:windowBackground">@drawable/splash</item>\n'
+        '        <item name="android:statusBarColor">@color/splash_background</item>\n'
+        '        <item name="android:navigationBarColor">@color/splash_background</item>'
     )
-    if 'AppTheme.NoActionBarLaunch' in styles and '@drawable/splash' not in styles:
-        styles = styles.replace(
-            '<style name="AppTheme.NoActionBarLaunch"',
-            '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar"',
-            1,
+
+    if 'AppTheme.NoActionBarLaunch' in styles:
+        import re
+        styles = re.sub(
+            r'\s*<item name="windowSplashScreen[^"]*">[^<]*</item>',
+            '',
+            styles,
         )
-        styles = styles.replace(
-            '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">',
-            '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">\n        '
-            + splash_items,
-            1,
+        styles = re.sub(
+            r'\s*<item name="postSplashScreenTheme">[^<]*</item>',
+            '',
+            styles,
         )
+        if '@drawable/splash' not in styles:
+            styles = styles.replace(
+                '<style name="AppTheme.NoActionBarLaunch"',
+                '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar"',
+                1,
+            )
+            styles = styles.replace(
+                '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">',
+                '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">\n        '
+                + splash_items,
+                1,
+            )
         with open(STYLES, 'w') as f:
             f.write(styles)
-        print('✅ Patched launch theme with splash drawable')
+        print('✅ Patched launch theme with centered splash drawable')
 
 BUILD_GRADLE = 'android/app/build.gradle'
 if os.path.exists(BUILD_GRADLE):
