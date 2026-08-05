@@ -1,22 +1,23 @@
 /**
- * Launcher / PWA icons from transparent PNG (icon1.png).
- * Adaptive foreground uses ~66% safe zone so OEM masks do not crop the art.
+ * Single canonical app icon from icon1.png — same output for PWA and APK.
  */
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { alphaBBox } from './kasy-icon-prep.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
+
+/** One fill ratio everywhere — matches the PWA icon the user approved. */
+export const APP_ICON_FILL = 0.88;
 
 function parseBg(hex) {
   return {
     r: parseInt(hex.slice(1, 3), 16),
     g: parseInt(hex.slice(3, 5), 16),
     b: parseInt(hex.slice(5, 7), 16),
-    alpha: 1,
+    alpha: hex.length >= 9 ? parseInt(hex.slice(7, 9), 16) / 255 : 1,
   };
 }
 
@@ -68,26 +69,30 @@ async function fitOnCanvas(input, size, { fill, transparent, bg }) {
   }).composite([{ input: resized, left, top }]);
 }
 
-/** Adaptive icon foreground — 66% safe zone (Google / OEM masks). */
-export function renderAdaptiveForeground(input, size, { safeFill = 0.66 } = {}) {
-  return fitOnCanvas(input, size, { fill: safeFill, transparent: true, bg: '#000000' });
+/** Canonical app icon — transparent PNG, used by PWA and APK from the same source. */
+export function renderAppIcon(input, size, { fill = APP_ICON_FILL } = {}) {
+  return fitOnCanvas(input, size, { fill, transparent: true, bg: '#00000000' });
 }
 
-/** Legacy / install preview — dark bg, slightly larger but still inside frame. */
-export function renderLegacyLauncher(input, size, { fill = 0.78, bg = '#050508' } = {}) {
-  return fitOnCanvas(input, size, { fill, transparent: false, bg });
+/** @deprecated Use renderAppIcon — kept for header logos from JPEG. */
+export function renderAdaptiveForeground(input, size, { safeFill = APP_ICON_FILL } = {}) {
+  return renderAppIcon(input, size, { fill: safeFill });
 }
 
-/** Web/PWA icon — preserve transparency. */
-export async function renderWebIconPng(input, size, { fill = 0.88 } = {}) {
-  return fitOnCanvas(input, size, { fill, transparent: true, bg: '#000000' });
+/** @deprecated Use renderAppIcon — no opaque legacy box. */
+export function renderLegacyLauncher(input, size, { fill = APP_ICON_FILL } = {}) {
+  return renderAppIcon(input, size, { fill });
 }
 
-export async function renderWebIconWebp(input, size, { fill = 0.88, quality = 82 } = {}) {
-  return renderWebIconPng(input, size, { fill }).then((p) => p.webp({ quality, effort: 6 }).toBuffer());
+export function renderWebIconPng(input, size, { fill = APP_ICON_FILL } = {}) {
+  return renderAppIcon(input, size, { fill });
 }
 
-/** Header logo from JPEG sources (brand.jpg) — unchanged path. */
+export async function renderWebIconWebp(input, size, { fill = APP_ICON_FILL, quality = 82 } = {}) {
+  return renderAppIcon(input, size, { fill }).then((p) => p.webp({ quality, effort: 6 }).toBuffer());
+}
+
+/** Header logo from JPEG sources (brand.jpg). */
 export async function trimArt(input, threshold = 18) {
   try {
     return await sharp(input).trim({ threshold }).toBuffer();
