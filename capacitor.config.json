@@ -17,7 +17,7 @@
       "launchAutoHide": true,
       "backgroundColor": "#050508",
       "androidSplashResourceName": "splash",
-      "androidScaleType": "CENTER_CROP",
+      "androidScaleType": "FIT_CENTER",
       "showSpinner": false,
       "splashFullScreen": true,
       "splashImmersive": true

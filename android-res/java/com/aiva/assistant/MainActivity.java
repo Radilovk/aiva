@@ -2,15 +2,22 @@ package com.aiva.assistant;
 
 import android.app.KeyguardManager;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.KeyEvent;
+import android.view.View;
+import android.view.Window;
 import android.view.WindowManager;
+
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
+    private static final int BRAND_BG = Color.parseColor("#050508");
     private boolean pendingListenStart = false;
 
     @Override
@@ -19,8 +26,40 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AivaShortcutPlugin.class);
         registerPlugin(AivaDevicePlugin.class);
         super.onCreate(savedInstanceState);
+        applyDarkSystemBars();
         AivaVolumeKeyHandler.getInstance().setListener(AivaShortcutLauncher::launchListening);
         handleLaunchIntent(getIntent());
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        applyDarkSystemBars();
+        if (pendingListenStart) {
+            pendingListenStart = false;
+            notifyShortcutToJs();
+        }
+    }
+
+    private void applyDarkSystemBars() {
+        Window window = getWindow();
+        if (window == null) return;
+
+        window.setStatusBarColor(BRAND_BG);
+        window.setNavigationBarColor(BRAND_BG);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.setNavigationBarContrastEnforced(false);
+        }
+
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        View decor = window.getDecorView();
+        decor.setBackgroundColor(BRAND_BG);
+
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decor);
+        if (controller != null) {
+            controller.setAppearanceLightStatusBars(false);
+            controller.setAppearanceLightNavigationBars(false);
+        }
     }
 
     @Override
@@ -28,15 +67,6 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleLaunchIntent(intent);
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (pendingListenStart) {
-            pendingListenStart = false;
-            notifyShortcutToJs();
-        }
     }
 
     private void handleLaunchIntent(Intent intent) {
