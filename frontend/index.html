@@ -15,17 +15,6 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preload" href="icons/brand.webp" as="image" type="image/webp">
-  <script>
-    (function () {
-      var standalone = window.matchMedia('(display-mode: standalone)').matches
-        || window.navigator.standalone === true;
-      var nativeApk = /Capacitor/i.test(navigator.userAgent)
-        || window.location.protocol === 'capacitor:'
-        || (window.location.hostname === 'localhost' && /Android/i.test(navigator.userAgent));
-      if (standalone && !nativeApk) document.documentElement.dataset.skipSplash = '1';
-    })();
-  </script>
-  <link rel="preload" href="icons/splash.webp" as="image" type="image/webp">
   <meta property="og:title" content="KASY — AI Secretary">
   <meta property="og:description" content="AI Secretary for tasks and calendar — voice-first personal assistant">
   <meta property="og:image" content="icons/og-image.png">
@@ -64,39 +53,6 @@
       padding: 0;
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
-    }
-
-    /* Splash — universal contain on every aspect ratio (no crop, no tile) */
-    #appSplash {
-      position: fixed;
-      inset: 0;
-      z-index: 999999;
-      background: #050508;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
-      box-sizing: border-box;
-      transition: opacity 0.35s ease;
-    }
-
-    #appSplash img {
-      display: block;
-      max-width: calc(100vw - var(--safe-left) - var(--safe-right));
-      max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
-      width: auto;
-      height: auto;
-      object-fit: contain;
-      object-position: center;
-    }
-
-    #appSplash.is-hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    html[data-skip-splash] #appSplash {
-      display: none !important;
     }
 
     html {
@@ -1764,9 +1720,6 @@
   </style>
 </head>
 <body>
-  <div id="appSplash" aria-hidden="true">
-    <img src="icons/splash.webp" alt="" decoding="sync" fetchpriority="high">
-  </div>
   <div class="app">
     <header class="header">
       <div class="brand">
@@ -2046,7 +1999,6 @@
   <script src="lib/geminilive.js"></script>
   <script src="lib/haptics.js"></script>
   <script src="lib/mediaUtils.js"></script>
-  <script src="lib/app-splash.js"></script>
   <script src="lib/shortcutBridge.js"></script>
   <script src="lib/deviceProfile.js"></script>
   <script src="lib/nativePermissions.js"></script>

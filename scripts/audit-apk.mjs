@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Audit built APK: correct icons, launch theme, splash image, no Capacitor defaults.
+ * Audit built APK: correct icons, launch theme, no splash, no Capacitor defaults.
  * Usage: node scripts/audit-apk.mjs [path/to/app-release.apk]
  */
 import { readFile, mkdir, rm, access } from 'node:fs/promises';
@@ -52,8 +52,8 @@ async function main() {
   const checks = [
     ['not Capacitor default icon', fgApkMd5 !== CAPACITOR_DEFAULT_FG_MD5, fgApkMd5],
     ['launcher fg is 192×192', fgMeta.width === 192 && fgMeta.height === 192, `${fgMeta.width}×${fgMeta.height}`],
-    ['windowBackground=@drawable/splash', /android:windowBackground">@drawable\/splash/.test(styles)],
-    ['splash_image.png in APK', await readFile(join(OUT, 'decoded', 'res', 'drawable', 'splash_image.png')).then((b) => b.length > 10000).catch(() => false)],
+    ['windowBackground=@color/app_background', /android:windowBackground">@color\/app_background/.test(styles)],
+    ['no splash drawable in APK', !(await readFile(join(OUT, 'decoded', 'res', 'drawable', 'splash.xml'), 'utf8').catch(() => null))],
     ['no Capacitor vector fg', !(await readFile(join(OUT, 'decoded', 'res', 'drawable-v24', 'ic_launcher_foreground.xml'), 'utf8').catch(() => null))],
     ['themed icon disabled', /THEMED_ICON_ENABLED.*false/.test(manifest)],
     ['ic_launcher_background #050508', colors.includes('#ff050508') || colors.includes('#050508')],

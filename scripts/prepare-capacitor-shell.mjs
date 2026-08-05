@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Slim APK web bundle — brand.webp + button.webp + splash.webp only.
+ * Slim APK web bundle — brand.webp + button.webp only.
  */
 import { cp, rm, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -16,7 +16,6 @@ const KEEP_ICONS = new Set([
   'brand.css',
   'brand.webp',
   'button.webp',
-  'splash.webp',
   'icon-512.png',
   'icon-512.webp',
   'icon-192.png',

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verify maskable launcher icon: art survives squircle mask at 66% safe zone.
+ * Verify maskable launcher icon: transparent foreground, art survives squircle mask.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -50,7 +50,7 @@ async function clippedArtPixels(fgBuf) {
 
 async function main() {
   await mkdir(OUT, { recursive: true });
-  const fgBuf = await renderApkForeground(ICON, SIZE).then((p) => p.png().toBuffer());
+  const fgBuf = await (await renderApkForeground(ICON, SIZE)).png().toBuffer();
   const clipped = await clippedArtPixels(fgBuf);
   await writeFile(join(OUT, 'apk-maskable-icon.png'), fgBuf);
   console.log(`Maskable icon preview → ${OUT}/apk-maskable-icon.png (fill ${APK_ICON_FILL.toFixed(3)})`);

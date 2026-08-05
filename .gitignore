@@ -9,3 +9,4 @@
 android/
 capacitor-shell/
 node_modules/
+.artifacts/

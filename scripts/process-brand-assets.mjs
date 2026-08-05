@@ -7,7 +7,8 @@ import { mkdir, writeFile, access, copyFile, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { renderSquareIcon } from './lib/brand-icon-prep.mjs';
+import { renderSquareIcon, renderAppIcon } from './lib/brand-icon-prep.mjs';
+import { prepApkIconSource } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,8 +31,6 @@ const ICON_512_CANDIDATES = [
 
 const BRAND_CANDIDATES = ['brand.jpg', 'brand.jpeg', 'brand.png'];
 const BUTTON_CANDIDATES = ['button.jpg', 'button.jpeg', 'button.png'];
-const SPLASH_CANDIDATES = ['splash.jpg', 'splash.jpeg', 'splash.png', 'splash.webp'];
-
 async function exists(path) {
   try {
     await access(path);
@@ -79,23 +78,23 @@ export async function processBrandAssets() {
 
   const brandSrc = await resolveInDirs(BRAND_CANDIDATES);
   const buttonSrc = await resolveInDirs(BUTTON_CANDIDATES);
-  const splashSrc = await resolveInDirs(SPLASH_CANDIDATES);
 
-  console.log('KASY brand assets (passthrough icons — no crop)');
+  console.log('KASY brand assets');
   console.log(`  icon-192: ${icon192Src}`);
   console.log(`  icon-512: ${icon512Src}`);
   console.log(`  brand:    ${brandSrc}`);
   console.log(`  button:   ${buttonSrc}`);
-  console.log(`  splash:   ${splashSrc}`);
 
   await mkdir(OUT, { recursive: true });
   await mkdir(SOURCE_DIR, { recursive: true });
   await copyFile(icon192Src, join(SOURCE_DIR, 'icon-192.png'));
   await copyFile(icon512Src, join(SOURCE_DIR, 'icon-512.png'));
 
-  console.log('\nApp icons (copy as-is, alpha preserved):');
-  const icon192Buf = await readFile(join(SOURCE_DIR, 'icon-192.png'));
-  const icon512Buf = await readFile(join(SOURCE_DIR, 'icon-512.png'));
+  console.log('\nApp icons (trim black padding, transparent background):');
+  const icon192Buf = await renderAppIcon(await prepApkIconSource(icon192Src), 192)
+    .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
+  const icon512Buf = await renderAppIcon(await prepApkIconSource(icon512Src), 512)
+    .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
   await writeFile(join(OUT, 'icon-192.png'), icon192Buf);
   const m192 = await sharp(icon192Buf).metadata();
   console.log(`  ✓ frontend/icons/icon-192.png (${m192.width}×${m192.height}, ${(icon192Buf.length / 1024).toFixed(1)} KB)`);
@@ -122,12 +121,6 @@ export async function processBrandAssets() {
 
   console.log('\nButton (listen):');
   await writeSquareWebp(buttonSrc, join(OUT, 'button.webp'), 512, { fill: 0.92 });
-
-  console.log('\nSplash (format only — no resize, no crop):');
-  const splashWebp = await sharp(splashSrc).webp({ quality: 88, effort: 6 }).toBuffer();
-  await writeFile(join(OUT, 'splash.webp'), splashWebp);
-  const sm = await sharp(splashWebp).metadata();
-  console.log(`  ✓ frontend/icons/splash.webp (${sm.width}×${sm.height}, ${(splashWebp.length / 1024).toFixed(1)} KB)`);
 
   console.log('\nDone.');
 }
