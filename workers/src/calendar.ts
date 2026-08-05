@@ -698,7 +698,6 @@ export async function startOAuthConnect(
     scope: cfg.scopes.join(' '),
     state,
     access_type: 'offline',
-    prompt: 'consent',
   });
 
   if (provider === 'microsoft') {

@@ -3,6 +3,9 @@
  * Based on multimodalLiveApi.ts - converted to JavaScript
  */
 
+function _log(...args) { window.AIVA_LOG?.debug(...args); }
+function _err(...args) { window.AIVA_LOG?.error(...args); }
+
 // Response type constants
 const MultimodalLiveResponseType = {
   TEXT: "TEXT",
@@ -32,7 +35,7 @@ function parseResponseMessages(data) {
   try {
     // Setup complete (exclusive — no other fields expected)
     if (data?.setupComplete) {
-      console.log("🏁 SETUP COMPLETE response", data);
+      _log("🏁 SETUP COMPLETE response", data);
       responses.push({ type: MultimodalLiveResponseType.SETUP_COMPLETE, data: "", endOfTurn: false });
       return responses;
     }
@@ -45,7 +48,7 @@ function parseResponseMessages(data) {
 
     // Tool call (exclusive)
     if (data?.toolCall) {
-      console.log("🎯 🛠️ TOOL CALL response", data?.toolCall);
+      _log("🎯 🛠️ TOOL CALL response", data?.toolCall);
       responses.push({ type: MultimodalLiveResponseType.TOOL_CALL, data: data.toolCall, endOfTurn: false });
       return responses;
     }
@@ -56,7 +59,7 @@ function parseResponseMessages(data) {
         if (part.inlineData) {
           responses.push({ type: MultimodalLiveResponseType.AUDIO, data: part.inlineData.data, endOfTurn: false });
         } else if (part.text) {
-          console.log("💬 TEXT response", part.text);
+          _log("💬 TEXT response", part.text);
           responses.push({ type: MultimodalLiveResponseType.TEXT, data: part.text, endOfTurn: false });
         }
       }
@@ -87,17 +90,17 @@ function parseResponseMessages(data) {
 
     // Interrupted
     if (serverContent?.interrupted) {
-      console.log("🗣️ INTERRUPTED response");
+      _log("🗣️ INTERRUPTED response");
       responses.push({ type: MultimodalLiveResponseType.INTERRUPTED, data: "", endOfTurn: false });
     }
 
     // Turn complete
     if (serverContent?.turnComplete) {
-      console.log("🏁 TURN COMPLETE response");
+      _log("🏁 TURN COMPLETE response");
       responses.push({ type: MultimodalLiveResponseType.TURN_COMPLETE, data: "", endOfTurn: true });
     }
   } catch (err) {
-    console.log("⚠️ Error parsing response data: ", err, data);
+    _log("⚠️ Error parsing response data: ", err, data);
   }
 
   return responses;
@@ -115,7 +118,7 @@ class FunctionCallDefinition {
   }
 
   functionToCall(parameters) {
-    console.log("▶️Default function call");
+    _log("▶️Default function call");
   }
 
   getDefinition() {
@@ -124,12 +127,12 @@ class FunctionCallDefinition {
       description: this.description,
       parameters: { required: this.requiredParameters, ...this.parameters },
     };
-    console.log("created FunctionDefinition: ", definition);
+    _log("created FunctionDefinition: ", definition);
     return definition;
   }
 
   runFunction(parameters) {
-    console.log(
+    _log(
       `⚡ Running ${this.name} function with parameters: ${JSON.stringify(
         parameters
       )}`
@@ -172,7 +175,7 @@ class GeminiLiveAPI {
     this.activityHandling = "ACTIVITY_HANDLING_UNSPECIFIED";
 
     this.serviceUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(this.token)}`;
-    console.log("Service URL (v1alpha): ", this.serviceUrl);
+    _log("Service URL (v1alpha): ", this.serviceUrl);
 
     this.connected = false;
     this.webSocket = null;
@@ -180,15 +183,15 @@ class GeminiLiveAPI {
 
     // Default callbacks
     this.onReceiveResponse = (message) => {
-      console.log("Default message received callback", message);
+      _log("Default message received callback", message);
     };
 
     this.onOpen = () => {
-      console.log("Default onOpen");
+      _log("Default onOpen");
     };
 
     this.onClose = () => {
-      console.log("Default onClose");
+      _log("Default onClose");
     };
 
     this.onError = (message) => {
@@ -196,7 +199,7 @@ class GeminiLiveAPI {
       this.connected = false;
     };
 
-    console.log("Created Gemini Live API object: ", this);
+    _log("Created Gemini Live API object: ", this);
   }
 
   setProjectId(projectId) {
@@ -204,12 +207,12 @@ class GeminiLiveAPI {
   }
 
   setSystemInstructions(newSystemInstructions) {
-    console.log("setting system instructions: ", newSystemInstructions);
+    _log("setting system instructions: ", newSystemInstructions);
     this.systemInstructions = newSystemInstructions;
   }
 
   setGoogleGrounding(newGoogleGrounding) {
-    console.log("setting google grounding: ", newGoogleGrounding);
+    _log("setting google grounding: ", newGoogleGrounding);
     this.googleGrounding = newGoogleGrounding;
   }
 
@@ -218,31 +221,31 @@ class GeminiLiveAPI {
   }
 
   setVoice(voiceName) {
-    console.log("setting voice: ", voiceName);
+    _log("setting voice: ", voiceName);
     this.voiceName = voiceName;
   }
 
 
 
   setInputAudioTranscription(enabled) {
-    console.log("setting input audio transcription: ", enabled);
+    _log("setting input audio transcription: ", enabled);
     this.inputAudioTranscription = enabled;
   }
 
   setOutputAudioTranscription(enabled) {
-    console.log("setting output audio transcription: ", enabled);
+    _log("setting output audio transcription: ", enabled);
     this.outputAudioTranscription = enabled;
   }
 
   setEnableFunctionCalls(enabled) {
-    console.log("setting enable function calls: ", enabled);
+    _log("setting enable function calls: ", enabled);
     this.enableFunctionCalls = enabled;
   }
 
   addFunction(newFunction) {
     this.functions.push(newFunction);
     this.functionsMap[newFunction.name] = newFunction;
-    console.log("added function: ", newFunction);
+    _log("added function: ", newFunction);
   }
 
   callFunction(functionName, parameters) {
@@ -285,29 +288,29 @@ class GeminiLiveAPI {
         this.onReceiveResponse(response);
       }
     } catch (err) {
-      console.error("Error parsing JSON message:", err, jsonData);
+      _err("Error parsing JSON message:", err, jsonData);
     }
   }
 
   setupWebSocketToService() {
-    console.log("connecting directly to: ", this.serviceUrl);
+    _log("connecting directly to: ", this.serviceUrl);
 
     this.webSocket = new WebSocket(this.serviceUrl);
 
     this.webSocket.onclose = (event) => {
-      console.log("websocket closed: ", event);
+      _log("websocket closed: ", event);
       this.connected = false;
       this.onClose();
     };
 
     this.webSocket.onerror = (event) => {
-      console.log("websocket error: ", event);
+      _log("websocket error: ", event);
       this.connected = false;
       this.onError("Connection error");
     };
 
     this.webSocket.onopen = (event) => {
-      console.log("websocket open: ", event);
+      _log("websocket open: ", event);
       this.connected = true;
       this.totalBytesSent = 0;
       this.sendInitialSetupMessages();
@@ -318,7 +321,7 @@ class GeminiLiveAPI {
   }
 
   getFunctionDefinitions() {
-    console.log("🛠️ getFunctionDefinitions called");
+    _log("🛠️ getFunctionDefinitions called");
     const tools = [];
 
     for (let index = 0; index < this.functions.length; index++) {
@@ -374,7 +377,7 @@ class GeminiLiveAPI {
     if (this.googleGrounding) {
       // The Live API accepts multiple tool entries, so keep the custom
       // function declarations (save/edit/delete task, ...) alongside search.
-      console.log("Google Grounding enabled, adding Google Search tool.");
+      _log("Google Grounding enabled, adding Google Search tool.");
       sessionSetupMessage.setup.tools = [
         ...sessionSetupMessage.setup.tools,
         { googleSearch: {} },
@@ -386,7 +389,7 @@ class GeminiLiveAPI {
     // Store the setup message for later access
     this.lastSetupMessage = sessionSetupMessage;
 
-    console.log("sessionSetupMessage: ", sessionSetupMessage);
+    _log("sessionSetupMessage: ", sessionSetupMessage);
     this.sendMessage(sessionSetupMessage);
   }
 
@@ -405,7 +408,7 @@ class GeminiLiveAPI {
         functionResponses: functionResponses,
       },
     };
-    console.log("🔧 Sending tool response:", message);
+    _log("🔧 Sending tool response:", message);
     this.sendMessage(message);
   }
 
@@ -442,4 +445,4 @@ class GeminiLiveAPI {
   }
 }
 
-console.log("loaded geminiLiveApi.js");
+_log("loaded geminiLiveApi.js");
