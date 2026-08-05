@@ -3,6 +3,9 @@
  * Handles media capture, processing, and playback
  */
 
+function _log(...args) { window.AIVA_LOG?.debug(...args); }
+function _err(...args) { window.AIVA_LOG?.error(...args); }
+
 /**
  * Audio Streamer - Captures and streams microphone audio
  */
@@ -89,10 +92,10 @@ class AudioStreamer {
       source.connect(this.audioWorklet);
 
       this.isStreaming = true;
-      console.log("🎤 Audio streaming started");
+      _log("🎤 Audio streaming started");
       return true;
     } catch (error) {
-      console.error("Failed to start audio streaming:", error);
+      _err("Failed to start audio streaming:", error);
       throw error;
     }
   }
@@ -119,7 +122,7 @@ class AudioStreamer {
       this.mediaStream = null;
     }
 
-    console.log("🛑 Audio streaming stopped");
+    _log("🛑 Audio streaming stopped");
   }
 
   /**
@@ -331,17 +334,17 @@ class VideoStreamer extends BaseVideoCapture {
       this.isStreaming = true;
       this.startCapturing();
 
-      console.log("📹 Camera streaming started at", fps, "fps");
+      _log("📹 Camera streaming started at", fps, "fps");
       return this.video; // Return video element for preview
     } catch (error) {
-      console.error("Failed to start camera streaming:", error);
+      _err("Failed to start camera streaming:", error);
       throw error;
     }
   }
 
   stop() {
     super.stop();
-    console.log("🛑 Camera streaming stopped");
+    _log("🛑 Camera streaming stopped");
   }
 }
 
@@ -386,21 +389,21 @@ class ScreenCapture extends BaseVideoCapture {
 
       // Handle stream end (user stops sharing)
       this.mediaStream.getVideoTracks()[0].onended = () => {
-        console.log("User stopped screen sharing");
+        _log("User stopped screen sharing");
         this.stop();
       };
 
-      console.log("🖥️ Screen capture started at", fps, "fps");
+      _log("🖥️ Screen capture started at", fps, "fps");
       return this.video; // Return video element for preview
     } catch (error) {
-      console.error("Failed to start screen capture:", error);
+      _err("Failed to start screen capture:", error);
       throw error;
     }
   }
 
   stop() {
     super.stop();
-    console.log("🛑 Screen capture stopped");
+    _log("🛑 Screen capture stopped");
   }
 }
 
@@ -464,9 +467,9 @@ class AudioPlayer {
       this.gainNode.connect(this.audioContext.destination);
 
       this.isInitialized = true;
-      console.log("🔊 Audio player initialized");
+      _log("🔊 Audio player initialized");
     } catch (error) {
-      console.error("Failed to initialize audio player:", error);
+      _err("Failed to initialize audio player:", error);
       throw error;
     }
   }
@@ -488,7 +491,7 @@ class AudioPlayer {
     this._playChain = this._playChain
       .then(() => this._playChunk(base64Audio))
       .catch((error) => {
-        console.error("Error playing audio chunk:", error);
+        _err("Error playing audio chunk:", error);
       });
     return this._playChain;
   }

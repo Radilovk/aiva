@@ -16,6 +16,8 @@
 Синхронизацията минава изцяло през **Cloudflare Worker (Бекенд)**, което гарантира еднакво поведение в уеб и APK.
 
 ### Стъпки за конфигуриране:
+**Пълен чеклист за Google (премахване на „непотвърдено приложение“, redirect URI, secrets):** виж **[GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md)**.
+
 1.  **Регистрация на приложение:**
     *   **Google:** В Google Cloud Console създайте OAuth 2.0 Client ID (Web Application). Добавете `https://aiva.radilov-k.workers.dev/settings.html` в Redirect URIs.
     *   **Microsoft:** В Azure Portal (App Registrations) регистрирайте приложение с разрешения `Calendars.ReadWrite` и `offline_access`.
