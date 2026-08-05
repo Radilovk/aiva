@@ -310,12 +310,17 @@
       background: rgba(5, 5, 8, 0.92);
       backdrop-filter: blur(20px);
       opacity: 0;
+      /* visibility: hidden сваля скрития fullscreen blur слой от рендиране —
+         иначе WebView го композира всеки кадър и целият екран премигва */
+      visibility: hidden;
       pointer-events: none;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.3s ease, visibility 0.3s step-end;
     }
 
     .app-onboard.visible {
       opacity: 1;
+      visibility: visible;
+      transition: opacity 0.3s ease;
       pointer-events: auto;
     }
 
@@ -599,9 +604,11 @@
       animation: listen-face-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
+    /* Само transform — анимиран filter кара WebView да пресъздава GPU слоеве
+       всеки кадър и предизвиква премигване на целия интерфейс по време на диалог */
     @keyframes listen-face-pulse {
-      0%, 100% { transform: scale(1); filter: brightness(1); }
-      50% { transform: scale(1.05); filter: brightness(1.1); }
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
     }
 
     .record-btn.live {
@@ -762,13 +769,17 @@
       padding: 16px 20px;
       z-index: 100;
       transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
-                  opacity 0.3s;
+                  opacity 0.3s, visibility 0.5s step-end;
       opacity: 0;
+      visibility: hidden;
     }
 
     .toast.visible {
       transform: translateX(-50%) translateY(0);
       opacity: 1;
+      visibility: visible;
+      transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  opacity 0.3s;
     }
 
     .toast-header {
@@ -1559,12 +1570,16 @@
       color: var(--accent);
       z-index: 100;
       opacity: 0;
-      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+      visibility: hidden;
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s,
+                  visibility 0.4s step-end;
     }
 
     .error-toast.visible {
       transform: translateX(-50%) translateY(0);
       opacity: 1;
+      visibility: visible;
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
     }
 
     /* Responsive */

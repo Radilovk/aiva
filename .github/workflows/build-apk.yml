@@ -89,8 +89,10 @@ jobs:
       - name: Verify launcher icon resources
         run: |
           grep -q '#050508' android/app/src/main/res/values/ic_launcher_background.xml
-          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_background.png
-          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+          ! test -e android/app/src/main/res/mipmap-anydpi-v26
+          ! test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
           grep -q 'android:windowBackground">@color/app_background' android/app/src/main/res/values/styles.xml
           ! test -f android/app/src/main/res/drawable/splash.xml
           ! test -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml

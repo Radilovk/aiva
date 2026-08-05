@@ -491,6 +491,9 @@ function setStatus(text, active = false, mode = 'default') {
 }
 
 function setAssistantSpeech(text) {
+  // Транскрипцията тече винаги (нужна за засичане на сбогуване), но се
+  // показва само ако потребителят е включил текстовия изход.
+  if (!assistantSettings.textOutputEnabled) return;
   const trimmed = String(text || '').trim();
   if (!trimmed) return;
   setStatus(trimmed, true, 'assistant');
@@ -504,6 +507,8 @@ const USER_GOODBYE_WORDS = [
   'obrigado', 'obrigada', 'goodbye', 'bye', 'stop', 'exit', 'quit',
   'arrivederci', 'sayonara', 'adiós', 'adios', 'adeu', 'paka', 'чао чао',
 ];
+// Само точно съвпадение — „край" като префикс би хванало „крайният срок"
+const USER_GOODBYE_EXACT = ['край', 'приключи', 'приключвай', 'the end', 'ende', 'fin'];
 
 function normalizeUtterance(text) {
   return String(text || '').toLowerCase().trim().replace(/[.!?,…]+$/g, '');
@@ -519,7 +524,10 @@ function utteranceHasGoodbyeWord(normalized, word) {
 function isUserGoodbye(text) {
   const normalized = normalizeUtterance(text);
   if (!normalized) return false;
-  return USER_GOODBYE_WORDS.some((word) => utteranceHasGoodbyeWord(normalized, word));
+  if (USER_GOODBYE_WORDS.some((word) => utteranceHasGoodbyeWord(normalized, word))) return true;
+  if (USER_GOODBYE_EXACT.includes(normalized)) return true;
+  const tokens = normalized.split(/[\s,;]+/).filter(Boolean);
+  return USER_GOODBYE_EXACT.some((word) => tokens.includes(word));
 }
 // Само изрични сбогувания — фрази като "приятен ден" се появяват и насред разговор
 const ASSISTANT_GOODBYE_RE = /\b(чао|довиждане|до\s*видане|goodbye|bye\s*bye|auf\s+wiedersehen|au\s+revoir|adiós|adios|до\s+свидания)\b/i;
@@ -601,7 +609,7 @@ async function startMicAfterGreeting() {
   }
 }
 
-const SESSION_END_FALLBACK_MS = 45000;
+const SESSION_END_FALLBACK_MS = 15000;
 
 function armSessionEnd() {
   if (sessionEnding) return;
@@ -633,8 +641,15 @@ function scheduleSessionEndFallback() {
   }, SESSION_END_FALLBACK_MS);
 }
 
-function requestSessionEndAfterFarewell() {
+function requestSessionEndAfterFarewell({ finalizeIfIdle = false } = {}) {
   armSessionEnd();
+  // Сбогуването на асистента може да пристигне след TURN_COMPLETE — тогава
+  // нов TURN_COMPLETE няма да дойде и трябва да приключим веднага (изчаква
+  // се само дозвучаването на аудиото).
+  if (finalizeIfIdle && assistantTurnComplete) {
+    finalizeSessionEnd();
+    return;
+  }
   scheduleSessionEndFallback();
 }
 
@@ -1762,7 +1777,7 @@ async function handleGeminiMessage(message) {
         // Сбогуването се проверява само на завършен транскрипт — частичните
         // фрагменти дават фалшиви съвпадения и затварят сесията погрешно.
         if (message.data.finished && detectAssistantGoodbye(assistantTranscriptBuffer)) {
-          requestSessionEndAfterFarewell();
+          requestSessionEndAfterFarewell({ finalizeIfIdle: true });
         }
       }
       break;
@@ -1773,7 +1788,7 @@ async function handleGeminiMessage(message) {
         setAssistantSpeech(assistantTranscriptBuffer);
         detectClosingQuestion(assistantTranscriptBuffer);
         if (detectAssistantGoodbye(assistantTranscriptBuffer)) {
-          requestSessionEndAfterFarewell();
+          requestSessionEndAfterFarewell({ finalizeIfIdle: true });
         }
       }
       break;
@@ -1937,8 +1952,10 @@ async function connectSession() {
       extraContext
     );
     client.systemInstructions = instructions;
-    client.inputAudioTranscription = assistantSettings.textOutputEnabled;
-    client.outputAudioTranscription = assistantSettings.textOutputEnabled;
+    // Винаги включени: без транскрипция клиентът не може да засече „чао"/
+    // „край"/„благодаря" и сесията (микрофонът) остава активна след сбогуване.
+    client.inputAudioTranscription = true;
+    client.outputAudioTranscription = true;
     client.responseModalities = assistantSettings.responseModalities;
     client.voiceName = assistantSettings.voiceName;
     client.temperature = assistantSettings.temperature;
