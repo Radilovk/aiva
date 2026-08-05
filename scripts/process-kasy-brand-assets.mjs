@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Package B — process kasyico.png + kasyspl.png → frontend/icons.
+ * Package B — process kasyico.png + kasyspl.png + kasybutton.png → frontend/icons/pack-b.
  * Sources: brand-assets/source/, repo root, or Cursor artifacts.
  */
 import { mkdir, writeFile, copyFile } from 'node:fs/promises';
@@ -14,13 +14,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 const ARTIFACTS_DIR = '/opt/cursor/artifacts/assets';
 const SOURCE_DIR = process.env.SOURCE_DIR || join(ROOT, 'brand-assets', 'source');
-const ICONS = join(ROOT, 'frontend', 'icons');
+const OUT = join(ROOT, 'frontend', 'icons', 'pack-b');
 const ANDROID = join(ROOT, 'android-res', 'drawable');
 const PACKAGE_OUT = join(ROOT, 'brand-assets', 'package-b');
 
 const ICON_CANDIDATES = ['kasyico.png', 'kasy-icon-source.png'];
 const SPLASH_CANDIDATES = ['kasyspl.png', 'kasy-splash-source.png'];
 const LISTEN_CANDIDATES = ['kasy-listen-source.png', 'kasyico.png'];
+const BUTTON_CANDIDATES = ['kasybutton.png', 'kasy-button-source.png'];
 
 async function exists(path) {
   try {
@@ -48,8 +49,8 @@ async function resolveSource(candidates, label) {
 }
 
 async function writePngWebp(pngBuf, baseName, webpQuality = 82) {
-  const pngPath = join(ICONS, `${baseName}.png`);
-  const webpPath = join(ICONS, `${baseName}.webp`);
+  const pngPath = join(OUT, `${baseName}.png`);
+  const webpPath = join(OUT, `${baseName}.webp`);
   await writeFile(pngPath, pngBuf);
   const webp = await sharp(pngBuf).webp({ quality: webpQuality, effort: 6 }).toBuffer();
   await writeFile(webpPath, webp);
@@ -72,7 +73,7 @@ async function portraitSplash(input, width, height, outName) {
   const webp = await sharp(input).resize(width, height, { fit: 'cover', position: 'centre' })
     .webp({ quality: 78, effort: 6 }).toBuffer();
   const base = outName.replace(/\.(png|webp)$/, '');
-  await writeFile(join(ICONS, `${base}.webp`), webp);
+  await writeFile(join(OUT, `${base}.webp`), webp);
   await writeFile(join(PACKAGE_OUT, `${base}.webp`), webp);
   console.log(`  ✓ ${base}.webp (${width}x${height})`);
 }
@@ -92,7 +93,7 @@ async function notificationIcon(input) {
   const art = await cropToSquareArt(input);
   const buf = await art.resize(96, 96, { fit: 'cover' })
     .grayscale().normalize().png({ compressionLevel: 9 }).toBuffer();
-  await writeFile(join(ICONS, 'ic-stat-notification.png'), buf);
+  await writeFile(join(OUT, 'ic-stat-notification.png'), buf);
   await writeFile(join(ANDROID, 'ic_stat_aiva.png'), buf);
   console.log('  ✓ ic-stat-notification.png');
 }
@@ -111,8 +112,27 @@ async function androidSplash(splashInput) {
   console.log('  ✓ android-res/drawable/splash.png');
 }
 
+async function brandMarkFromButton(input) {
+  const meta = await sharp(input).metadata();
+  const maxDim = Math.max(meta.width || 512, meta.height || 512);
+  const target = Math.min(512, Math.max(192, Math.round(maxDim)));
+
+  const png = await sharp(input)
+    .resize(target, target, {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png({ compressionLevel: 9, effort: 10 })
+    .toBuffer();
+
+  await writePngWebp(png, 'brand-mark', 86);
+  await writeFile(join(OUT, 'logo-mark.png'), png);
+  await writeFile(join(PACKAGE_OUT, 'logo-mark.png'), png);
+  console.log(`  ✓ brand-mark (${target}px from kasybutton.png)`);
+}
+
 export async function runPackageB() {
-  console.log('Package B — from kasyico.png + kasyspl.png');
+  console.log('Package B — from kasyico.png + kasyspl.png + kasybutton.png');
   const iconSrc = await resolveSource(ICON_CANDIDATES, 'Icon');
   const splashSrc = await resolveSource(SPLASH_CANDIDATES, 'Splash');
   let listenSrc = iconSrc;
@@ -121,11 +141,23 @@ export async function runPackageB() {
   } catch {
     console.log('  Listen: using icon source');
   }
+  let buttonSrc = listenSrc;
+  try {
+    buttonSrc = await resolveSource(BUTTON_CANDIDATES, 'Brand mark');
+  } catch {
+    console.log('  Brand mark: using listen/icon source');
+  }
 
-  await mkdir(ICONS, { recursive: true });
+  await mkdir(OUT, { recursive: true });
   await mkdir(ANDROID, { recursive: true });
   await archiveSource(iconSrc, 'kasyico.png');
   await archiveSource(splashSrc, 'kasyspl.png');
+  if (buttonSrc !== listenSrc) {
+    await archiveSource(buttonSrc, 'kasybutton.png');
+  }
+
+  console.log('Brand mark (kasybutton):');
+  await brandMarkFromButton(buttonSrc);
 
   console.log('Icons (alpha-trim + scaled fill):');
   await squareIcon(iconSrc, 32, 'favicon-32.png', { fill: 0.9 });
@@ -148,8 +180,7 @@ export async function runPackageB() {
   console.log('Notification:');
   await notificationIcon(listenSrc);
 
-  await writeFile(join(ROOT, 'brand-assets', 'active-package'), 'B\n');
-  console.log('Done — active package: B');
+  console.log('Done — package B assets in frontend/icons/pack-b/');
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

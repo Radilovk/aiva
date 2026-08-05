@@ -301,7 +301,7 @@
     <header class="topbar">
       <div>
         <div class="admin-brand">
-          <img class="brand-mark" src="icons/logo-mark.svg" alt="" width="48" height="48">
+          <img class="brand-mark" src="icons/brand-mark.png" alt="" width="48" height="48">
           <div class="eyebrow">KASY Admin</div>
         </div>
         <h1>Контролен панел</h1>
@@ -490,6 +490,14 @@
             <input id="compactCalendar" type="checkbox">
           </label>
           <label>
+            Brand пакет
+            <select id="brandPackage">
+              <option value="A">Пакет A — генериран (voice + календар)</option>
+              <option value="B">Пакет B — kasyico / kasybutton</option>
+            </select>
+          </label>
+          <p class="section-note">Пакет B използва <code>kasybutton.png</code> за brand-mark в landing и приложението. Промяната се записва глобално за всички потребители.</p>
+          <label>
             Export / Import JSON
             <textarea id="exportOutput" placeholder="Натисни Export или постави JSON за Import"></textarea>
           </label>
@@ -517,6 +525,7 @@
 
   <script src="config.js"></script>
   <script src="settings.js"></script>
+  <script src="lib/brand-boot.js"></script>
   <script src="lib/voices.js"></script>
   <script src="admin.js"></script>
 </body>

@@ -11,7 +11,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
-const OUT = join(ROOT, 'frontend', 'icons');
+const OUT = join(ROOT, 'frontend', 'icons', 'pack-a');
+const ICONS_ROOT = join(ROOT, 'frontend', 'icons');
 const ANDROID_OUT = join(ROOT, 'android-res', 'drawable');
 const PACKAGE_OUT = join(ROOT, 'brand-assets', 'package-a');
 
@@ -212,8 +213,10 @@ async function writePngWebp(pngBuf, baseName) {
 
 async function writeSvgFiles() {
   const mark = iconSvg(512, { extras: true });
-  await writeFile(join(OUT, 'logo-mark.svg'), mark);
-  await writeFile(join(PACKAGE_OUT, 'logo-mark.svg'), mark);
+  for (const dir of [OUT, PACKAGE_OUT]) {
+    await writeFile(join(dir, 'logo-mark.svg'), mark);
+    await writeFile(join(dir, 'brand-mark.svg'), mark);
+  }
 }
 
 async function main() {
@@ -266,8 +269,7 @@ async function main() {
     console.log(`  ✓ listen-${s}`);
   }
 
-  await writeFile(join(ROOT, 'brand-assets', 'active-package'), 'A\n');
-  console.log('Done — active package: A');
+  console.log('Done — package A assets in frontend/icons/pack-a/');
 }
 
 main().catch((err) => {

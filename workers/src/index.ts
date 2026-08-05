@@ -866,6 +866,33 @@ app.post('/api/stripe/webhook', async (c) => {
   }
 });
 
+// --- Brand package (global, set from admin panel) ---
+
+const BRAND_PACKAGE_KEY = 'brand:package';
+
+app.get('/api/brand-config', async (c) => {
+  try {
+    const stored = await c.env.SESSIONS.get(BRAND_PACKAGE_KEY);
+    const pkg = stored === 'A' ? 'A' : 'B';
+    return c.json({ package: pkg });
+  } catch (e) {
+    console.error('Brand config read error:', e);
+    return c.json({ package: 'B' });
+  }
+});
+
+app.post('/api/admin/brand-package', async (c) => {
+  const body = await c.req.json<{ package?: string }>().catch(() => null);
+  const pkg = body?.package === 'A' ? 'A' : 'B';
+  try {
+    await c.env.SESSIONS.put(BRAND_PACKAGE_KEY, pkg);
+    return c.json({ success: true, package: pkg });
+  } catch (e) {
+    console.error('Brand package save error:', e);
+    return c.json({ error: 'Грешка при запис на brand package' }, 500);
+  }
+});
+
 // --- Push subscription endpoint ---
 
 app.post('/api/push/subscribe', async (c) => {
