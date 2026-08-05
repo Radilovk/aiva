@@ -1,5 +1,6 @@
 /**
- * Android launcher icons — flat PWA look on #050508, padded for adaptive masks.
+ * Android adaptive icons — maskable-style: robot in 66% safe zone on #050508.
+ * Corners are filled with bg so launcher masks never clip the art.
  */
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -10,8 +11,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
 export const APK_BG = '#050508';
-/** Slightly inset so squircle/circle masks do not clip headset edges. */
-export const APK_ICON_FILL = 0.86;
+/** Google adaptive icon safe zone = 66dp / 108dp */
+export const APK_ICON_FILL = 66 / 108;
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 
 function parseBg(hex) {
@@ -23,28 +24,25 @@ function parseBg(hex) {
   };
 }
 
-/** One flat launcher bitmap — same for adaptive foreground and legacy. */
-export function renderApkIcon(input, size, { fill = APK_ICON_FILL } = {}) {
-  const inner = Math.round(size * fill);
-  const resized = sharp(input)
+async function renderMaskableSquare(input, size) {
+  const inner = Math.max(1, Math.round(size * APK_ICON_FILL));
+  const resized = await sharp(input)
     .resize(inner, inner, { fit: 'inside', background: TRANSPARENT })
     .png()
     .toBuffer();
-
-  return resized.then(async (buf) => {
-    const meta = await sharp(buf).metadata();
-    const left = Math.floor((size - meta.width) / 2);
-    const top = Math.floor((size - meta.height) / 2);
-    return sharp({
-      create: { width: size, height: size, channels: 4, background: parseBg(APK_BG) },
-    }).composite([{ input: buf, left, top }]);
-  });
+  const meta = await sharp(resized).metadata();
+  const left = Math.floor((size - meta.width) / 2);
+  const top = Math.floor((size - meta.height) / 2);
+  return sharp({
+    create: { width: size, height: size, channels: 4, background: parseBg(APK_BG) },
+  }).composite([{ input: resized, left, top }]);
 }
 
+/** Foreground + legacy: opaque maskable tile (bg corners + centered art). */
 export function renderApkForeground(input, size) {
-  return renderApkIcon(input, size);
+  return renderMaskableSquare(input, size);
 }
 
 export function renderApkLegacy(input, size) {
-  return renderApkIcon(input, size);
+  return renderMaskableSquare(input, size);
 }

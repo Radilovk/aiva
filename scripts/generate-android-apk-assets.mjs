@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Android launcher icons from PWA assets (icon-512.png, splash.webp in WebView).
+ * Android launcher icons + native splash image from PWA assets.
  */
 import { mkdir, writeFile, readFile, readdir, rm, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { APK_BG, APK_ICON_FILL, renderApkForeground, renderApkLegacy } from './lib/android-icon.mjs';
+import { APK_BG, APK_ICON_FILL, renderApkForeground } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,6 +29,11 @@ const MIPMAP_SIZES = [
 const SPLASH_LAYER_XML = `<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_background"/>
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash_image"/>
+    </item>
 </layer-list>
 `;
 
@@ -65,6 +70,20 @@ async function resolveIcon192() {
   throw new Error('Missing icon-192.png / PSX_20260805_210411.png');
 }
 
+async function resolveSplash() {
+  const candidates = [
+    join(FRONTEND_ICONS, 'splash.webp'),
+    join(SOURCE_DIR, 'splash.webp'),
+    join(ROOT, 'splash.webp'),
+    join(ROOT, 'splash.jpg'),
+    join(ROOT, 'splash.png'),
+  ];
+  for (const p of candidates) {
+    if (await exists(p)) return p;
+  }
+  throw new Error('Missing splash.webp');
+}
+
 async function writeLauncherIcons(icon512Path) {
   for (const [dir, size] of MIPMAP_SIZES) {
     const folder = join(OUT, dir);
@@ -76,7 +95,7 @@ async function writeLauncherIcons(icon512Path) {
     await writeFile(join(folder, 'ic_launcher_foreground.png'), iconBuf);
     await writeFile(join(folder, 'ic_launcher.png'), iconBuf);
     await writeFile(join(folder, 'ic_launcher_round.png'), iconBuf);
-    console.log(`  ✓ ${dir}/ ${size}px (fill ${Math.round(APK_ICON_FILL * 100)}%, flat ${APK_BG})`);
+    console.log(`  ✓ ${dir}/ ${size}px (maskable ${Math.round(APK_ICON_FILL * 100)}%, ${APK_BG})`);
   }
 }
 
@@ -105,12 +124,20 @@ async function removeDensitySplashes() {
   }
 }
 
-async function writeSplashDrawable() {
+async function writeSplashDrawable(splashPath) {
   const androidResDrawable = join(ANDROID_RES, 'drawable');
   const outDrawable = join(OUT, 'drawable');
   await mkdir(androidResDrawable, { recursive: true });
   await mkdir(outDrawable, { recursive: true });
+
+  const splashImage = await sharp(splashPath)
+    .resize({ width: 540, height: 1080, fit: 'inside', withoutEnlargement: true })
+    .png({ compressionLevel: 9, palette: true })
+    .toBuffer();
+  const meta = await sharp(splashImage).metadata();
+
   for (const dir of [androidResDrawable, outDrawable]) {
+    await writeFile(join(dir, 'splash_image.png'), splashImage);
     await writeFile(join(dir, 'splash.xml'), SPLASH_LAYER_XML);
     for (const legacy of ['splash_art.png', 'splash_art.webp', 'splash.png', 'splash.webp']) {
       try {
@@ -120,7 +147,8 @@ async function writeSplashDrawable() {
       }
     }
   }
-  console.log(`  ✓ drawable/splash.xml (solid ${APK_BG}; branded splash in WebView)`);
+
+  console.log(`  ✓ drawable/splash_image.png (${meta.width}×${meta.height}, ${(splashImage.length / 1024).toFixed(0)} KB)`);
   await removeDensitySplashes();
 }
 
@@ -167,7 +195,7 @@ async function writeAdaptiveIconXml() {
     await writeFile(join(anydpi, 'ic_launcher.xml'), xml);
     await writeFile(join(anydpi, 'ic_launcher_round.xml'), xml);
   }
-  console.log(`  ✓ adaptive icons (flat foreground, bg ${APK_BG})`);
+  console.log(`  ✓ adaptive icons (maskable fg, bg ${APK_BG})`);
 }
 
 async function mirrorToAndroidRes() {
@@ -180,16 +208,19 @@ async function mirrorToAndroidRes() {
       await writeFile(join(dstDir, name), buf);
     }
   }
-  console.log('  ✓ mirrored mipmaps → android-res/');
+  const splashImage = await readFile(join(OUT, 'drawable', 'splash_image.png'));
+  await writeFile(join(ANDROID_RES, 'drawable', 'splash_image.png'), splashImage);
+  console.log('  ✓ mirrored mipmaps + splash → android-res/');
 }
 
 async function main() {
   const icon512Path = await resolveIcon512();
   const icon192Path = await resolveIcon192();
+  const splashPath = await resolveSplash();
   console.log(`Android branding → ${OUT}`);
   console.log(`  master: ${icon512Path}`);
   await writeLauncherIcons(icon512Path);
-  await writeSplashDrawable();
+  await writeSplashDrawable(splashPath);
   await writeBrandColors();
   await writeAdaptiveIconXml();
   await writeNotificationIcon(icon192Path);

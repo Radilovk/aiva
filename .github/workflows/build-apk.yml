@@ -90,7 +90,9 @@ jobs:
         run: |
           grep -q '#050508' android/app/src/main/res/values/ic_launcher_background.xml
           test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
-          ! test -f android/app/src/main/res/drawable/splash_art.png
+          test -f android/app/src/main/res/drawable/splash_image.png
+          grep -q 'splash_image' android/app/src/main/res/drawable/splash.xml
+          grep -q 'android:windowBackground">@drawable/splash' android/app/src/main/res/values/styles.xml
           ! test -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
           node scripts/verify-apk-icon-preview.mjs
 
@@ -99,6 +101,9 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease
+
+      - name: Audit APK contents
+        run: node scripts/audit-apk.mjs android/app/build/outputs/apk/release/app-release.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

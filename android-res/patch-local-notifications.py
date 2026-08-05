@@ -109,6 +109,15 @@ if 'AivaShortcutAccessibilityService' not in content:
     content = content.replace('</application>', ACCESSIBILITY_SERVICE + '\n    </application>', 1)
     print('✅ Added AivaShortcutAccessibilityService')
 
+# Disable themed/monochrome launcher icon (keeps full-color maskable tile)
+THEMED_ICON_META = (
+    '        <meta-data android:name="com.google.android.apps.nexuslauncher.THEMED_ICON_ENABLED" '
+    'android:value="false" />\n'
+)
+if 'THEMED_ICON_ENABLED' not in content:
+    content = content.replace('<application', THEMED_ICON_META + '    <application', 1)
+    print('✅ Disabled launcher themed icon tinting')
+
 with open(MANIFEST, 'w') as f:
     f.write(content)
 
@@ -159,9 +168,10 @@ if os.path.exists(STRINGS_SRC):
     shutil.copy2(STRINGS_SRC, STRINGS_DST)
     print('✅ Copied AIVA strings resource')
 
-# Launch theme: branded splash drawable (no Android 12 icon API — avoids stitch artifact)
+# Launch theme: windowBackground MUST be @drawable/splash (android:background alone is ignored)
 STYLES = 'android/app/src/main/res/values/styles.xml'
 if os.path.exists(STYLES):
+    import re
     with open(STYLES, 'r') as f:
         styles = f.read()
 
@@ -170,16 +180,16 @@ if os.path.exists(STYLES):
             'parent="Theme.SplashScreen"',
             'parent="Theme.AppCompat.DayNight.NoActionBar"',
         )
-        print('✅ Replaced Theme.SplashScreen with AppCompat (full-screen splash)')
+        print('✅ Replaced Theme.SplashScreen with AppCompat')
 
-    splash_items = (
-        '<item name="android:windowBackground">@drawable/splash</item>\n'
-        '        <item name="android:statusBarColor">@color/splash_background</item>\n'
-        '        <item name="android:navigationBarColor">@color/splash_background</item>'
-    )
+    launch_style = '''    <style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+        <item name="android:background">@null</item>
+    </style>'''
 
     if 'AppTheme.NoActionBarLaunch' in styles:
-        import re
         styles = re.sub(
             r'\s*<item name="windowSplashScreen[^"]*">[^<]*</item>',
             '',
@@ -190,21 +200,16 @@ if os.path.exists(STYLES):
             '',
             styles,
         )
-        if '@drawable/splash' not in styles:
-            styles = styles.replace(
-                '<style name="AppTheme.NoActionBarLaunch"',
-                '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar"',
-                1,
-            )
-            styles = styles.replace(
-                '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">',
-                '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">\n        '
-                + splash_items,
-                1,
-            )
+        styles = re.sub(
+            r'<style name="AppTheme\.NoActionBarLaunch"[^>]*>.*?</style>',
+            launch_style,
+            styles,
+            count=1,
+            flags=re.DOTALL,
+        )
         with open(STYLES, 'w') as f:
             f.write(styles)
-        print('✅ Patched launch theme with @drawable/splash')
+        print('✅ Patched launch theme: android:windowBackground=@drawable/splash')
 
 # Launcher icon: Capacitor ships #FFFFFF background → white box on install screen
 LAUNCHER_BG = 'android/app/src/main/res/values/ic_launcher_background.xml'
