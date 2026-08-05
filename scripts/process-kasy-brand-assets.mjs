@@ -106,7 +106,7 @@ async function ogImage(splashInput) {
 
 async function androidSplash(splashInput) {
   const buf = await sharp(splashInput)
-    .resize(720, 1280, { fit: 'cover', position: 'north' })
+    .resize(720, 1280, { fit: 'contain', background: '#050508', position: 'centre' })
     .png({ compressionLevel: 9, effort: 10, palette: true }).toBuffer();
   await writeFile(join(OUT, 'splash-android.png'), buf);
   console.log('  ✓ splash-android.png');

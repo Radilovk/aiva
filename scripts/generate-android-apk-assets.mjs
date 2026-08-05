@@ -75,11 +75,23 @@ async function resolveSplashSource() {
 function splashPipeline(input, w, h) {
   return sharp(input)
     .resize(w, h, {
-      fit: 'cover',
-      position: 'north',
+      fit: 'contain',
+      background: BRAND_BG,
+      position: 'centre',
     })
-    .webp({ quality: 76, effort: 6 });
+    .webp({ quality: 78, effort: 6 });
 }
+
+const SPLASH_LAYER_XML = `<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background"/>
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash_art" />
+    </item>
+</layer-list>
+`;
 
 async function writeLauncherIcons(iconInput) {
   for (const [dir, size] of MIPMAP_SIZES) {
@@ -127,10 +139,13 @@ async function writeSplashAssets(splashInput) {
   await mkdir(androidResDrawable, { recursive: true });
   await mkdir(join(OUT, 'drawable'), { recursive: true });
 
-  const baseBuf = await splashPipeline(splashInput, SPLASH_W, SPLASH_H).toBuffer();
-  await writeFile(join(androidResDrawable, 'splash.webp'), baseBuf);
-  await writeFile(join(OUT, 'drawable', 'splash.webp'), baseBuf);
-  for (const legacy of ['splash.png']) {
+  const artBuf = await splashPipeline(splashInput, SPLASH_W, SPLASH_H).toBuffer();
+  await writeFile(join(androidResDrawable, 'splash_art.webp'), artBuf);
+  await writeFile(join(OUT, 'drawable', 'splash_art.webp'), artBuf);
+  await writeFile(join(androidResDrawable, 'splash.xml'), SPLASH_LAYER_XML);
+  await writeFile(join(OUT, 'drawable', 'splash.xml'), SPLASH_LAYER_XML);
+
+  for (const legacy of ['splash.png', 'splash.webp']) {
     for (const dir of [androidResDrawable, join(OUT, 'drawable')]) {
       try {
         await unlink(join(dir, legacy));
@@ -139,7 +154,7 @@ async function writeSplashAssets(splashInput) {
       }
     }
   }
-  console.log(`  ✓ drawable/splash.webp (${SPLASH_W}x${SPLASH_H}, kasyspl)`);
+  console.log(`  ✓ drawable/splash.xml + splash_art.webp (${SPLASH_W}x${SPLASH_H}, contain)`);
 
   await removeDensitySplashes();
 }
