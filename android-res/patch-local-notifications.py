@@ -211,6 +211,26 @@ if os.path.exists(STYLES):
             f.write(styles)
         print('✅ Patched launch theme with centered splash drawable')
 
+# Launcher icon: Capacitor ships #FFFFFF background → white box on install screen
+LAUNCHER_BG = 'android/app/src/main/res/values/ic_launcher_background.xml'
+LAUNCHER_BG_FIX = '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#050508</color>
+</resources>
+'''
+if os.path.exists(LAUNCHER_BG):
+    with open(LAUNCHER_BG, 'r') as f:
+        bg = f.read()
+    if '#050508' not in bg:
+        with open(LAUNCHER_BG, 'w') as f:
+            f.write(LAUNCHER_BG_FIX)
+        print('✅ ic_launcher_background → #050508 (was white/transparent)')
+
+VECTOR_FG = 'android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml'
+if os.path.exists(VECTOR_FG):
+    os.remove(VECTOR_FG)
+    print('✅ Removed Capacitor default vector ic_launcher_foreground.xml')
+
 BUILD_GRADLE = 'android/app/build.gradle'
 if os.path.exists(BUILD_GRADLE):
     with open(BUILD_GRADLE, 'r') as f:
