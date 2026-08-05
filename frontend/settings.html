@@ -526,12 +526,14 @@
       <div class="section-title" data-i18n="hardwareShortcutTitle" data-i18n-prefix="📱 ">Хардуерен бутон</div>
       <p class="hardware-shortcut-web-note" id="hardwareShortcutWebNote" data-i18n="hardwareShortcutWebNote">Настройките за физически бутони са налични в Android приложението (APK). Инсталирайте го на телефона си, за да стартирате слушане с бутоните за звук.</p>
       <div class="hardware-shortcut-android-only" id="hardwareShortcutAndroidControls">
-        <div class="toggle-row">
-          <span class="toggle-label" data-i18n="hardwareShortcutEnabled">Включи бърз достъп: + и − едновременно</span>
+        <p class="field-hint" id="shortcutStatusLine" data-i18n="shortcutStatusOff">Натиснете бутона по-долу, за да активирате бърз достъп с бутоните за звук.</p>
+        <button class="btn primary" type="button" id="activateShortcutBtn" data-i18n="shortcutActivateBtn">Активирай бутоните за звук</button>
+        <p class="field-hint" data-i18n="hardwareShortcutHint">Натисни <strong>+</strong> и <strong>−</strong> едновременно → KASY започва да слуша. Ако не работи, опитай последователно: + − + −. За заключен екран — включи достъпността по-долу.</p>
+        <div class="toggle-row" style="margin-top:14px">
+          <span class="toggle-label" data-i18n="hardwareShortcutEnabled">Бърз достъп с бутоните за звук</span>
           <div class="toggle" id="toggleShortcutEnabled"></div>
         </div>
-        <p class="field-hint" data-i18n="hardwareShortcutHint">Натисни двата бутона за звук (усилване + намаляване) едновременно → KASY се отваря и започва да слуша. Кратко натискане — без задържане. Ако телефонът не отчита двата бутона заедно, натисни последователно + − + −. За затворено приложение или заключен екран — включете услугата по-долу.</p>
-        <button class="btn primary" type="button" id="openA11yBtn" data-i18n="hardwareShortcutOpenA11y">Включи фонов режим (достъпност)</button>
+        <button class="btn" type="button" id="openA11yBtn" data-i18n="hardwareShortcutOpenA11y" style="margin-top:12px">Включи фонов режим (достъпност)</button>
         <p class="field-hint" data-i18n="hardwareShortcutBackgroundHint">Задължително за работа при затворено приложение и заключен екран. Натиснете бутона и активирайте услугата KASY в настройките за достъпност.</p>
       </div>
     </div>
@@ -868,6 +870,38 @@
     async function applyHardwareShortcutConfig(cfg) {
       if (!window.AIVA_SHORTCUT?.isAndroid?.()) return;
       await window.AIVA_SHORTCUT.applyShortcutConfig(cfg || {});
+      await refreshShortcutStatus();
+    }
+
+    async function refreshShortcutStatus() {
+      const el = document.getElementById('shortcutStatusLine');
+      if (!el || !isAndroidPlatform) return;
+      const enabled = getToggle('toggleShortcutEnabled');
+      let a11y = false;
+      try {
+        a11y = await window.AIVA_SHORTCUT?.isAccessibilityEnabled?.();
+      } catch { /* ignore */ }
+      if (enabled && a11y) {
+        el.textContent = t('shortcutStatusFull') || '✓ Активно — бутоните + и − работят (включително във фон и на заключен екран).';
+      } else if (enabled) {
+        el.textContent = t('shortcutStatusPartial') || 'Частично активно — работи с отворено приложение. За заключен екран включете достъпността по-долу.';
+      } else {
+        el.textContent = t('shortcutStatusOff') || 'Изключено — натиснете «Активирай бутоните за звук».';
+      }
+    }
+
+    async function activateHardwareShortcut() {
+      setToggle('toggleShortcutEnabled', true);
+      settings = saveAssistantSettings({
+        ...settings,
+        hardwareShortcut: { enabled: true },
+      });
+      await applyHardwareShortcutConfig({ enabled: true });
+      showSavedToast();
+      const a11y = await window.AIVA_SHORTCUT?.isAccessibilityEnabled?.().catch(() => false);
+      if (!a11y && confirm(t('shortcutOpenA11yConfirm') || 'За работа при заключен екран е нужна услугата за достъпност. Да отворя ли настройките?')) {
+        await window.AIVA_SHORTCUT?.openAccessibilitySettings?.();
+      }
     }
 
     async function connectLocalCalendar() {
@@ -1363,6 +1397,21 @@
 
     document.getElementById('openA11yBtn')?.addEventListener('click', () => {
       window.AIVA_SHORTCUT?.openAccessibilitySettings?.();
+    });
+
+    document.getElementById('activateShortcutBtn')?.addEventListener('click', () => {
+      activateHardwareShortcut();
+    });
+
+    document.getElementById('toggleShortcutEnabled')?.addEventListener('click', async () => {
+      setTimeout(async () => {
+        const enabled = getToggle('toggleShortcutEnabled');
+        settings = saveAssistantSettings({
+          ...settings,
+          hardwareShortcut: { enabled },
+        });
+        await applyHardwareShortcutConfig({ enabled });
+      }, 0);
     });
 
     document.getElementById('saveBtn').addEventListener('click', async () => {

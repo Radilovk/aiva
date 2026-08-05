@@ -113,6 +113,7 @@ let currentDate = new Date();
 let calendarView = assistantSettings.calendar.defaultView || 'day';
 let weekFocusDate = new Date();
 let touchStartX = null;
+let calendarNavLock = false;
 let voiceFocusTask = null;
 let cachedCalendarEvents = [];
 let awaitingCloseConfirmation = false;
@@ -136,9 +137,9 @@ async function tryUnmuteMicAfterAssistant() {
 function onAssistantPlaybackStateChange(isPlaying) {
   if (isPlaying) {
     setMicUplinkMuted(true);
+    window.AIVA_HAPTICS?.touchSpeechSession?.();
     return;
   }
-  window.AIVA_HAPTICS?.stopSpeechHaptics?.();
   tryUnmuteMicAfterAssistant();
 }
 
@@ -524,6 +525,7 @@ const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|ня
 const USER_GOODBYE_RE = /^(спри|стоп|затвори|излез|чао|довиждане|до\s*видане|goodbye|bye|stop|exit|quit)\b/i;
 // Само изрични сбогувания — фрази като "приятен ден" се появяват и насред разговор
 const ASSISTANT_GOODBYE_RE = /\b(чао|довиждане|до\s*видане|goodbye|bye\s*bye|auf\s+wiedersehen|au\s+revoir|adiós|adios|до\s+свидания)\b/i;
+const ASSISTANT_FAREWELL_RE = /(оставам\s+на\s+разположение|на\s+разположение\s+съм|до\s+скоро|приятен\s+ден|до\s+ново\s+срещане|i\s*'?m\s+here\s+if\s+you\s+need|reach\s+out\s+any\s*time|на\s+услуга)/i;
 
 function detectClosingQuestion(text) {
   if (CLOSING_QUESTION_RE.test(String(text || '').toLowerCase())) {
@@ -545,7 +547,8 @@ function isUserGoodbye(text) {
 
 function detectAssistantGoodbye(text) {
   if (!text || sessionEnding) return false;
-  return ASSISTANT_GOODBYE_RE.test(String(text).toLowerCase());
+  const lower = String(text).toLowerCase();
+  return ASSISTANT_GOODBYE_RE.test(lower) || ASSISTANT_FAREWELL_RE.test(lower);
 }
 
 function resetSessionCloseState() {
@@ -612,19 +615,32 @@ function beginSessionEnd() {
   awaitingCloseConfirmation = false;
   pendingUserTranscript = '';
   setMicUplinkMuted(true);
+  if (audioStreamer) {
+    audioStreamer.stop();
+    audioStreamer = null;
+  }
   waveform.classList.remove('active');
+  recordBtn.classList.remove('recording');
+  setRecordBtnLive(false);
+}
+
+async function finalizeSessionEnd() {
+  if (audioPlayer) {
+    await audioPlayer.waitForDrain(30000);
+  }
+  window.AIVA_HAPTICS?.endSpeechSession?.();
+  if (isSessionActive) disconnectSession();
 }
 
 function scheduleSessionEnd(delayMs = 300) {
   beginSessionEnd();
-  if (sessionEndTimer) return;
-  sessionEndTimer = setTimeout(async () => {
+  if (sessionEndTimer) {
+    clearTimeout(sessionEndTimer);
     sessionEndTimer = null;
-    if (!isSessionActive) return;
-    if (audioPlayer) {
-      await audioPlayer.waitForDrain(12000);
-    }
-    if (isSessionActive) disconnectSession();
+  }
+  sessionEndTimer = setTimeout(() => {
+    sessionEndTimer = null;
+    finalizeSessionEnd();
   }, delayMs);
 }
 
@@ -643,7 +659,7 @@ function handleUserTranscriptForSessionControl(text, finished = false) {
     return;
   }
   if (finished && isUserGoodbye(text)) {
-    beginSessionEnd();
+    scheduleSessionEnd();
   }
 }
 
@@ -880,19 +896,37 @@ function updateRangeLabel(dates) {
   }
 }
 
-function renderAgendaView(dates) {
+function paintTasksContainer(html, { animate = false, direction = 1 } = {}) {
+  if (!animate || !tasksContainer.firstElementChild) {
+    tasksContainer.innerHTML = html;
+    return;
+  }
+  tasksContainer.style.setProperty('--nav-dir', String(direction));
+  tasksContainer.classList.add('calendar-nav-out');
+  requestAnimationFrame(() => {
+    tasksContainer.innerHTML = html;
+    tasksContainer.classList.remove('calendar-nav-out');
+    tasksContainer.classList.add('calendar-nav-in');
+    requestAnimationFrame(() => {
+      tasksContainer.classList.remove('calendar-nav-in');
+      calendarNavLock = false;
+    });
+  });
+}
+
+function renderAgendaView(dates, renderOpts = {}) {
   updateRangeLabel(dates);
   updateTodayChipVisibility();
 
-  tasksContainer.innerHTML = `
+  paintTasksContainer(`
     <div class="agenda-grid view-${calendarView}">
       ${dates.map((date) => renderDaySection(date)).join('')}
     </div>
     ${renderUnscheduledBlock()}
-  `;
+  `, renderOpts);
 }
 
-function renderWeekView(days) {
+function renderWeekView(days, renderOpts = {}) {
   if (!days.some((date) => sameDay(date, weekFocusDate))) {
     weekFocusDate = days.find((date) => sameDay(date, new Date())) || days[0];
   }
@@ -901,7 +935,7 @@ function renderWeekView(days) {
   updateTodayChipVisibility();
 
   const focusTasks = tasksForDate(weekFocusDate);
-  tasksContainer.innerHTML = `
+  paintTasksContainer(`
     ${renderWeekStrip(days)}
     <section class="calendar-day week-focus-day ${sameDay(weekFocusDate, new Date()) ? 'is-today' : ''}">
       <div class="day-header">
@@ -916,10 +950,10 @@ function renderWeekView(days) {
       </div>
     </section>
     ${renderUnscheduledBlock()}
-  `;
+  `, renderOpts);
 }
 
-function renderMonthView() {
+function renderMonthView(renderOpts = {}) {
   const firstOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const gridStart = startOfWeek(firstOfMonth);
   const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
@@ -927,7 +961,7 @@ function renderMonthView() {
   updateTodayChipVisibility();
 
   const selectedTasks = tasksForDate(currentDate);
-  tasksContainer.innerHTML = `
+  paintTasksContainer(`
     <div class="month-shell">
       <div class="month-grid">
         ${getWeekdayHeaders().map((day) => `<div class="month-weekday">${escapeHtml(day)}</div>`).join('')}
@@ -971,27 +1005,30 @@ function renderMonthView() {
         </div>
       </section>
     </div>
-  `;
+  `, renderOpts);
 }
 
-function renderCalendar() {
+function renderCalendar(renderOpts = {}) {
   setActiveViewButton();
   tasksCount.textContent = tasks.length;
   renderUpcomingStrip();
 
   if (calendarView === 'day') {
-    renderAgendaView([currentDate]);
+    renderAgendaView([currentDate], renderOpts);
   } else if (calendarView === 'three') {
-    renderAgendaView([currentDate, addDays(currentDate, 1), addDays(currentDate, 2)]);
+    renderAgendaView([currentDate, addDays(currentDate, 1), addDays(currentDate, 2)], renderOpts);
   } else if (calendarView === 'week') {
     const start = startOfWeek(currentDate);
-    renderWeekView(Array.from({ length: 7 }, (_, index) => addDays(start, index)));
+    renderWeekView(Array.from({ length: 7 }, (_, index) => addDays(start, index)), renderOpts);
   } else {
-    renderMonthView();
+    renderMonthView(renderOpts);
   }
 }
 
-function moveCalendar(direction) {
+function moveCalendar(direction, { animate = false } = {}) {
+  if (animate && calendarNavLock) return;
+  if (animate) calendarNavLock = true;
+
   if (calendarView === 'day') {
     currentDate = addDays(currentDate, direction);
   } else if (calendarView === 'three') {
@@ -1002,7 +1039,7 @@ function moveCalendar(direction) {
   } else {
     currentDate = addMonths(currentDate, direction);
   }
-  renderCalendar();
+  renderCalendar(animate ? { animate: true, direction } : {});
   refreshExternalEvents();
 }
 
@@ -1704,6 +1741,7 @@ async function handleGeminiMessage(message) {
 
     case MultimodalLiveResponseType.AUDIO:
       assistantTurnComplete = false;
+      window.AIVA_HAPTICS?.beginSpeechSession?.();
       if (audioPlayer) await audioPlayer.play(message.data);
       break;
 
@@ -1793,8 +1831,12 @@ async function handleGeminiMessage(message) {
       assistantTurnComplete = true;
       if (awaitingGreetingMic) {
         startMicAfterGreeting();
-      } else if (sessionEnding && !sessionEndTimer) {
-        scheduleSessionEnd(0);
+      } else if (sessionEnding) {
+        if (sessionEndTimer) {
+          clearTimeout(sessionEndTimer);
+          sessionEndTimer = null;
+        }
+        finalizeSessionEnd();
       } else if (!sessionEnding) {
         tryUnmuteMicAfterAssistant();
       }
@@ -2053,7 +2095,7 @@ tasksContainer.addEventListener('touchend', (e) => {
   const delta = e.changedTouches[0].clientX - touchStartX;
   touchStartX = null;
   if (Math.abs(delta) < 60) return;
-  moveCalendar(delta < 0 ? 1 : -1);
+  moveCalendar(delta < 0 ? 1 : -1, { animate: true });
 }, { passive: true });
 
 taskForm.addEventListener('submit', async (e) => {
@@ -2288,6 +2330,16 @@ function initPaywallUi() {
   });
 }
 
+function initHardwareShortcut() {
+  if (!window.AIVA_SHORTCUT?.isAndroid?.()) return;
+  const cfg = assistantSettings.hardwareShortcut || { enabled: true };
+  window.AIVA_SHORTCUT.applyShortcutConfig(cfg);
+  window.AIVA_SHORTCUT.onShortcutTriggered(tryAutoStartListening);
+  window.AIVA_SHORTCUT.consumePendingLaunch().then((pending) => {
+    if (pending) waitForReadyAndListen();
+  });
+}
+
 function tryAutoStartListening() {
   if (isSessionActive || isConnecting) return;
   connectSession();
@@ -2303,14 +2355,7 @@ function waitForReadyAndListen(attempts = 30) {
 }
 
 window.addEventListener('aiva:shortcut-triggered', tryAutoStartListening);
-
-if (window.AIVA_SHORTCUT?.isAndroid?.()) {
-  window.AIVA_SHORTCUT.onShortcutTriggered(tryAutoStartListening);
-  window.AIVA_SHORTCUT.consumePendingLaunch().then((pending) => {
-    if (!pending) return;
-    waitForReadyAndListen();
-  });
-}
+initHardwareShortcut();
 
 // Initialize notification scheduler
 if (window.AIVA_NOTIFIER) {

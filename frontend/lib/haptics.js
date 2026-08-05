@@ -1,17 +1,21 @@
 (function () {
   const PAUSE_MS = 90;
   const SPEECH_SAMPLE_RATE = 24000;
-  const FRAME_SAMPLES = 480; // 20 ms @ 24 kHz — roughly phoneme-scale
-  const MIN_PULSE_GAP_MS = 30;
-  const SILENCE_RMS = 0.016;
-  const VOWEL_RMS = 0.034;
-  const CONSONANT_ZCR = 0.105;
+  const FRAME_SAMPLES = 480; // 20 ms @ 24 kHz
+  const MIN_PULSE_GAP_MS = 18;
+  const SILENCE_RMS = 0.014;
+  const VOWEL_RMS = 0.03;
+  const CONSONANT_ZCR = 0.1;
+  const IDLE_END_MS = 2800; // keep session alive between streamed chunks + playback tail
 
   let audioCtx = null;
   let speechEnabled = true;
+  let speechSessionActive = false;
   let speechPending = new Float32Array(0);
+  let lastFeedAt = 0;
   let lastPulseAt = 0;
   let vibrateChain = Promise.resolve();
+  let sustainTimer = null;
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -58,10 +62,11 @@
   }
 
   async function vibrateOnce(duration = 28) {
+    const ms = Math.max(8, Math.min(220, duration));
     const Haptics = getCapacitorHaptics();
     if (Haptics?.vibrate) {
       try {
-        await Haptics.vibrate({ duration: Math.max(8, Math.min(120, duration)) });
+        await Haptics.vibrate({ duration: ms });
         return;
       } catch {
         // fall through
@@ -69,15 +74,19 @@
     }
     if (Haptics?.impact) {
       try {
-        await Haptics.impact({ style: duration >= 35 ? 'Medium' : 'Light' });
+        await Haptics.impact({ style: ms >= 40 ? 'Medium' : 'Light' });
         return;
       } catch {
         // fall through
       }
     }
     if (navigator.vibrate) {
-      navigator.vibrate(Math.max(8, Math.min(120, duration)));
+      navigator.vibrate(ms);
     }
+  }
+
+  function cancelVibration() {
+    if (navigator.vibrate) navigator.vibrate(0);
   }
 
   function appendPcmBuffer(chunk) {
@@ -105,7 +114,7 @@
     return crossings / frame.length;
   }
 
-  function scheduleSpeechPulse(durationMs, kind) {
+  function scheduleSpeechPulse(durationMs) {
     const now = performance.now();
     if (now - lastPulseAt < MIN_PULSE_GAP_MS) return;
     lastPulseAt = now;
@@ -119,23 +128,20 @@
     if (rms < SILENCE_RMS) return;
 
     const zcr = frameZcr(frame);
-    const energy = Math.min(1, rms / 0.24);
+    const energy = Math.min(1, rms / 0.22);
 
-    // High zero-crossing + energy → consonant (plosive / fricative)
-    if (zcr >= CONSONANT_ZCR && rms >= VOWEL_RMS * 0.8) {
-      scheduleSpeechPulse(Math.round(10 + energy * 16), 'consonant');
+    if (zcr >= CONSONANT_ZCR && rms >= VOWEL_RMS * 0.75) {
+      scheduleSpeechPulse(Math.round(12 + energy * 22));
       return;
     }
 
-    // Sustained energy, lower ZCR → vowel / sonorant
     if (rms >= VOWEL_RMS) {
-      scheduleSpeechPulse(Math.round(26 + energy * 52), 'vowel');
+      scheduleSpeechPulse(Math.round(32 + energy * 88));
       return;
     }
 
-    // Weak transient between phonemes
-    if (rms >= SILENCE_RMS * 2) {
-      scheduleSpeechPulse(11, 'consonant');
+    if (rms >= SILENCE_RMS * 1.8) {
+      scheduleSpeechPulse(14);
     }
   }
 
@@ -145,13 +151,50 @@
       analyzeSpeechFrame(frame);
       speechPending = speechPending.subarray(FRAME_SAMPLES);
     }
-    if (speechPending.length > FRAME_SAMPLES * 8) {
-      speechPending = speechPending.subarray(speechPending.length - FRAME_SAMPLES * 2);
+    if (speechPending.length > FRAME_SAMPLES * 10) {
+      speechPending = speechPending.subarray(speechPending.length - FRAME_SAMPLES * 3);
     }
+  }
+
+  function startSustainLoop() {
+    if (sustainTimer) return;
+    sustainTimer = setInterval(() => {
+      if (!speechSessionActive) {
+        clearInterval(sustainTimer);
+        sustainTimer = null;
+        return;
+      }
+      const idle = performance.now() - lastFeedAt;
+      if (idle > IDLE_END_MS) {
+        endSpeechSession();
+        return;
+      }
+      processSpeechBuffer();
+    }, 35);
+  }
+
+  function beginSpeechSession() {
+    if (speechSessionActive) return;
+    speechSessionActive = true;
+    lastFeedAt = performance.now();
+    startSustainLoop();
+  }
+
+  function endSpeechSession() {
+    speechSessionActive = false;
+    speechPending = new Float32Array(0);
+    lastPulseAt = 0;
+    if (sustainTimer) {
+      clearInterval(sustainTimer);
+      sustainTimer = null;
+    }
+    cancelVibration();
   }
 
   function feedSpeechPcm(float32Data, sampleRate = SPEECH_SAMPLE_RATE) {
     if (!speechEnabled || !float32Data?.length) return;
+    if (!speechSessionActive) beginSpeechSession();
+    lastFeedAt = performance.now();
 
     let data = float32Data;
     if (sampleRate !== SPEECH_SAMPLE_RATE) {
@@ -169,14 +212,16 @@
   }
 
   function stopSpeechHaptics() {
-    speechPending = new Float32Array(0);
-    lastPulseAt = 0;
-    if (navigator.vibrate) navigator.vibrate(0);
+    endSpeechSession();
+  }
+
+  function touchSpeechSession() {
+    lastFeedAt = performance.now();
   }
 
   function setSpeechHapticsEnabled(enabled) {
     speechEnabled = !!enabled;
-    if (!speechEnabled) stopSpeechHaptics();
+    if (!speechEnabled) endSpeechSession();
   }
 
   async function onListeningStart() {
@@ -186,13 +231,16 @@
   }
 
   async function onListeningStop() {
-    stopSpeechHaptics();
+    endSpeechSession();
     await Promise.all([playTone(620, 0.11), vibrateOnce()]);
   }
 
   window.AIVA_HAPTICS = {
     onListeningStart,
     onListeningStop,
+    beginSpeechSession,
+    endSpeechSession,
+    touchSpeechSession,
     feedSpeechPcm,
     stopSpeechHaptics,
     setSpeechHapticsEnabled,

@@ -1119,6 +1119,22 @@
       touch-action: pan-y;
     }
 
+    #tasksContainer {
+      contain: layout style;
+      transition: opacity 0.14s ease, transform 0.14s ease;
+      will-change: opacity, transform;
+    }
+
+    #tasksContainer.calendar-nav-out {
+      opacity: 0.35;
+      transform: translateX(calc(var(--nav-dir, 1) * -14px));
+    }
+
+    #tasksContainer.calendar-nav-in {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
     .agenda-grid.view-three {
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
