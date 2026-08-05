@@ -46,9 +46,6 @@ jobs:
             @capacitor/local-notifications @capacitor/preferences @capacitor/haptics \
             @capacitor/app @capacitor/splash-screen
 
-      - name: Build Package A brand assets
-        run: node scripts/process-kasy-brand-assets.mjs
-
       - name: Build Capacitor web shell
         run: node scripts/prepare-capacitor-shell.mjs
 
