@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import {
+  APP_ICON_FILL,
   renderSquareIcon,
   renderWebIconPng,
   renderWebIconWebp,
@@ -105,12 +106,12 @@ export async function processBrandAssets() {
     splash: splashSrc,
   });
 
-  console.log('\nApp icon (transparent icon1.png):');
-  const icon512Webp = await renderWebIconWebp(iconSrc, 512, { fill: 0.88, quality: 82 });
+  console.log('\nApp icon (transparent icon1.png — same as APK):');
+  const icon512Webp = await renderWebIconWebp(iconSrc, 512, { fill: APP_ICON_FILL, quality: 82 });
   await writeFile(join(OUT, 'icon-512.webp'), icon512Webp);
-  console.log(`  ✓ frontend/icons/icon-512.webp (512×512, ${(icon512Webp.length / 1024).toFixed(1)} KB)`);
+  console.log(`  ✓ frontend/icons/icon-512.webp (512×512, fill ${Math.round(APP_ICON_FILL * 100)}%, ${(icon512Webp.length / 1024).toFixed(1)} KB)`);
 
-  const icon192 = await renderWebIconPng(iconSrc, 192, { fill: 0.88 })
+  const icon192 = await renderWebIconPng(iconSrc, 192, { fill: APP_ICON_FILL })
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
   await writeFile(join(OUT, 'icon-192.png'), icon192);
   console.log(`  ✓ frontend/icons/icon-192.png (192×192, ${(icon192.length / 1024).toFixed(1)} KB)`);

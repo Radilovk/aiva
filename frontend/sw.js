@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v38';
+const CACHE_NAME = 'aiva-v39';
 const ASSETS = [
   'index.html',
   'landing.html',
@@ -42,6 +42,7 @@ const ASSETS = [
   'lib/haptics.js',
   'lib/geminilive.js',
   'lib/mediaUtils.js',
+  'lib/app-splash.js',
   'audio-processors/capture.worklet.js',
   'audio-processors/playback.worklet.js',
   'lib/deviceCalendar.js',

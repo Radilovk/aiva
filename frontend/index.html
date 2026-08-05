@@ -14,7 +14,17 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preload" href="icons/brand.webp" as="image" type="image/webp">
-  <link rel="preload" href="icons/splash.webp" as="image" type="image/webp">
+  <script>
+    (function () {
+      var standalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+      var nativeApk = /Capacitor/i.test(navigator.userAgent)
+        || window.location.protocol === 'capacitor:'
+        || (window.location.hostname === 'localhost' && /Android/i.test(navigator.userAgent));
+      if (standalone && !nativeApk) document.documentElement.dataset.skipSplash = '1';
+    })();
+  </script>
+  <link rel="preload" href="icons/splash.webp" as="image" type="image/webp" media="(display-mode: browser)">
   <meta property="og:title" content="KASY — AI Secretary">
   <meta property="og:description" content="AI Secretary for tasks and calendar — voice-first personal assistant">
   <meta property="og:image" content="icons/og-image.png">
@@ -83,6 +93,10 @@
     #appSplash.is-hidden {
       opacity: 0;
       pointer-events: none;
+    }
+
+    html[data-skip-splash] #appSplash {
+      display: none !important;
     }
 
     html {
@@ -2032,26 +2046,11 @@
   <script src="lib/geminilive.js"></script>
   <script src="lib/haptics.js"></script>
   <script src="lib/mediaUtils.js"></script>
+  <script src="lib/app-splash.js"></script>
   <script src="lib/shortcutBridge.js"></script>
   <script src="lib/deviceProfile.js"></script>
   <script src="lib/nativePermissions.js"></script>
   <script src="app.js"></script>
-  <script>
-    (function hideAppSplash() {
-      function dismiss() {
-        const el = document.getElementById('appSplash');
-        if (!el || el.classList.contains('is-hidden')) return;
-        el.classList.add('is-hidden');
-        setTimeout(() => el.remove(), 400);
-        if (window.Capacitor?.Plugins?.SplashScreen?.hide) {
-          window.Capacitor.Plugins.SplashScreen.hide().catch(() => {});
-        }
-      }
-      if (document.readyState === 'complete') dismiss();
-      else window.addEventListener('load', dismiss, { once: true });
-      document.addEventListener('DOMContentLoaded', () => setTimeout(dismiss, 400), { once: true });
-    })();
-  </script>
   <script>
     if ('serviceWorker' in navigator) {
       const swUrl = window.AIVA_CONFIG?.appUrl?.('sw.js') || 'sw.js';

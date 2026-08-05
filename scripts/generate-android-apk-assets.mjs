@@ -1,16 +1,13 @@
 #!/usr/bin/env node
 /**
- * Android launcher from icon1.png (transparent) + splash via WebView contain.
+ * Android launcher icons — identical transparent output to PWA (icon1.png via renderAppIcon).
+ * Splash: solid native bg + splash.webp in WebView (#appSplash).
  */
 import { mkdir, writeFile, readdir, rm, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import {
-  renderAdaptiveForeground,
-  renderLegacyLauncher,
-  trimAlphaArt,
-} from './lib/brand-icon-prep.mjs';
+import { APP_ICON_FILL, renderAppIcon, trimAlphaArt } from './lib/brand-icon-prep.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,9 +21,7 @@ const ICON_CANDIDATES = [
 ];
 
 const BRAND_BG = '#050508';
-/** Android adaptive safe zone — do not exceed or OEM masks crop the glow */
-const ADAPTIVE_SAFE_FILL = 0.66;
-const LEGACY_FILL = 0.78;
+const ICON_BG_TRANSPARENT = '#00000000';
 
 const MIPMAP_SIZES = [
   ['mipmap-mdpi', 48],
@@ -63,19 +58,13 @@ async function writeLauncherIcons(iconSrc) {
     const folder = join(OUT, dir);
     await mkdir(folder, { recursive: true });
 
-    const legacyBuf = await renderLegacyLauncher(iconSrc, size, {
-      fill: LEGACY_FILL,
-      bg: BRAND_BG,
-    }).then((p) => p.png({ compressionLevel: 9 }).toBuffer());
+    const iconBuf = await renderAppIcon(iconSrc, size, { fill: APP_ICON_FILL })
+      .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
-    const fgBuf = await renderAdaptiveForeground(iconSrc, size, {
-      safeFill: ADAPTIVE_SAFE_FILL,
-    }).then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-
-    await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
-    await writeFile(join(folder, 'ic_launcher_round.png'), legacyBuf);
-    await writeFile(join(folder, 'ic_launcher_foreground.png'), fgBuf);
-    console.log(`  ✓ ${dir}/ic_launcher (fg safe ${Math.round(ADAPTIVE_SAFE_FILL * 100)}%)`);
+    await writeFile(join(folder, 'ic_launcher.png'), iconBuf);
+    await writeFile(join(folder, 'ic_launcher_round.png'), iconBuf);
+    await writeFile(join(folder, 'ic_launcher_foreground.png'), iconBuf);
+    console.log(`  ✓ ${dir}/ (transparent, fill ${Math.round(APP_ICON_FILL * 100)}%)`);
   }
 }
 
@@ -109,7 +98,7 @@ async function writeSplashDrawable() {
       }
     }
   }
-  console.log('  ✓ drawable/splash.xml (solid bg; splash.webp in WebView)');
+  console.log('  ✓ drawable/splash.xml (solid bg; branded art via #appSplash)');
   await removeDensitySplashes();
 }
 
@@ -136,7 +125,7 @@ async function writeBrandColors() {
 `);
   await writeFile(join(valuesDir, 'ic_launcher_background.xml'), `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">${BRAND_BG}</color>
+    <color name="ic_launcher_background">${ICON_BG_TRANSPARENT}</color>
 </resources>
 `);
 }
@@ -148,18 +137,17 @@ async function writeAdaptiveIconXml() {
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-    <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>
 `;
   await writeFile(join(anydpi, 'ic_launcher.xml'), xml);
   await writeFile(join(anydpi, 'ic_launcher_round.xml'), xml);
-  console.log('  ✓ adaptive icons (dark bg + transparent foreground)');
+  console.log('  ✓ adaptive icons (transparent bg + fg, no monochrome — avoids MIUI tint)');
 }
 
 async function main() {
   const iconSrc = await resolveIconSource();
   console.log(`Android branding → ${OUT}`);
-  console.log(`  Icon: ${iconSrc}`);
+  console.log(`  Icon: ${iconSrc} (same pipeline as PWA icon-512.webp)`);
   await writeLauncherIcons(iconSrc);
   await writeSplashDrawable();
   await writeBrandColors();
