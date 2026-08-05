@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v33';
+const CACHE_NAME = 'aiva-v34';
 const ASSETS = [
   'index.html',
   'landing.html',
@@ -22,7 +22,6 @@ const ASSETS = [
   'admin.html',
   'config.js',
   'settings.js',
-  'lib/brand-boot.js',
   'lib/i18n-boot.js',
   'lib/logger.js',
   'lib/i18n.js',
@@ -52,24 +51,9 @@ const ASSETS = [
   'lib/calendarOnboarding.js',
   'manifest.json',
   'icons/brand.css',
-  'icons/brand-mark.png',
-  'icons/brand-mark.webp',
-  'icons/pack-a/brand-mark.png',
-  'icons/pack-a/brand-mark.webp',
-  'icons/pack-b/brand-mark.png',
-  'icons/pack-b/brand-mark.webp',
-  'icons/listen-120.webp',
-  'icons/listen-120.png',
-  'icons/listen-88.webp',
-  'icons/listen-88.png',
-  'icons/splash-portrait-1080.webp',
+  'icons/icon-512.webp',
   'icons/splash-portrait-720.webp',
-  'icons/logo-full.svg',
-  'icons/favicon-32.png',
   'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/apple-touch-icon.png',
-  'icons/maskable-512.png',
 ].map(asset);
 
 // Install — pre-cache shell assets

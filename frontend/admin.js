@@ -31,7 +31,6 @@ const showCompletedTasksField = document.getElementById('showCompletedTasks');
 const maxDuplicateDaysField = document.getElementById('maxDuplicateDays');
 const accentColorField = document.getElementById('accentColor');
 const compactCalendarField = document.getElementById('compactCalendar');
-const brandPackageField = document.getElementById('brandPackage');
 const exportOutput = document.getElementById('exportOutput');
 const setupPreview = document.getElementById('setupPreview');
 
@@ -80,7 +79,6 @@ function renderSettings(settings) {
   maxDuplicateDaysField.value = settings.safety.maxDuplicateDays;
   accentColorField.value = settings.appearance.accentColor;
   compactCalendarField.checked = settings.appearance.compactCalendar;
-  if (brandPackageField) brandPackageField.value = settings.appearance.brandPackage || 'A';
   renderPreview(settings);
 }
 
@@ -125,7 +123,6 @@ function collectSettings() {
     appearance: {
       accentColor: accentColorField.value,
       compactCalendar: compactCalendarField.checked,
-      brandPackage: brandPackageField?.value === 'A' ? 'A' : 'B',
     },
   };
 }
@@ -162,10 +159,6 @@ function handleSave(event) {
   event.preventDefault();
   const settings = saveAssistantSettings(collectSettings());
   renderSettings(settings);
-  const pkg = settings.appearance.brandPackage;
-  if (window.AIVA_BRAND?.setPackage) {
-    window.AIVA_BRAND.setPackage(pkg, { persistLocal: false, persistRemote: true });
-  }
   setSaveState('Настройките са запазени. Ще се приложат при следваща voice сесия.');
 }
 

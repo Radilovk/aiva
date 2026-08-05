@@ -1,28 +1,23 @@
 #!/usr/bin/env node
 /**
- * Generate Android launcher icons + native splash into android/app/src/main/res.
- * Splash: kasyspl.png (your upload). Icons: kasyico.png with larger safe-zone fill.
+ * Android launcher + splash from canonical web assets:
+ *   icons/icon-512.webp — launcher icon
+ *   icons/splash-portrait-720.webp — native splash (centered, no crop)
  */
-import { mkdir, writeFile, copyFile, readdir, rm, unlink } from 'node:fs/promises';
+import { mkdir, writeFile, readdir, rm, unlink, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { renderIconSquare } from './lib/kasy-icon-prep.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
 const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res');
-const ICON_SRC = join(ROOT, 'brand-assets', 'source', 'kasyico.png');
-const ICON_FALLBACK = join(ROOT, 'frontend', 'icons', 'icon-512.png');
-const SPLASH_FALLBACK = join(ROOT, 'android-res', 'drawable', 'splash.png');
-const NOTIF_SRC = join(ROOT, 'frontend', 'icons', 'ic-stat-notification.png');
+const ICON_SRC = join(ROOT, 'frontend', 'icons', 'icon-512.webp');
+const SPLASH_SRC = join(ROOT, 'frontend', 'icons', 'splash-portrait-720.webp');
 
 const BRAND_BG = '#050508';
-/** Larger fill — adaptive icon safe zone is ~66%; larger values get masked/cropped */
-const FOREGROUND_FILL = 0.66;
-const LEGACY_FILL = 0.92;
 
 const MIPMAP_SIZES = [
   ['mipmap-mdpi', 48],
@@ -31,56 +26,6 @@ const MIPMAP_SIZES = [
   ['mipmap-xxhdpi', 144],
   ['mipmap-xxxhdpi', 192],
 ];
-
-/** One splash asset — Android scales @drawable/splash; avoids ~1.5MB of density PNGs */
-const SPLASH_W = 720;
-const SPLASH_H = 1280;
-
-async function exists(path) {
-  try {
-    await import('node:fs/promises').then((fs) => fs.access(path));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function resolveIconSource() {
-  const candidates = [
-    ICON_SRC,
-    join(ROOT, 'kasyico.png'),
-    join(ROOT, 'brand-assets', 'package-a', 'kasyico.png'),
-    ICON_FALLBACK,
-  ];
-  for (const p of candidates) {
-    if (await exists(p)) return p;
-  }
-  return ICON_FALLBACK;
-}
-
-async function resolveSplashSource() {
-  const candidates = [
-    join(ROOT, 'kasyspl.png'),
-    join(ROOT, 'brand-assets', 'source', 'kasyspl.png'),
-    join(ROOT, 'brand-assets', 'package-a', 'kasyspl.png'),
-    join(ROOT, 'frontend', 'icons', 'pack-a', 'splash-android.png'),
-    SPLASH_FALLBACK,
-  ];
-  for (const p of candidates) {
-    if (await exists(p)) return p;
-  }
-  return SPLASH_FALLBACK;
-}
-
-function splashPipeline(input, w, h) {
-  return sharp(input)
-    .resize(w, h, {
-      fit: 'contain',
-      background: BRAND_BG,
-      position: 'centre',
-    })
-    .webp({ quality: 78, effort: 6 });
-}
 
 const SPLASH_LAYER_XML = `<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
@@ -93,23 +38,29 @@ const SPLASH_LAYER_XML = `<?xml version="1.0" encoding="utf-8"?>
 </layer-list>
 `;
 
+async function exists(path) {
+  try {
+    await import('node:fs/promises').then((fs) => fs.access(path));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function writeLauncherIcons(iconInput) {
   for (const [dir, size] of MIPMAP_SIZES) {
     const folder = join(OUT, dir);
     await mkdir(folder, { recursive: true });
 
-    const legacyBuf = await renderIconSquare(iconInput, {
-      size,
-      fill: LEGACY_FILL,
-      transparent: false,
-      bg: BRAND_BG,
-    }).then((p) => p.toBuffer());
+    const legacyBuf = await sharp(iconInput)
+      .resize(size, size, { fit: 'contain', background: BRAND_BG })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
 
-    const fgBuf = await renderIconSquare(iconInput, {
-      size,
-      fill: FOREGROUND_FILL,
-      transparent: true,
-    }).then((p) => p.toBuffer());
+    const fgBuf = await sharp(iconInput)
+      .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
 
     await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
     await writeFile(join(folder, 'ic_launcher_round.png'), legacyBuf);
@@ -129,17 +80,21 @@ async function removeDensitySplashes() {
     if (!entry.isDirectory()) continue;
     if (/^drawable-(port|land)-/.test(entry.name)) {
       await rm(join(OUT, entry.name), { recursive: true, force: true });
-      console.log(`  ✓ removed ${entry.name}/ (unused density splash)`);
+      console.log(`  ✓ removed ${entry.name}/`);
     }
   }
 }
 
-async function writeSplashAssets(splashInput) {
+async function writeSplashAssets() {
+  if (!await exists(SPLASH_SRC)) {
+    throw new Error(`Missing ${SPLASH_SRC}`);
+  }
+
   const androidResDrawable = join(ROOT, 'android-res', 'drawable');
   await mkdir(androidResDrawable, { recursive: true });
   await mkdir(join(OUT, 'drawable'), { recursive: true });
 
-  const artBuf = await splashPipeline(splashInput, SPLASH_W, SPLASH_H).toBuffer();
+  const artBuf = await readFile(SPLASH_SRC);
   await writeFile(join(androidResDrawable, 'splash_art.webp'), artBuf);
   await writeFile(join(OUT, 'drawable', 'splash_art.webp'), artBuf);
   await writeFile(join(androidResDrawable, 'splash.xml'), SPLASH_LAYER_XML);
@@ -150,13 +105,25 @@ async function writeSplashAssets(splashInput) {
       try {
         await unlink(join(dir, legacy));
       } catch {
-        /* already removed */
+        /* ok */
       }
     }
   }
-  console.log(`  ✓ drawable/splash.xml + splash_art.webp (${SPLASH_W}x${SPLASH_H}, contain)`);
+  console.log('  ✓ drawable/splash.xml + splash_art.webp (splash-portrait-720.webp)');
 
   await removeDensitySplashes();
+}
+
+async function writeNotificationIcon(iconInput) {
+  await mkdir(join(OUT, 'drawable'), { recursive: true });
+  const buf = await sharp(iconInput)
+    .resize(96, 96, { fit: 'contain', background: BRAND_BG })
+    .grayscale()
+    .normalize()
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+  await writeFile(join(OUT, 'drawable', 'ic_stat_aiva.png'), buf);
+  console.log('  ✓ drawable/ic_stat_aiva.png (from icon-512.webp)');
 }
 
 async function writeBrandColors() {
@@ -191,23 +158,18 @@ async function writeAdaptiveIconXml() {
   console.log('  ✓ mipmap-anydpi-v26 adaptive icons');
 }
 
-async function copyNotificationIcon() {
-  await mkdir(join(OUT, 'drawable'), { recursive: true });
-  await copyFile(NOTIF_SRC, join(OUT, 'drawable', 'ic_stat_aiva.png'));
-  console.log('  ✓ drawable/ic_stat_aiva.png');
-}
-
 async function main() {
-  const iconInput = await resolveIconSource();
-  const splashInput = await resolveSplashSource();
+  if (!await exists(ICON_SRC)) {
+    throw new Error(`Missing ${ICON_SRC}`);
+  }
   console.log(`Android branding → ${OUT}`);
-  console.log(`  Icon source: ${iconInput}`);
-  console.log(`  Splash source: ${splashInput}`);
-  await writeLauncherIcons(iconInput);
-  await writeSplashAssets(splashInput);
+  console.log(`  Icon: ${ICON_SRC}`);
+  console.log(`  Splash: ${SPLASH_SRC}`);
+  await writeLauncherIcons(ICON_SRC);
+  await writeSplashAssets();
   await writeBrandColors();
   await writeAdaptiveIconXml();
-  await copyNotificationIcon();
+  await writeNotificationIcon(ICON_SRC);
   console.log('Done.');
 }
 
