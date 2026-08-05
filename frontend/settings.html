@@ -656,24 +656,10 @@
     <!-- Appearance -->
     <div class="section">
       <div class="section-title" data-i18n="appearanceTitle" data-i18n-prefix="🎨 ">Външен вид</div>
-      <div class="field">
-        <span class="field-label" data-i18n="accentLabel">Акцентен цвят</span>
-        <input type="color" id="accentColor">
-      </div>
       <div class="toggle-row">
         <span class="toggle-label" data-i18n="compactCal">Компактен календар</span>
         <div class="toggle" id="toggleCompactCalendar"></div>
       </div>
-    </div>
-
-    <!-- Data -->
-    <div class="section">
-      <div class="section-title" data-i18n="dataTitle" data-i18n-prefix="💾 ">Данни</div>
-      <div class="btn-group">
-        <button class="btn" id="exportBtn" type="button" data-i18n="exportBtn">Експорт (JSON)</button>
-        <button class="btn" id="importBtn" type="button" data-i18n="importBtnLabel">Импорт</button>
-      </div>
-      <input type="file" id="importFile" accept=".json" style="display:none">
     </div>
 
     <!-- Actions -->
@@ -843,7 +829,6 @@
       document.getElementById('maxDuplicateDays').value = settings.safety.maxDuplicateDays;
 
       // Appearance
-      document.getElementById('accentColor').value = settings.appearance.accentColor;
       setToggle('toggleCompactCalendar', settings.appearance.compactCalendar);
     }
 
@@ -1187,7 +1172,7 @@
           maxDuplicateDays: parseInt(document.getElementById('maxDuplicateDays').value, 10) || 30,
         },
         appearance: {
-          accentColor: document.getElementById('accentColor').value,
+          accentColor: settings.appearance.accentColor,
           compactCalendar: getToggle('toggleCompactCalendar'),
         },
         notifications: {
@@ -1395,54 +1380,6 @@
       applySettingsLanguage(settings.profile?.language || 'bg');
       await applyHardwareShortcutConfig(settings.hardwareShortcut);
       showSavedToast();
-    });
-
-    document.getElementById('exportBtn').addEventListener('click', async () => {
-      const userId = getUserId();
-      try {
-        const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`);
-        const data = await res.json();
-        const blob = new Blob([JSON.stringify({ settings, tasks: data.tasks || [] }, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `kasy-backup-${new Date().toISOString().slice(0, 10)}.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      } catch (e) {
-        alert(tf('errExportFail', { msg: e.message }));
-      }
-    });
-
-    document.getElementById('importBtn').addEventListener('click', () => {
-      document.getElementById('importFile').click();
-    });
-
-    document.getElementById('importFile').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        if (data.settings) {
-          settings = saveAssistantSettings(data.settings);
-          populateUI();
-          applySettingsLanguage(settings.profile?.language || 'bg');
-        }
-        if (data.tasks?.length) {
-          const userId = getUserId();
-          for (const task of data.tasks) {
-            await fetch(`${API_BASE}/api/tasks`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: userId, task: task.content, ...task }),
-            });
-          }
-        }
-        showSavedToast();
-      } catch (err) {
-        alert(tf('errImportFail', { msg: err.message }));
-      }
-      e.target.value = '';
     });
 
     // --- Device-specific setup (detected profile → OEM guidance) ---
