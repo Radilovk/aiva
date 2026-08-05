@@ -12,13 +12,13 @@
       "iconColor": "#ff3b5c"
     },
     "SplashScreen": {
-      "launchShowDuration": 2000,
-      "launchFadeOutDuration": 350,
+      "launchShowDuration": 0,
+      "launchFadeOutDuration": 200,
       "launchAutoHide": true,
       "backgroundColor": "#050508",
       "showSpinner": false,
-      "splashFullScreen": true,
-      "splashImmersive": true
+      "splashFullScreen": false,
+      "splashImmersive": false
     }
   },
   "android": {
