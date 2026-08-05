@@ -168,7 +168,7 @@ if os.path.exists(STRINGS_SRC):
     shutil.copy2(STRINGS_SRC, STRINGS_DST)
     print('✅ Copied AIVA strings resource')
 
-# Launch theme: windowBackground MUST be @drawable/splash (android:background alone is ignored)
+# Launch theme: solid app background — no splash drawable
 STYLES = 'android/app/src/main/res/values/styles.xml'
 if os.path.exists(STYLES):
     import re
@@ -183,9 +183,9 @@ if os.path.exists(STYLES):
         print('✅ Replaced Theme.SplashScreen with AppCompat')
 
     launch_style = '''    <style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="android:windowBackground">@drawable/splash</item>
-        <item name="android:statusBarColor">@color/splash_background</item>
-        <item name="android:navigationBarColor">@color/splash_background</item>
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:statusBarColor">@color/app_background</item>
+        <item name="android:navigationBarColor">@color/app_background</item>
         <item name="android:background">@null</item>
     </style>'''
 
@@ -209,7 +209,7 @@ if os.path.exists(STYLES):
         )
         with open(STYLES, 'w') as f:
             f.write(styles)
-        print('✅ Patched launch theme: android:windowBackground=@drawable/splash')
+        print('✅ Patched launch theme: android:windowBackground=@color/app_background')
 
 # Launcher icon: Capacitor ships #FFFFFF background → white box on install screen
 LAUNCHER_BG = 'android/app/src/main/res/values/ic_launcher_background.xml'

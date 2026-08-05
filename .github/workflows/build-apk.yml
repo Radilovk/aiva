@@ -83,16 +83,15 @@ jobs:
       - name: Copy ProGuard rules
         run: cp android-res/proguard-rules.pro android/app/proguard-rules.pro
 
-      - name: Generate launcher icons and native splash
+      - name: Generate launcher icons
         run: node scripts/generate-android-apk-assets.mjs android/app/src/main/res
 
       - name: Verify launcher icon resources
         run: |
           grep -q '#050508' android/app/src/main/res/values/ic_launcher_background.xml
           test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
-          test -f android/app/src/main/res/drawable/splash_image.png
-          grep -q 'splash_image' android/app/src/main/res/drawable/splash.xml
-          grep -q 'android:windowBackground">@drawable/splash' android/app/src/main/res/values/styles.xml
+          grep -q 'android:windowBackground">@color/app_background' android/app/src/main/res/values/styles.xml
+          ! test -f android/app/src/main/res/drawable/splash.xml
           ! test -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
           node scripts/verify-apk-icon-preview.mjs
 

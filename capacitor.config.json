@@ -13,12 +13,9 @@
     },
     "SplashScreen": {
       "launchShowDuration": 0,
-      "launchFadeOutDuration": 200,
       "launchAutoHide": true,
       "backgroundColor": "#050508",
-      "showSpinner": false,
-      "splashFullScreen": false,
-      "splashImmersive": false
+      "showSpinner": false
     }
   },
   "android": {
