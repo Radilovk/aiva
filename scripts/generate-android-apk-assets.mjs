@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 /**
- * Android launcher icons from PWA assets (no native splash).
+ * Android launcher icons from the transparent master artwork (no native splash).
+ *
+ * Per density bucket:
+ *   - ic_launcher_background.png / ic_launcher_foreground.png — adaptive
+ *     layers at 108 dp (dark full-bleed bg + artwork in the 72 dp zone)
+ *   - ic_launcher.png / ic_launcher_round.png — legacy 48 dp bitmaps,
+ *     transparent, artwork nearly full-bleed (Android ≤ 7.1 launchers)
  */
 import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -10,6 +16,11 @@ import {
   APP_WINDOW_BG,
   APK_ICON_BG,
   APK_FOREGROUND_FILL,
+  APK_LEGACY_FILL,
+  ADAPTIVE_DP,
+  LEGACY_DP,
+  DENSITY_SCALES,
+  resolveMasterIcon,
   renderApkBackground,
   renderApkForeground,
   renderApkLegacy,
@@ -23,16 +34,7 @@ const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res');
 const ANDROID_RES = join(ROOT, 'android-res');
 const SOURCE_DIR = join(ROOT, 'brand-assets', 'source');
-const FRONTEND_ICONS = join(ROOT, 'frontend', 'icons');
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
-
-const MIPMAP_SIZES = [
-  ['mipmap-mdpi', 48],
-  ['mipmap-hdpi', 72],
-  ['mipmap-xhdpi', 96],
-  ['mipmap-xxhdpi', 144],
-  ['mipmap-xxxhdpi', 192],
-];
 
 async function exists(path) {
   try {
@@ -43,23 +45,11 @@ async function exists(path) {
   }
 }
 
-async function resolveIcon512() {
-  const candidates = [
-    join(FRONTEND_ICONS, 'icon-512.png'),
-    join(SOURCE_DIR, 'icon-512.png'),
-    join(ROOT, 'PSX_20260805_210455.png'),
-  ];
-  for (const p of candidates) {
-    if (await exists(p)) return p;
-  }
-  throw new Error('Missing icon-512.png / PSX_20260805_210455.png');
-}
-
 async function resolveIcon192() {
   const candidates = [
-    join(FRONTEND_ICONS, 'icon-192.png'),
     join(SOURCE_DIR, 'icon-192.png'),
     join(ROOT, 'PSX_20260805_210411.png'),
+    join(SOURCE_DIR, 'PSX_20260805_210411.png'),
   ];
   for (const p of candidates) {
     if (await exists(p)) return p;
@@ -67,17 +57,20 @@ async function resolveIcon192() {
   throw new Error('Missing icon-192.png / PSX_20260805_210411.png');
 }
 
-async function writeLauncherIcons(icon512Path) {
-  for (const [dir, size] of MIPMAP_SIZES) {
-    const folder = join(OUT, dir);
+async function writeLauncherIcons(masterPath) {
+  for (const [density, scale] of DENSITY_SCALES) {
+    const folder = join(OUT, `mipmap-${density}`);
     await mkdir(folder, { recursive: true });
 
-    const bgBuf = await renderApkBackground(size).png({ compressionLevel: 9 }).toBuffer();
-    const fgBuf = await renderApkForeground(icon512Path, size)
+    const adaptiveSize = Math.round(ADAPTIVE_DP * scale);
+    const legacySize = Math.round(LEGACY_DP * scale);
+
+    const bgBuf = await renderApkBackground(adaptiveSize).png({ compressionLevel: 9 }).toBuffer();
+    const fgBuf = await renderApkForeground(masterPath, adaptiveSize)
       .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-    const legacyBuf = await renderApkLegacy(icon512Path, size)
+    const legacyBuf = await renderApkLegacy(masterPath, legacySize)
       .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-    const roundBuf = await renderApkRound(icon512Path, size)
+    const roundBuf = await renderApkRound(masterPath, legacySize)
       .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
     await writeFile(join(folder, 'ic_launcher_background.png'), bgBuf);
@@ -85,7 +78,7 @@ async function writeLauncherIcons(icon512Path) {
     await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
     await writeFile(join(folder, 'ic_launcher_round.png'), roundBuf);
     console.log(
-      `  ✓ ${dir}/ ${size}px (bg ${APK_ICON_BG}, fg ${Math.round(APK_FOREGROUND_FILL * 100)}% safe zone)`,
+      `  ✓ mipmap-${density}/ adaptive ${adaptiveSize}px (bg ${APK_ICON_BG}, fg ${Math.round(APK_FOREGROUND_FILL * 100)}%), legacy ${legacySize}px transparent (${Math.round(APK_LEGACY_FILL * 100)}%)`,
     );
   }
 }
@@ -102,6 +95,7 @@ async function removeCapacitorDefaultVectors() {
 
 async function writeNotificationIcon(icon192Path) {
   await mkdir(join(OUT, 'drawable'), { recursive: true });
+  await mkdir(join(ANDROID_RES, 'drawable'), { recursive: true });
   const buf = await sharp(icon192Path)
     .resize(96, 96, { fit: 'inside', background: TRANSPARENT })
     .grayscale()
@@ -148,9 +142,9 @@ async function writeAdaptiveIconXml() {
 }
 
 async function mirrorToAndroidRes() {
-  for (const [dir] of MIPMAP_SIZES) {
-    const srcDir = join(OUT, dir);
-    const dstDir = join(ANDROID_RES, dir);
+  for (const [density] of DENSITY_SCALES) {
+    const srcDir = join(OUT, `mipmap-${density}`);
+    const dstDir = join(ANDROID_RES, `mipmap-${density}`);
     await mkdir(dstDir, { recursive: true });
     for (const name of [
       'ic_launcher_background.png',
@@ -166,11 +160,11 @@ async function mirrorToAndroidRes() {
 }
 
 async function main() {
-  const icon512Path = await resolveIcon512();
+  const masterPath = await resolveMasterIcon();
   const icon192Path = await resolveIcon192();
   console.log(`Android branding → ${OUT}`);
-  console.log(`  master: ${icon512Path}`);
-  await writeLauncherIcons(icon512Path);
+  console.log(`  master: ${masterPath}`);
+  await writeLauncherIcons(masterPath);
   await writeBrandColors();
   await writeAdaptiveIconXml();
   await writeNotificationIcon(icon192Path);

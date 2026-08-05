@@ -90,7 +90,7 @@ export async function processBrandAssets() {
   await copyFile(icon192Src, join(SOURCE_DIR, 'icon-192.png'));
   await copyFile(icon512Src, join(SOURCE_DIR, 'icon-512.png'));
 
-  console.log('\nApp icons (white full-bleed launcher tile, 72dp safe zone):');
+  console.log('\nApp icons (transparent, artwork nearly full-bleed):');
   const icon192Buf = await renderApkLegacy(icon192Src, 192)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
   const icon512Buf = await renderApkLegacy(icon512Src, 512)
