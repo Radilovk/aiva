@@ -97,7 +97,7 @@ public class MainActivity extends BridgeActivity {
             window.setNavigationBarContrastEnforced(false);
         }
 
-        WindowCompat.setDecorFitsSystemWindows(window, false);
+        WindowCompat.setDecorFitsSystemWindows(window, true);
         View decor = window.getDecorView();
         decor.setBackgroundColor(BRAND_BG);
 

@@ -106,7 +106,7 @@ async function ogImage(splashInput) {
 
 async function androidSplash(splashInput) {
   const buf = await sharp(splashInput)
-    .resize(720, 1280, { fit: 'contain', background: '#050508', position: 'centre' })
+    .resize(720, 1280, { fit: 'cover', position: 'north' })
     .png({ compressionLevel: 9, effort: 10, palette: true }).toBuffer();
   await writeFile(join(OUT, 'splash-android.png'), buf);
   console.log('  ✓ splash-android.png');
@@ -159,10 +159,10 @@ export async function runPackageA() {
   await brandMarkFromButton(buttonSrc);
 
   console.log('Icons (alpha-trim + scaled fill):');
-  await squareIcon(iconSrc, 32, 'favicon-32.png', { fill: 0.94 });
-  await squareIcon(iconSrc, 192, 'icon-192.png', { fill: 0.92 });
-  await squareIcon(iconSrc, 512, 'icon-512.png', { fill: 0.92 });
-  await squareIcon(iconSrc, 180, 'apple-touch-icon.png', { fill: 0.92 });
+  await squareIcon(iconSrc, 32, 'favicon-32.png', { fill: 0.88 });
+  await squareIcon(iconSrc, 192, 'icon-192.png', { fill: 0.86 });
+  await squareIcon(iconSrc, 512, 'icon-512.png', { fill: 0.86 });
+  await squareIcon(iconSrc, 180, 'apple-touch-icon.png', { fill: 0.86 });
   const maskBuf = await renderMaskable(listenSrc, 512).then((p) => p.toBuffer());
   await writePngWebp(maskBuf, 'maskable-512');
   console.log('  ✓ maskable-512.png (safe zone)');

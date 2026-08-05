@@ -1024,9 +1024,9 @@ function renderCalendar(renderOpts = {}) {
   }
 }
 
-function moveCalendar(direction, { animate = false } = {}) {
-  if (animate && calendarNavLock) return;
-  if (animate) calendarNavLock = true;
+async function moveCalendar(direction) {
+  if (calendarNavLock) return;
+  calendarNavLock = true;
 
   if (calendarView === 'day') {
     currentDate = addDays(currentDate, direction);
@@ -1038,8 +1038,8 @@ function moveCalendar(direction, { animate = false } = {}) {
   } else {
     currentDate = addMonths(currentDate, direction);
   }
-  renderCalendar(animate ? { animate: true, direction } : {});
-  refreshExternalEvents();
+  await fetchExternalEvents();
+  renderCalendar();
 }
 
 // --- Tasks API ---
@@ -1467,9 +1467,10 @@ async function handleVoiceDiscussTask(args) {
   return { success: true, message: 'Обсъждаме задачата. Използвай Google Search за актуална информация.' };
 }
 
-async function refreshExternalEvents() {
+async function fetchExternalEvents() {
   if (!window.AIVA_CALENDAR_SYNC?.syncIncomingEvents) return;
-  let start, end;
+  let start;
+  let end;
   if (calendarView === 'week') {
     const s = startOfWeek(currentDate);
     start = toISODate(s);
@@ -1486,6 +1487,10 @@ async function refreshExternalEvents() {
     end = start;
   }
   externalEvents = await window.AIVA_CALENDAR_SYNC.syncIncomingEvents(start, end);
+}
+
+async function refreshExternalEvents() {
+  await fetchExternalEvents();
   renderCalendar();
 }
 
@@ -2093,7 +2098,7 @@ tasksContainer.addEventListener('touchend', (e) => {
   const delta = e.changedTouches[0].clientX - touchStartX;
   touchStartX = null;
   if (Math.abs(delta) < 60) return;
-  moveCalendar(delta < 0 ? 1 : -1, { animate: true });
+  moveCalendar(delta < 0 ? 1 : -1);
 }, { passive: true });
 
 taskForm.addEventListener('submit', async (e) => {

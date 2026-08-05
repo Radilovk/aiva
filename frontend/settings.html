@@ -449,7 +449,8 @@
         </div>
         <p class="sync-note" id="localCalendarStatusText" data-i18n="localCalNotSelected" data-i18n-dynamic>Не е избран локален календар.</p>
       </div>
-      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+      <hr id="calendarFallbackDivider" style="border:none;border-top:1px solid var(--border);margin:14px 0">
+      <div id="calendarFallbackBlock">
       <div class="field">
         <span class="field-label" data-i18n="fallbackTitle">Fallback синхронизация (резервен режим)</span>
         <select id="calendarProvider">
@@ -487,6 +488,7 @@
       <div class="field" id="nativeSection" style="display:none">
         <p class="sync-note" data-i18n="nativeHint">Директен режим за Android APK — задачите се записват в системния календар с напомняния. Изисква разрешение за календар при първо ползване.</p>
         <button class="btn primary" type="button" id="requestCalendarPermBtn" data-i18n="grantCalPerm">Разреши достъп до календара</button>
+      </div>
       </div>
     </div>
 
@@ -1156,6 +1158,15 @@
     }
 
     function updateCalendarSyncUI() {
+      const fallbackBlock = document.getElementById('calendarFallbackBlock');
+      const fallbackDivider = document.getElementById('calendarFallbackDivider');
+      if (isAndroidPlatform) {
+        if (fallbackBlock) fallbackBlock.style.display = 'none';
+        if (fallbackDivider) fallbackDivider.style.display = 'none';
+      } else {
+        if (fallbackBlock) fallbackBlock.style.display = '';
+        if (fallbackDivider) fallbackDivider.style.display = '';
+      }
       let provider = document.getElementById('calendarProvider').value;
       if (isAndroidPlatform) {
         provider = 'native';

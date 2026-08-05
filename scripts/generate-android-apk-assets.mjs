@@ -20,9 +20,9 @@ const SPLASH_FALLBACK = join(ROOT, 'android-res', 'drawable', 'splash.png');
 const NOTIF_SRC = join(ROOT, 'frontend', 'icons', 'ic-stat-notification.png');
 
 const BRAND_BG = '#050508';
-/** Larger fill — adaptive icon squircle was cropping too aggressively */
-const FOREGROUND_FILL = 0.94;
-const LEGACY_FILL = 0.96;
+/** Larger fill — adaptive icon safe zone is ~66%; larger values get masked/cropped */
+const FOREGROUND_FILL = 0.66;
+const LEGACY_FILL = 0.92;
 
 const MIPMAP_SIZES = [
   ['mipmap-mdpi', 48],
@@ -79,9 +79,8 @@ async function resolveSplashSource() {
 function splashPipeline(input, w, h) {
   return sharp(input)
     .resize(w, h, {
-      fit: 'contain',
-      background: BRAND_BG,
-      position: 'centre',
+      fit: 'cover',
+      position: 'north',
     })
     .png({ compressionLevel: 9, effort: 10, palette: true, quality: 80 });
 }
@@ -119,7 +118,7 @@ async function writeSplashAssets(splashInput) {
   const baseBuf = await splashPipeline(splashInput, 720, 1280).toBuffer();
   await writeFile(join(androidResDrawable, 'splash.png'), baseBuf);
   await writeFile(join(OUT, 'drawable', 'splash.png'), baseBuf);
-  console.log('  ✓ drawable/splash.png (kasyspl, contain)');
+  console.log('  ✓ drawable/splash.png (kasyspl, cover top)');
 
   for (const [dir, w, h] of SPLASH_PORT) {
     const folder = join(OUT, dir);
