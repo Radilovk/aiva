@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 /**
- * Android launcher icons — identical transparent output to PWA (icon1.png via renderAppIcon).
- * Splash: solid native bg + splash.webp in WebView (#appSplash).
+ * Android launcher icons — same PNG files as PWA, scaled per density (contain, no crop).
  */
-import { mkdir, writeFile, readdir, rm, unlink } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir, rm, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { APP_ICON_FILL, renderAppIcon, trimAlphaArt } from './lib/brand-icon-prep.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,13 +13,10 @@ const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
 const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res');
 const SOURCE_DIR = join(ROOT, 'brand-assets', 'source');
-const ICON_CANDIDATES = [
-  join(SOURCE_DIR, 'icon1.png'),
-  join(ROOT, 'icon1.png'),
-];
+const FRONTEND_ICONS = join(ROOT, 'frontend', 'icons');
 
 const BRAND_BG = '#050508';
-const ICON_BG_TRANSPARENT = '#00000000';
+const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 
 const MIPMAP_SIZES = [
   ['mipmap-mdpi', 48],
@@ -46,25 +41,57 @@ async function exists(path) {
   }
 }
 
-async function resolveIconSource() {
-  for (const p of ICON_CANDIDATES) {
+async function resolveIcon512() {
+  const candidates = [
+    join(FRONTEND_ICONS, 'icon-512.png'),
+    join(SOURCE_DIR, 'icon-512.png'),
+    join(ROOT, 'PSX_20260805_210455.png'),
+  ];
+  for (const p of candidates) {
     if (await exists(p)) return p;
   }
-  throw new Error('Missing icon1.png — add to brand-assets/source/ or repo root');
+  throw new Error('Missing icon-512.png / PSX_20260805_210455.png');
 }
 
-async function writeLauncherIcons(iconSrc) {
+async function resolveIcon192() {
+  const candidates = [
+    join(FRONTEND_ICONS, 'icon-192.png'),
+    join(SOURCE_DIR, 'icon-192.png'),
+    join(ROOT, 'PSX_20260805_210411.png'),
+  ];
+  for (const p of candidates) {
+    if (await exists(p)) return p;
+  }
+  throw new Error('Missing icon-192.png / PSX_20260805_210411.png');
+}
+
+/** Scale icon to density — contain on transparent square, never crop artwork. */
+async function scaleIcon(input, size) {
+  const meta = await sharp(input).metadata();
+  if (meta.width === size && meta.height === size) {
+    return readFile(input);
+  }
+  return sharp(input)
+    .resize(size, size, { fit: 'contain', background: TRANSPARENT })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
+
+async function writeLauncherIcons(icon512Path, icon192Path) {
+  const icon192Buf = await readFile(icon192Path);
+
   for (const [dir, size] of MIPMAP_SIZES) {
     const folder = join(OUT, dir);
     await mkdir(folder, { recursive: true });
 
-    const iconBuf = await renderAppIcon(iconSrc, size, { fill: APP_ICON_FILL })
-      .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
+    const iconBuf = size === 192
+      ? icon192Buf
+      : await scaleIcon(icon512Path, size);
 
     await writeFile(join(folder, 'ic_launcher.png'), iconBuf);
     await writeFile(join(folder, 'ic_launcher_round.png'), iconBuf);
     await writeFile(join(folder, 'ic_launcher_foreground.png'), iconBuf);
-    console.log(`  ✓ ${dir}/ (transparent, fill ${Math.round(APP_ICON_FILL * 100)}%)`);
+    console.log(`  ✓ ${dir}/ ${size}px (passthrough, alpha)`);
   }
 }
 
@@ -98,15 +125,14 @@ async function writeSplashDrawable() {
       }
     }
   }
-  console.log('  ✓ drawable/splash.xml (solid bg; branded art via #appSplash)');
+  console.log('  ✓ drawable/splash.xml (solid bg; splash.webp in WebView)');
   await removeDensitySplashes();
 }
 
-async function writeNotificationIcon(iconSrc) {
+async function writeNotificationIcon(icon192Path) {
   await mkdir(join(OUT, 'drawable'), { recursive: true });
-  const trimmed = await trimAlphaArt(iconSrc);
-  const buf = await sharp(trimmed)
-    .resize(96, 96, { fit: 'inside' })
+  const buf = await sharp(icon192Path)
+    .resize(96, 96, { fit: 'inside', background: TRANSPARENT })
     .grayscale()
     .normalize()
     .png({ compressionLevel: 9 })
@@ -125,7 +151,7 @@ async function writeBrandColors() {
 `);
   await writeFile(join(valuesDir, 'ic_launcher_background.xml'), `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">${ICON_BG_TRANSPARENT}</color>
+    <color name="ic_launcher_background">#00000000</color>
 </resources>
 `);
 }
@@ -141,18 +167,20 @@ async function writeAdaptiveIconXml() {
 `;
   await writeFile(join(anydpi, 'ic_launcher.xml'), xml);
   await writeFile(join(anydpi, 'ic_launcher_round.xml'), xml);
-  console.log('  ✓ adaptive icons (transparent bg + fg, no monochrome — avoids MIUI tint)');
+  console.log('  ✓ adaptive icons (transparent bg + foreground PNG as-is)');
 }
 
 async function main() {
-  const iconSrc = await resolveIconSource();
+  const icon512Path = await resolveIcon512();
+  const icon192Path = await resolveIcon192();
   console.log(`Android branding → ${OUT}`);
-  console.log(`  Icon: ${iconSrc} (same pipeline as PWA icon-512.webp)`);
-  await writeLauncherIcons(iconSrc);
+  console.log(`  512: ${icon512Path}`);
+  console.log(`  192: ${icon192Path}`);
+  await writeLauncherIcons(icon512Path, icon192Path);
   await writeSplashDrawable();
   await writeBrandColors();
   await writeAdaptiveIconXml();
-  await writeNotificationIcon(iconSrc);
+  await writeNotificationIcon(icon192Path);
   console.log('Done.');
 }
 

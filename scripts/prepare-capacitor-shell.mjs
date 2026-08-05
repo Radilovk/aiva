@@ -17,6 +17,7 @@ const KEEP_ICONS = new Set([
   'brand.webp',
   'button.webp',
   'splash.webp',
+  'icon-512.png',
   'icon-512.webp',
   'icon-192.png',
   'favicon-32.webp',
@@ -67,6 +68,7 @@ async function patchApkManifest(outDir) {
     const raw = await readFile(manifestPath, 'utf8');
     const manifest = JSON.parse(raw);
     manifest.icons = [
+      { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
       { src: 'icons/icon-512.webp', sizes: '512x512', type: 'image/webp', purpose: 'any' },
       { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     ];
