@@ -6,7 +6,15 @@ import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { APK_BG, APK_ICON_FILL, renderApkForeground, renderApkLegacy } from './lib/android-icon.mjs';
+import {
+  APP_WINDOW_BG,
+  APK_ICON_BG,
+  APK_FOREGROUND_FILL,
+  renderApkBackground,
+  renderApkForeground,
+  renderApkLegacy,
+  renderApkRound,
+} from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -64,15 +72,21 @@ async function writeLauncherIcons(icon512Path) {
     const folder = join(OUT, dir);
     await mkdir(folder, { recursive: true });
 
+    const bgBuf = await renderApkBackground(size).png({ compressionLevel: 9 }).toBuffer();
     const fgBuf = await renderApkForeground(icon512Path, size)
       .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
     const legacyBuf = await renderApkLegacy(icon512Path, size)
       .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
+    const roundBuf = await renderApkRound(icon512Path, size)
+      .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
+    await writeFile(join(folder, 'ic_launcher_background.png'), bgBuf);
     await writeFile(join(folder, 'ic_launcher_foreground.png'), fgBuf);
     await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
-    await writeFile(join(folder, 'ic_launcher_round.png'), legacyBuf);
-    console.log(`  ✓ ${dir}/ ${size}px (fg transparent ${Math.round(APK_ICON_FILL * 100)}%, legacy bg ${APK_BG})`);
+    await writeFile(join(folder, 'ic_launcher_round.png'), roundBuf);
+    console.log(
+      `  ✓ ${dir}/ ${size}px (bg ${APK_ICON_BG}, fg ${Math.round(APK_FOREGROUND_FILL * 100)}% safe zone)`,
+    );
   }
 }
 
@@ -102,12 +116,12 @@ async function writeNotificationIcon(icon192Path) {
 async function writeBrandColors() {
   const colorsXml = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="app_background">${APK_BG}</color>
+    <color name="app_background">${APP_WINDOW_BG}</color>
 </resources>
 `;
   const bgXml = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">${APK_BG}</color>
+    <color name="ic_launcher_background">${APK_ICON_BG}</color>
 </resources>
 `;
   for (const valuesDir of [join(OUT, 'values'), join(ANDROID_RES, 'values')]) {
@@ -120,8 +134,9 @@ async function writeBrandColors() {
 async function writeAdaptiveIconXml() {
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
+    <background android:drawable="@mipmap/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>
 `;
   for (const anydpi of [join(OUT, 'mipmap-anydpi-v26'), join(ANDROID_RES, 'mipmap-anydpi-v26')]) {
@@ -129,7 +144,7 @@ async function writeAdaptiveIconXml() {
     await writeFile(join(anydpi, 'ic_launcher.xml'), xml);
     await writeFile(join(anydpi, 'ic_launcher_round.xml'), xml);
   }
-  console.log(`  ✓ adaptive icons (transparent fg, bg ${APK_BG})`);
+  console.log(`  ✓ adaptive icons (bitmap bg ${APK_ICON_BG}, fg safe zone)`);
 }
 
 async function mirrorToAndroidRes() {
@@ -137,7 +152,12 @@ async function mirrorToAndroidRes() {
     const srcDir = join(OUT, dir);
     const dstDir = join(ANDROID_RES, dir);
     await mkdir(dstDir, { recursive: true });
-    for (const name of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']) {
+    for (const name of [
+      'ic_launcher_background.png',
+      'ic_launcher.png',
+      'ic_launcher_round.png',
+      'ic_launcher_foreground.png',
+    ]) {
       const buf = await readFile(join(srcDir, name));
       await writeFile(join(dstDir, name), buf);
     }

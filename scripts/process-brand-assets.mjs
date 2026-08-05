@@ -7,8 +7,8 @@ import { mkdir, writeFile, access, copyFile, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { renderSquareIcon, renderAppIcon } from './lib/brand-icon-prep.mjs';
-import { prepApkIconSource } from './lib/android-icon.mjs';
+import { renderSquareIcon } from './lib/brand-icon-prep.mjs';
+import { renderApkLegacy } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -90,10 +90,10 @@ export async function processBrandAssets() {
   await copyFile(icon192Src, join(SOURCE_DIR, 'icon-192.png'));
   await copyFile(icon512Src, join(SOURCE_DIR, 'icon-512.png'));
 
-  console.log('\nApp icons (trim black padding, transparent background):');
-  const icon192Buf = await renderAppIcon(await prepApkIconSource(icon192Src), 192)
+  console.log('\nApp icons (white full-bleed launcher tile, 72dp safe zone):');
+  const icon192Buf = await renderApkLegacy(icon192Src, 192)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-  const icon512Buf = await renderAppIcon(await prepApkIconSource(icon512Src), 512)
+  const icon512Buf = await renderApkLegacy(icon512Src, 512)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
   await writeFile(join(OUT, 'icon-192.png'), icon192Buf);
   const m192 = await sharp(icon192Buf).metadata();
