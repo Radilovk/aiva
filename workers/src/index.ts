@@ -873,11 +873,11 @@ const BRAND_PACKAGE_KEY = 'brand:package';
 app.get('/api/brand-config', async (c) => {
   try {
     const stored = await c.env.SESSIONS.get(BRAND_PACKAGE_KEY);
-    const pkg = stored === 'A' ? 'A' : 'B';
+    const pkg = stored === 'B' ? 'B' : 'A';
     return c.json({ package: pkg });
   } catch (e) {
     console.error('Brand config read error:', e);
-    return c.json({ package: 'B' });
+    return c.json({ package: 'A' });
   }
 });
 

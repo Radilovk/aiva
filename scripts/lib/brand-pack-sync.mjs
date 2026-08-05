@@ -1,12 +1,13 @@
 /**
  * Copy active brand pack to frontend/icons root (PWA, manifest, splash).
  */
-import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ICONS = join(ROOT, 'frontend', 'icons');
+const ANDROID = join(ROOT, 'android-res', 'drawable');
 
 const ROOT_COPY_FILES = [
   'favicon-32.png', 'favicon-32.webp',
@@ -20,13 +21,15 @@ const ROOT_COPY_FILES = [
   'og-image.png', 'og-image.webp',
   'splash-portrait-1080.webp', 'splash-portrait-720.webp',
   'ic-stat-notification.png',
-  'logo-mark.svg', 'brand-mark.svg', 'brand-mark.png', 'brand-mark.webp',
+  'brand-mark.png', 'brand-mark.webp',
+  'logo-mark.png',
 ];
 
 export async function copyPackToRoot(pkg) {
-  const p = String(pkg).toUpperCase() === 'A' ? 'A' : 'B';
+  const p = String(pkg).toUpperCase() === 'B' ? 'B' : 'A';
   const srcDir = join(ICONS, `pack-${p.toLowerCase()}`);
   await mkdir(ICONS, { recursive: true });
+  await mkdir(ANDROID, { recursive: true });
 
   for (const name of ROOT_COPY_FILES) {
     try {
@@ -36,26 +39,24 @@ export async function copyPackToRoot(pkg) {
     }
   }
 
-  if (p === 'A') {
-    try {
-      await copyFile(join(srcDir, 'brand-mark.svg'), join(ICONS, 'logo-mark.svg'));
-    } catch { /* ignore */ }
-  } else {
-    try {
-      await copyFile(join(srcDir, 'logo-mark.png'), join(ICONS, 'logo-mark.png'));
-    } catch { /* ignore */ }
-  }
+  try {
+    await copyFile(join(srcDir, 'splash-android.png'), join(ANDROID, 'splash.png'));
+  } catch { /* ignore */ }
+
+  try {
+    await copyFile(join(srcDir, 'ic-stat-notification.png'), join(ANDROID, 'ic_stat_aiva.png'));
+  } catch { /* ignore */ }
 
   await writeFile(join(ROOT, 'brand-assets', 'active-package'), `${p}\n`);
-  console.log(`  ✓ Active pack ${p} → frontend/icons/`);
+  console.log(`  ✓ Active pack ${p} → frontend/icons/ + android-res/`);
 }
 
 export async function readActivePackage() {
   try {
     const raw = await readFile(join(ROOT, 'brand-assets', 'active-package'), 'utf8');
     const p = raw.trim().toUpperCase();
-    return p === 'A' ? 'A' : 'B';
+    return p === 'B' ? 'B' : 'A';
   } catch {
-    return 'B';
+    return 'A';
   }
 }

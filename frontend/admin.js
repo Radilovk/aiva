@@ -80,7 +80,7 @@ function renderSettings(settings) {
   maxDuplicateDaysField.value = settings.safety.maxDuplicateDays;
   accentColorField.value = settings.appearance.accentColor;
   compactCalendarField.checked = settings.appearance.compactCalendar;
-  if (brandPackageField) brandPackageField.value = settings.appearance.brandPackage || 'B';
+  if (brandPackageField) brandPackageField.value = settings.appearance.brandPackage || 'A';
   renderPreview(settings);
 }
 

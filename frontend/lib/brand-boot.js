@@ -3,11 +3,11 @@
  */
 (function () {
   const STORAGE_KEY = 'aiva_assistant_settings_v1';
-  const DEFAULT_PKG = 'B';
+  const DEFAULT_PKG = 'A';
 
   const MARK = {
-    A: { src: 'icons/pack-a/brand-mark.svg', type: 'image/svg+xml' },
-    B: { src: 'icons/pack-b/brand-mark.webp', type: 'image/webp', fallback: 'icons/pack-b/brand-mark.png' },
+    A: { src: 'icons/pack-a/brand-mark.webp', fallback: 'icons/pack-a/brand-mark.png' },
+    B: { src: 'icons/pack-b/brand-mark.webp', fallback: 'icons/pack-b/brand-mark.png' },
   };
 
   const LISTEN = {

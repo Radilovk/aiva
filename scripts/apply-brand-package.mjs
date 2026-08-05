@@ -2,11 +2,12 @@
 /**
  * Build KASY brand packages and sync the active one to frontend/icons/.
  *
- *   node scripts/apply-brand-package.mjs       — rebuild A+B, keep current active
- *   node scripts/apply-brand-package.mjs A     — rebuild A+B, activate A
- *   node scripts/apply-brand-package.mjs B     — rebuild A+B, activate B
+ *   Package A — your uploaded icons + splash (kasyico, kasyspl, kasybutton)
+ *   Package B — humanoid art + speech bubble + task calendar overlays
  *
- * Env: BRAND_PACKAGE=A|B
+ *   node scripts/apply-brand-package.mjs       — rebuild A+B, keep current active
+ *   node scripts/apply-brand-package.mjs A     — rebuild A+B, activate A (default)
+ *   node scripts/apply-brand-package.mjs B     — rebuild A+B, activate B
  */
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -27,16 +28,16 @@ function run(script) {
 
 async function main() {
   const arg = (process.argv[2] || process.env.BRAND_PACKAGE || '').toUpperCase();
-  const { runPackageB } = await import('./process-kasy-brand-assets.mjs');
+  const { runPackageA } = await import('./process-kasy-brand-assets.mjs');
 
-  console.log('Building package A…');
+  console.log('Building package A (your uploads)…');
+  await runPackageA();
+
+  console.log('\nBuilding package B (humanoid + bubble + calendar)…');
   await run('generate-kasy-brand.mjs');
 
-  console.log('\nBuilding package B…');
-  await runPackageB();
-
   let active = arg === 'A' || arg === 'B' ? arg : await readActivePackage();
-  if (active !== 'A' && active !== 'B') active = 'B';
+  if (active !== 'A' && active !== 'B') active = 'A';
 
   console.log(`\nActivating package ${active}…`);
   await copyPackToRoot(active);
