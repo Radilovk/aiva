@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Package B — process kasyico.png + kasyspl.png + kasybutton.png → frontend/icons/pack-b.
- * Sources: brand-assets/source/, repo root, or Cursor artifacts.
+ * Package A — your uploaded art (kasyico.png + kasyspl.png + kasybutton.png).
+ * No generated overlays. Sources: brand-assets/source/, repo root, or Cursor artifacts.
  */
 import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -14,9 +14,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 const ARTIFACTS_DIR = '/opt/cursor/artifacts/assets';
 const SOURCE_DIR = process.env.SOURCE_DIR || join(ROOT, 'brand-assets', 'source');
-const OUT = join(ROOT, 'frontend', 'icons', 'pack-b');
-const ANDROID = join(ROOT, 'android-res', 'drawable');
-const PACKAGE_OUT = join(ROOT, 'brand-assets', 'package-b');
+const OUT = join(ROOT, 'frontend', 'icons', 'pack-a');
+const PACKAGE_OUT = join(ROOT, 'brand-assets', 'package-a');
 
 const ICON_CANDIDATES = ['kasyico.png', 'kasy-icon-source.png'];
 const SPLASH_CANDIDATES = ['kasyspl.png', 'kasy-splash-source.png'];
@@ -94,7 +93,6 @@ async function notificationIcon(input) {
   const buf = await art.resize(96, 96, { fit: 'cover' })
     .grayscale().normalize().png({ compressionLevel: 9 }).toBuffer();
   await writeFile(join(OUT, 'ic-stat-notification.png'), buf);
-  await writeFile(join(ANDROID, 'ic_stat_aiva.png'), buf);
   console.log('  ✓ ic-stat-notification.png');
 }
 
@@ -108,8 +106,8 @@ async function ogImage(splashInput) {
 async function androidSplash(splashInput) {
   const buf = await sharp(splashInput).resize(720, 1280, { fit: 'cover', position: 'centre' })
     .png({ compressionLevel: 9, effort: 10, palette: true }).toBuffer();
-  await writeFile(join(ANDROID, 'splash.png'), buf);
-  console.log('  ✓ android-res/drawable/splash.png');
+  await writeFile(join(OUT, 'splash-android.png'), buf);
+  console.log('  ✓ splash-android.png');
 }
 
 async function brandMarkFromButton(input) {
@@ -131,8 +129,8 @@ async function brandMarkFromButton(input) {
   console.log(`  ✓ brand-mark (${target}px from kasybutton.png)`);
 }
 
-export async function runPackageB() {
-  console.log('Package B — from kasyico.png + kasyspl.png + kasybutton.png');
+export async function runPackageA() {
+  console.log('Package A — your uploads (kasyico + kasyspl + kasybutton)');
   const iconSrc = await resolveSource(ICON_CANDIDATES, 'Icon');
   const splashSrc = await resolveSource(SPLASH_CANDIDATES, 'Splash');
   let listenSrc = iconSrc;
@@ -149,7 +147,6 @@ export async function runPackageB() {
   }
 
   await mkdir(OUT, { recursive: true });
-  await mkdir(ANDROID, { recursive: true });
   await archiveSource(iconSrc, 'kasyico.png');
   await archiveSource(splashSrc, 'kasyspl.png');
   if (buttonSrc !== listenSrc) {
@@ -180,11 +177,11 @@ export async function runPackageB() {
   console.log('Notification:');
   await notificationIcon(listenSrc);
 
-  console.log('Done — package B assets in frontend/icons/pack-b/');
+  console.log('Done — package A assets in frontend/icons/pack-a/');
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  runPackageB().catch((e) => {
+  runPackageA().catch((e) => {
     console.error(e.message || e);
     process.exit(1);
   });
