@@ -2354,13 +2354,14 @@ function waitForReadyAndListen(attempts = 30) {
 window.addEventListener('aiva:shortcut-triggered', tryAutoStartListening);
 initHardwareShortcut();
 
-// Initialize notification scheduler
+// Initialize notification scheduler + auto permissions on APK
 if (window.AIVA_NOTIFIER) {
   window.AIVA_NOTIFIER.init().then(async () => {
-    if (!assistantSettings.notifications?.enabled) return;
     if (window.Capacitor?.isNativePlatform?.()) {
-      await window.AIVA_NOTIFIER.requestPermission();
+      await window.AIVA_NATIVE_PERMISSIONS?.bootstrap?.();
+      return;
     }
+    if (!assistantSettings.notifications?.enabled) return;
     window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
   });
 }

@@ -83,7 +83,7 @@ function splashPipeline(input, w, h) {
       background: BRAND_BG,
       position: 'centre',
     })
-    .png({ compressionLevel: 9, effort: 10 });
+    .png({ compressionLevel: 9, effort: 10, palette: true, quality: 80 });
 }
 
 async function writeLauncherIcons(iconInput) {

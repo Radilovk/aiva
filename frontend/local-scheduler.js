@@ -52,6 +52,10 @@
     return true;
   }
 
+  function markNotifierReady() {
+    window.dispatchEvent(new CustomEvent('aiva:notifier-ready'));
+  }
+
   async function ensureNativeReady() {
     if (!window.Capacitor?.isNativePlatform?.()) return false;
     if (isCapacitor && LocalNotifications) return true;
@@ -122,9 +126,7 @@
   async function init() {
     if (window.Capacitor?.isNativePlatform?.()) {
       await ensureNativeReady();
-    }
-
-    if (!isCapacitor && 'Notification' in window && Notification.permission === 'default') {
+    } else if ('Notification' in window && Notification.permission === 'default') {
       // Don't auto-request on web — settings/onboarding handle it
     }
 
@@ -139,6 +141,7 @@
         }
       });
     }
+    markNotifierReady();
   }
 
   // --- Precise web timer (PWA fallback path) ---
