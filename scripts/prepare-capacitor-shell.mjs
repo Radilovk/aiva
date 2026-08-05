@@ -10,7 +10,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = process.argv[2] || join(ROOT, 'capacitor-shell');
 const SRC = join(ROOT, 'frontend');
 
-const EXCLUDE_DIRS = new Set(['pack-a', 'pack-b', 'node_modules']);
+const EXCLUDE_DIRS = new Set(['node_modules']);
 
 const KEEP_ICONS = new Set([
   'brand.css',

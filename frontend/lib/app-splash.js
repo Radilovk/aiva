@@ -1,7 +1,7 @@
 /**
  * Unified splash: #appSplash + icons/splash.webp (contain, no crop).
  *
- * - APK (Capacitor): show branded splash (native window is solid #050508 only).
+ * - APK (Capacitor): show branded splash (native window uses same splash_art).
  * - Browser tab: show branded splash on load.
  * - Installed PWA: skip — OS already shows launch frame (avoids double splash).
  */
