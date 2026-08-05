@@ -90,16 +90,29 @@ async function fitLogo(input, size, fill) {
   return { resized, left, top };
 }
 
-/** Opaque full-bleed background layer (required by AdaptiveIconDrawable). */
+/**
+ * Opaque full-bleed background layer (required by AdaptiveIconDrawable).
+ * Radial neon glow sampled from the icon1.png master art: bright magenta
+ * behind the robot fading to near-black at the tile edges, so the launcher
+ * icon looks exactly like the original artwork instead of a flat tile.
+ */
 export function renderApkBackground(size) {
-  return sharp({
-    create: {
-      width: size,
-      height: size,
-      channels: 4,
-      background: parseBg(APK_ICON_BG),
-    },
-  });
+  const c = size / 2;
+  const svg = Buffer.from(
+    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#E3AEDC"/>
+      <stop offset="45%" stop-color="#7A3A6C"/>
+      <stop offset="78%" stop-color="#1E0C1A"/>
+      <stop offset="100%" stop-color="${APK_ICON_BG}"/>
+    </radialGradient>
+  </defs>
+  <rect width="${size}" height="${size}" fill="${APK_ICON_BG}"/>
+  <circle cx="${c}" cy="${c}" r="${c}" fill="url(#glow)"/>
+</svg>`,
+  );
+  return sharp(svg).ensureAlpha().flatten({ background: parseBg(APK_ICON_BG) });
 }
 
 /** Transparent foreground — artwork centered in the 72 dp visible zone. */
