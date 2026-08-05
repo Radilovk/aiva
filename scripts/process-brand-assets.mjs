@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 /**
- * Process brand.jpg, button.jpg, splash.jpg → compressed web assets for Web/PWA/APK.
+ * Process brand.jpg, button.jpg, splash.jpg, icon1.png → compressed web assets for Web/PWA/APK.
  * Sources: repo root or brand-assets/source/
  */
 import { mkdir, writeFile, access, copyFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { renderSquareIcon, trimArt } from './lib/brand-icon-prep.mjs';
+import {
+  renderSquareIcon,
+  renderWebIconPng,
+  renderWebIconWebp,
+  trimAlphaArt,
+} from './lib/brand-icon-prep.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,6 +22,7 @@ const SOURCE_DIR = join(ROOT, 'brand-assets', 'source');
 const BG = '#050508';
 
 const FILES = {
+  icon: ['icon1.png'],
   brand: ['brand.jpg', 'brand.jpeg', 'brand.png'],
   button: ['button.jpg', 'button.jpeg', 'button.png'],
   splash: ['splash.jpg', 'splash.jpeg', 'splash.png'],
@@ -80,39 +86,48 @@ async function archiveSources(paths) {
 }
 
 export async function processBrandAssets() {
+  const iconSrc = await resolveSource('icon');
   const brandSrc = await resolveSource('brand');
   const buttonSrc = await resolveSource('button');
   const splashSrc = await resolveSource('splash');
 
   console.log('KASY brand assets');
+  console.log(`  icon:   ${iconSrc}`);
   console.log(`  brand:  ${brandSrc}`);
   console.log(`  button: ${buttonSrc}`);
   console.log(`  splash: ${splashSrc}`);
 
   await mkdir(OUT, { recursive: true });
-  await archiveSources({ brand: brandSrc, button: buttonSrc, splash: splashSrc });
+  await archiveSources({
+    icon: iconSrc,
+    brand: brandSrc,
+    button: buttonSrc,
+    splash: splashSrc,
+  });
 
-  console.log('\nBrand (logo + app icon):');
-  await writeSquareWebp(brandSrc, join(OUT, 'brand.webp'), 512, { fill: 0.92 });
-  await writeSquareWebp(brandSrc, join(OUT, 'icon-512.webp'), 512, { fill: 0.92 });
-  const icon192 = await renderSquareIcon(brandSrc, {
-    size: 192,
-    fill: 0.92,
-    transparent: false,
-    bg: BG,
-  }).then((p) => p.png({ compressionLevel: 9 }).toBuffer());
+  console.log('\nApp icon (transparent icon1.png):');
+  const icon512Webp = await renderWebIconWebp(iconSrc, 512, { fill: 0.88, quality: 82 });
+  await writeFile(join(OUT, 'icon-512.webp'), icon512Webp);
+  console.log(`  ✓ frontend/icons/icon-512.webp (512×512, ${(icon512Webp.length / 1024).toFixed(1)} KB)`);
+
+  const icon192 = await renderWebIconPng(iconSrc, 192, { fill: 0.88 })
+    .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
   await writeFile(join(OUT, 'icon-192.png'), icon192);
   console.log(`  ✓ frontend/icons/icon-192.png (192×192, ${(icon192.length / 1024).toFixed(1)} KB)`);
-  await writeWebp(brandSrc, join(OUT, 'favicon-32.webp'), { width: 32, height: 32, quality: 78 });
 
-  const notif = await renderSquareIcon(brandSrc, {
-    size: 96,
-    fill: 0.9,
-    transparent: false,
-    bg: BG,
-  }).then((p) => p.grayscale().normalize().png({ compressionLevel: 9 }).toBuffer());
+  const trimmedIcon = await trimAlphaArt(iconSrc);
+  const notif = await sharp(trimmedIcon)
+    .resize(96, 96, { fit: 'inside' })
+    .grayscale()
+    .normalize()
+    .png({ compressionLevel: 9 })
+    .toBuffer();
   await writeFile(join(OUT, 'ic-stat-notification.png'), notif);
-  console.log(`  ✓ frontend/icons/ic-stat-notification.png`);
+  console.log('  ✓ frontend/icons/ic-stat-notification.png');
+
+  console.log('\nBrand (header logo from brand.jpg):');
+  await writeSquareWebp(brandSrc, join(OUT, 'brand.webp'), 512, { fill: 0.92 });
+  await writeWebp(brandSrc, join(OUT, 'favicon-32.webp'), { width: 32, height: 32, quality: 78 });
 
   console.log('\nButton (listen):');
   await writeSquareWebp(buttonSrc, join(OUT, 'button.webp'), 512, { fill: 0.92 });

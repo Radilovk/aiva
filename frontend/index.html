@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/webp" sizes="512x512" href="icons/icon-512.webp">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-  <link rel="apple-touch-icon" href="icons/brand.webp">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preload" href="icons/brand.webp" as="image" type="image/webp">
   <link rel="preload" href="icons/splash.webp" as="image" type="image/webp">
   <meta property="og:title" content="KASY — AI Secretary">
@@ -46,8 +46,6 @@
       --listen-wrap-size: calc(var(--listen-btn-size) * 1.78);
       --listen-orbit-1: calc(var(--listen-btn-size) * 1.38);
       --listen-orbit-2: calc(var(--listen-btn-size) * 1.72);
-      /* Splash art aspect (splash.jpg 720×1456) */
-      --splash-aspect: 720 / 1456;
     }
 
     * {
@@ -73,13 +71,11 @@
 
     #appSplash img {
       display: block;
+      aspect-ratio: 720 / 1456;
+      max-width: calc(100vw - var(--safe-left) - var(--safe-right));
+      max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
       width: auto;
       height: auto;
-      max-width: min(100%, calc((100dvh - var(--safe-top) - var(--safe-bottom)) * var(--splash-aspect)));
-      max-height: min(
-        calc(100dvh - var(--safe-top) - var(--safe-bottom)),
-        calc((100vw - var(--safe-left) - var(--safe-right)) / var(--splash-aspect))
-      );
       object-fit: contain;
       object-position: center;
     }

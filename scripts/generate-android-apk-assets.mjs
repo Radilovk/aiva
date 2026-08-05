@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 /**
- * Android launcher + splash from brand.jpg (trimmed) + splash.webp (web overlay).
- * Native cold start: solid bg only. Splash image = CSS object-fit:contain in index.html.
+ * Android launcher from icon1.png (transparent) + splash via WebView contain.
  */
 import { mkdir, writeFile, readdir, rm, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { renderSquareIcon } from './lib/brand-icon-prep.mjs';
+import {
+  renderAdaptiveForeground,
+  renderLegacyLauncher,
+  trimAlphaArt,
+} from './lib/brand-icon-prep.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,15 +18,15 @@ const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
 const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res');
 const SOURCE_DIR = join(ROOT, 'brand-assets', 'source');
-const BRAND_CANDIDATES = [
-  join(SOURCE_DIR, 'brand.jpg'),
-  join(ROOT, 'brand.jpg'),
-  join(ROOT, 'frontend', 'icons', 'brand.webp'),
+const ICON_CANDIDATES = [
+  join(SOURCE_DIR, 'icon1.png'),
+  join(ROOT, 'icon1.png'),
 ];
 
 const BRAND_BG = '#050508';
-const LEGACY_FILL = 0.92;
-const FOREGROUND_FILL = 0.88;
+/** Android adaptive safe zone — do not exceed or OEM masks crop the glow */
+const ADAPTIVE_SAFE_FILL = 0.66;
+const LEGACY_FILL = 0.78;
 
 const MIPMAP_SIZES = [
   ['mipmap-mdpi', 48],
@@ -33,7 +36,6 @@ const MIPMAP_SIZES = [
   ['mipmap-xxxhdpi', 192],
 ];
 
-/** Solid color only — bitmap splash crops on OEM skins; WebView uses CSS contain */
 const SPLASH_LAYER_XML = `<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_background"/>
@@ -49,43 +51,31 @@ async function exists(path) {
   }
 }
 
-async function resolveBrandSource() {
-  for (const p of BRAND_CANDIDATES) {
+async function resolveIconSource() {
+  for (const p of ICON_CANDIDATES) {
     if (await exists(p)) return p;
   }
-  throw new Error('Missing brand source — run node scripts/process-brand-assets.mjs');
+  throw new Error('Missing icon1.png — add to brand-assets/source/ or repo root');
 }
 
-async function trimArt(input) {
-  try {
-    return await sharp(input).trim({ threshold: 18 }).toBuffer();
-  } catch {
-    return sharp(input).toBuffer();
-  }
-}
-
-async function writeLauncherIcons(brandSrc) {
+async function writeLauncherIcons(iconSrc) {
   for (const [dir, size] of MIPMAP_SIZES) {
     const folder = join(OUT, dir);
     await mkdir(folder, { recursive: true });
 
-    const legacyBuf = await renderSquareIcon(brandSrc, {
-      size,
+    const legacyBuf = await renderLegacyLauncher(iconSrc, size, {
       fill: LEGACY_FILL,
-      transparent: false,
       bg: BRAND_BG,
     }).then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
-    const fgBuf = await renderSquareIcon(brandSrc, {
-      size,
-      fill: FOREGROUND_FILL,
-      transparent: true,
+    const fgBuf = await renderAdaptiveForeground(iconSrc, size, {
+      safeFill: ADAPTIVE_SAFE_FILL,
     }).then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
     await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
     await writeFile(join(folder, 'ic_launcher_round.png'), legacyBuf);
     await writeFile(join(folder, 'ic_launcher_foreground.png'), fgBuf);
-    console.log(`  ✓ ${dir}/ic_launcher (${size}px, fill ${Math.round(LEGACY_FILL * 100)}%)`);
+    console.log(`  ✓ ${dir}/ic_launcher (fg safe ${Math.round(ADAPTIVE_SAFE_FILL * 100)}%)`);
   }
 }
 
@@ -119,18 +109,19 @@ async function writeSplashDrawable() {
       }
     }
   }
-  console.log('  ✓ drawable/splash.xml (solid bg — image via WebView contain)');
+  console.log('  ✓ drawable/splash.xml (solid bg; splash.webp in WebView)');
   await removeDensitySplashes();
 }
 
-async function writeNotificationIcon(brandSrc) {
+async function writeNotificationIcon(iconSrc) {
   await mkdir(join(OUT, 'drawable'), { recursive: true });
-  const buf = await renderSquareIcon(brandSrc, {
-    size: 96,
-    fill: 0.9,
-    transparent: false,
-    bg: BRAND_BG,
-  }).then((p) => p.grayscale().normalize().png({ compressionLevel: 9 }).toBuffer());
+  const trimmed = await trimAlphaArt(iconSrc);
+  const buf = await sharp(trimmed)
+    .resize(96, 96, { fit: 'inside' })
+    .grayscale()
+    .normalize()
+    .png({ compressionLevel: 9 })
+    .toBuffer();
   await writeFile(join(OUT, 'drawable', 'ic_stat_aiva.png'), buf);
   console.log('  ✓ drawable/ic_stat_aiva.png');
 }
@@ -157,22 +148,23 @@ async function writeAdaptiveIconXml() {
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>
 `;
   await writeFile(join(anydpi, 'ic_launcher.xml'), xml);
   await writeFile(join(anydpi, 'ic_launcher_round.xml'), xml);
-  console.log('  ✓ adaptive icons');
+  console.log('  ✓ adaptive icons (dark bg + transparent foreground)');
 }
 
 async function main() {
-  const brandSrc = await resolveBrandSource();
+  const iconSrc = await resolveIconSource();
   console.log(`Android branding → ${OUT}`);
-  console.log(`  Brand: ${brandSrc}`);
-  await writeLauncherIcons(brandSrc);
+  console.log(`  Icon: ${iconSrc}`);
+  await writeLauncherIcons(iconSrc);
   await writeSplashDrawable();
   await writeBrandColors();
   await writeAdaptiveIconXml();
-  await writeNotificationIcon(brandSrc);
+  await writeNotificationIcon(iconSrc);
   console.log('Done.');
 }
 
