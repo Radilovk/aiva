@@ -44,7 +44,6 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         applyDarkSystemBars();
-        requestEssentialPermissions();
         if (pendingListenStart) {
             pendingListenStart = false;
             notifyShortcutToJs();
@@ -97,7 +96,7 @@ public class MainActivity extends BridgeActivity {
             window.setNavigationBarContrastEnforced(false);
         }
 
-        WindowCompat.setDecorFitsSystemWindows(window, false);
+        WindowCompat.setDecorFitsSystemWindows(window, true);
         View decor = window.getDecorView();
         decor.setBackgroundColor(BRAND_BG);
 

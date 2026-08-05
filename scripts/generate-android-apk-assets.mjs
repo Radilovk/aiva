@@ -3,7 +3,7 @@
  * Generate Android launcher icons + native splash into android/app/src/main/res.
  * Splash: kasyspl.png (your upload). Icons: kasyico.png with larger safe-zone fill.
  */
-import { mkdir, writeFile, copyFile } from 'node:fs/promises';
+import { mkdir, writeFile, copyFile, readdir, rm, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -20,9 +20,9 @@ const SPLASH_FALLBACK = join(ROOT, 'android-res', 'drawable', 'splash.png');
 const NOTIF_SRC = join(ROOT, 'frontend', 'icons', 'ic-stat-notification.png');
 
 const BRAND_BG = '#050508';
-/** Larger fill — adaptive icon squircle was cropping too aggressively */
-const FOREGROUND_FILL = 0.94;
-const LEGACY_FILL = 0.96;
+/** Larger fill — adaptive icon safe zone is ~66%; larger values get masked/cropped */
+const FOREGROUND_FILL = 0.66;
+const LEGACY_FILL = 0.92;
 
 const MIPMAP_SIZES = [
   ['mipmap-mdpi', 48],
@@ -32,13 +32,9 @@ const MIPMAP_SIZES = [
   ['mipmap-xxxhdpi', 192],
 ];
 
-const SPLASH_PORT = [
-  ['drawable-port-mdpi', 320, 480],
-  ['drawable-port-hdpi', 480, 800],
-  ['drawable-port-xhdpi', 720, 1280],
-  ['drawable-port-xxhdpi', 1080, 1920],
-  ['drawable-port-xxxhdpi', 1440, 2560],
-];
+/** One splash asset — Android scales @drawable/splash; avoids ~1.5MB of density PNGs */
+const SPLASH_W = 720;
+const SPLASH_H = 1280;
 
 async function exists(path) {
   try {
@@ -79,11 +75,10 @@ async function resolveSplashSource() {
 function splashPipeline(input, w, h) {
   return sharp(input)
     .resize(w, h, {
-      fit: 'contain',
-      background: BRAND_BG,
-      position: 'centre',
+      fit: 'cover',
+      position: 'north',
     })
-    .png({ compressionLevel: 9, effort: 10, palette: true, quality: 80 });
+    .webp({ quality: 76, effort: 6 });
 }
 
 async function writeLauncherIcons(iconInput) {
@@ -111,23 +106,42 @@ async function writeLauncherIcons(iconInput) {
   }
 }
 
+async function removeDensitySplashes() {
+  let entries = [];
+  try {
+    entries = await readdir(OUT, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (/^drawable-(port|land)-/.test(entry.name)) {
+      await rm(join(OUT, entry.name), { recursive: true, force: true });
+      console.log(`  ✓ removed ${entry.name}/ (unused density splash)`);
+    }
+  }
+}
+
 async function writeSplashAssets(splashInput) {
   const androidResDrawable = join(ROOT, 'android-res', 'drawable');
   await mkdir(androidResDrawable, { recursive: true });
   await mkdir(join(OUT, 'drawable'), { recursive: true });
 
-  const baseBuf = await splashPipeline(splashInput, 720, 1280).toBuffer();
-  await writeFile(join(androidResDrawable, 'splash.png'), baseBuf);
-  await writeFile(join(OUT, 'drawable', 'splash.png'), baseBuf);
-  console.log('  ✓ drawable/splash.png (kasyspl, contain)');
-
-  for (const [dir, w, h] of SPLASH_PORT) {
-    const folder = join(OUT, dir);
-    await mkdir(folder, { recursive: true });
-    const buf = await splashPipeline(splashInput, w, h).toBuffer();
-    await writeFile(join(folder, 'splash.png'), buf);
-    console.log(`  ✓ ${dir}/splash.png (${w}x${h})`);
+  const baseBuf = await splashPipeline(splashInput, SPLASH_W, SPLASH_H).toBuffer();
+  await writeFile(join(androidResDrawable, 'splash.webp'), baseBuf);
+  await writeFile(join(OUT, 'drawable', 'splash.webp'), baseBuf);
+  for (const legacy of ['splash.png']) {
+    for (const dir of [androidResDrawable, join(OUT, 'drawable')]) {
+      try {
+        await unlink(join(dir, legacy));
+      } catch {
+        /* already removed */
+      }
+    }
   }
+  console.log(`  ✓ drawable/splash.webp (${SPLASH_W}x${SPLASH_H}, kasyspl)`);
+
+  await removeDensitySplashes();
 }
 
 async function writeBrandColors() {

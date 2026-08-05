@@ -56,7 +56,7 @@
     window.dispatchEvent(new CustomEvent('aiva:notifier-ready'));
   }
 
-  async function ensureNativeReady() {
+  async function ensureNativeReady({ request = true } = {}) {
     if (!window.Capacitor?.isNativePlatform?.()) return false;
     if (isCapacitor && LocalNotifications) return true;
 
@@ -66,7 +66,11 @@
       if (!LocalNotifications) return false;
 
       let perm = await LocalNotifications.checkPermissions?.();
-      if (!perm || perm.display === 'prompt' || perm.display === 'prompt-with-rationale') {
+      if (perm?.display === 'granted') {
+        return activateCapacitorNotifications();
+      }
+      if (!request) return false;
+      if (perm?.display === 'prompt' || perm?.display === 'prompt-with-rationale') {
         perm = await LocalNotifications.requestPermissions();
       }
       if (perm.display === 'granted') {
