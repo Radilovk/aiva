@@ -8,6 +8,7 @@ on:
       - 'frontend/**'
       - 'capacitor.config.json'
       - 'android-res/**'
+      - 'scripts/process-kasy-brand-assets.mjs'
       - 'scripts/generate-android-apk-assets.mjs'
       - 'scripts/apply-brand-package.mjs'
       - 'scripts/generate-kasy-brand.mjs'
@@ -44,6 +45,9 @@ jobs:
           npm install @capacitor/core @capacitor/cli @capacitor/android \
             @capacitor/local-notifications @capacitor/preferences @capacitor/haptics \
             @capacitor/app @capacitor/splash-screen
+
+      - name: Build Package A brand assets
+        run: node scripts/process-kasy-brand-assets.mjs
 
       - name: Build Capacitor web shell
         run: node scripts/prepare-capacitor-shell.mjs
