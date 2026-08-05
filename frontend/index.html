@@ -39,6 +39,15 @@
       --radius-sm: 14px;
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      /* Listen button — scales on all phones, stays large */
+      --listen-btn-size: clamp(140px, 42vmin, 168px);
+      --listen-wrap-size: calc(var(--listen-btn-size) * 1.78);
+      --listen-orbit-1: calc(var(--listen-btn-size) * 1.38);
+      --listen-orbit-2: calc(var(--listen-btn-size) * 1.72);
+      /* Splash art aspect (splash.jpg 720×1456) */
+      --splash-aspect: 720 / 1456;
     }
 
     * {
@@ -48,7 +57,7 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* Splash — CSS contain (no native crop on any phone) */
+    /* Splash — universal contain on every aspect ratio (no crop, no tile) */
     #appSplash {
       position: fixed;
       inset: 0;
@@ -57,12 +66,20 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+      box-sizing: border-box;
       transition: opacity 0.35s ease;
     }
 
     #appSplash img {
-      width: 100%;
-      height: 100%;
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: min(100%, calc((100dvh - var(--safe-top) - var(--safe-bottom)) * var(--splash-aspect)));
+      max-height: min(
+        calc(100dvh - var(--safe-top) - var(--safe-bottom)),
+        calc((100vw - var(--safe-left) - var(--safe-right)) / var(--splash-aspect))
+      );
       object-fit: contain;
       object-position: center;
     }
@@ -578,16 +595,16 @@
 
     .record-wrapper {
       position: relative;
-      width: 220px;
-      height: 220px;
+      width: var(--listen-wrap-size);
+      height: var(--listen-wrap-size);
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     .record-btn {
-      width: 120px;
-      height: 120px;
+      width: var(--listen-btn-size);
+      height: var(--listen-btn-size);
       border-radius: 50%;
       border: none;
       background: transparent;
@@ -607,7 +624,7 @@
       width: 100%;
       height: 100%;
       border-radius: 50%;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
       pointer-events: none;
     }
@@ -681,8 +698,8 @@
       transition: opacity 0.4s, transform 0.4s;
     }
 
-    .orbit-1 { width: 165px; height: 165px; }
-    .orbit-2 { width: 205px; height: 205px; }
+    .orbit-1 { width: var(--listen-orbit-1); height: var(--listen-orbit-1); }
+    .orbit-2 { width: var(--listen-orbit-2); height: var(--listen-orbit-2); }
 
     .record-btn.recording ~ .orbit-1,
     .record-btn.live ~ .orbit-1 {
@@ -1586,11 +1603,6 @@
 
     /* Responsive */
     @media (max-width: 380px) {
-      .record-btn { width: 104px; height: 104px; }
-      .orbit-1 { width: 145px; height: 145px; }
-      .orbit-2 { width: 175px; height: 175px; }
-      .record-wrapper { width: 190px; height: 190px; }
-
       .agenda-grid.view-three {
         grid-template-columns: 1fr;
       }
@@ -1793,7 +1805,7 @@
     <section class="voice-section">
       <div class="record-wrapper">
         <button class="record-btn" id="recordBtn" data-i18n-aria="record" aria-label="Запис">
-          <img class="listen-face" src="icons/button.webp" alt="" width="120" height="120" decoding="sync">
+          <img class="listen-face" src="icons/button.webp" alt="" width="156" height="156" decoding="sync">
           <span class="icon-stop" aria-hidden="true"></span>
         </button>
         <div class="orbit orbit-1"></div>
