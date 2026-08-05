@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="icon" type="image/webp" sizes="512x512" href="icons/icon-512.webp">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -81,7 +82,6 @@
 
     #appSplash img {
       display: block;
-      aspect-ratio: 720 / 1456;
       max-width: calc(100vw - var(--safe-left) - var(--safe-right));
       max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
       width: auto;
@@ -1765,7 +1765,7 @@
 </head>
 <body>
   <div id="appSplash" aria-hidden="true">
-    <img src="icons/splash.webp" alt="" width="720" height="1456" decoding="sync" fetchpriority="high">
+    <img src="icons/splash.webp" alt="" decoding="sync" fetchpriority="high">
   </div>
   <div class="app">
     <header class="header">

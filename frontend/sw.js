@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v39';
+const CACHE_NAME = 'aiva-v40';
 const ASSETS = [
   'index.html',
   'landing.html',
@@ -55,6 +55,7 @@ const ASSETS = [
   'icons/brand.webp',
   'icons/button.webp',
   'icons/splash.webp',
+  'icons/icon-512.png',
   'icons/icon-512.webp',
   'icons/icon-192.png',
 ].map(asset);
