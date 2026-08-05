@@ -159,7 +159,7 @@ if os.path.exists(STRINGS_SRC):
     shutil.copy2(STRINGS_SRC, STRINGS_DST)
     print('✅ Copied AIVA strings resource')
 
-# Ensure launch theme: legacy full-screen splash (no Android 12 icon API = no stitch)
+# Launch theme: branded splash drawable (no Android 12 icon API — avoids stitch artifact)
 STYLES = 'android/app/src/main/res/values/styles.xml'
 if os.path.exists(STYLES):
     with open(STYLES, 'r') as f:
@@ -173,7 +173,7 @@ if os.path.exists(STYLES):
         print('✅ Replaced Theme.SplashScreen with AppCompat (full-screen splash)')
 
     splash_items = (
-        '<item name="android:windowBackground">@color/splash_background</item>\n'
+        '<item name="android:windowBackground">@drawable/splash</item>\n'
         '        <item name="android:statusBarColor">@color/splash_background</item>\n'
         '        <item name="android:navigationBarColor">@color/splash_background</item>'
     )
@@ -190,12 +190,7 @@ if os.path.exists(STYLES):
             '',
             styles,
         )
-        if '@color/splash_background' not in styles and 'android:windowBackground">@drawable/splash' in styles:
-            styles = styles.replace(
-                '<item name="android:windowBackground">@drawable/splash</item>',
-                '<item name="android:windowBackground">@color/splash_background</item>',
-            )
-        if '@color/splash_background' not in styles and '@drawable/splash' not in styles:
+        if '@drawable/splash' not in styles:
             styles = styles.replace(
                 '<style name="AppTheme.NoActionBarLaunch"',
                 '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar"',
@@ -209,7 +204,7 @@ if os.path.exists(STYLES):
             )
         with open(STYLES, 'w') as f:
             f.write(styles)
-        print('✅ Patched launch theme with centered splash drawable')
+        print('✅ Patched launch theme with @drawable/splash')
 
 # Launcher icon: Capacitor ships #FFFFFF background → white box on install screen
 LAUNCHER_BG = 'android/app/src/main/res/values/ic_launcher_background.xml'
