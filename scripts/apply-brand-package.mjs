@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
- * Apply KASY brand package to frontend/icons.
+ * Build KASY brand packages and sync the active one to frontend/icons/.
  *
- *   node scripts/apply-brand-package.mjs A   — generated (voice + calendar + speech bubble)
- *   node scripts/apply-brand-package.mjs B   — from kasyico.png + kasyspl.png in brand-assets/source/
+ *   node scripts/apply-brand-package.mjs       — rebuild A+B, keep current active
+ *   node scripts/apply-brand-package.mjs A     — rebuild A+B, activate A
+ *   node scripts/apply-brand-package.mjs B     — rebuild A+B, activate B
  *
  * Env: BRAND_PACKAGE=A|B
  */
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { copyPackToRoot, readActivePackage } from './lib/brand-pack-sync.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -24,28 +26,21 @@ function run(script) {
 }
 
 async function main() {
-  const pkg = (process.argv[2] || process.env.BRAND_PACKAGE || '').toUpperCase();
-  if (pkg === 'B') {
-    const { runPackageB } = await import('./process-kasy-brand-assets.mjs');
-    await runPackageB();
-    return;
-  }
-  if (pkg === 'A') {
-    await run('generate-kasy-brand.mjs');
-    return;
-  }
-  // Auto: prefer Package B when user art is present
-  const { existsSync } = await import('node:fs');
-  const bIcon = ['brand-assets/source/kasyico.png', 'kasyico.png'].find((p) =>
-    existsSync(join(ROOT, p))
-  );
-  if (bIcon) {
-    console.log(`Found ${bIcon} — applying Package B`);
-    const { runPackageB } = await import('./process-kasy-brand-assets.mjs');
-    await runPackageB();
-  } else {
-    await run('generate-kasy-brand.mjs');
-  }
+  const arg = (process.argv[2] || process.env.BRAND_PACKAGE || '').toUpperCase();
+  const { runPackageB } = await import('./process-kasy-brand-assets.mjs');
+
+  console.log('Building package A…');
+  await run('generate-kasy-brand.mjs');
+
+  console.log('\nBuilding package B…');
+  await runPackageB();
+
+  let active = arg === 'A' || arg === 'B' ? arg : await readActivePackage();
+  if (active !== 'A' && active !== 'B') active = 'B';
+
+  console.log(`\nActivating package ${active}…`);
+  await copyPackToRoot(active);
+  console.log(`\nAll done — active package: ${active}`);
 }
 
 main().catch((e) => {

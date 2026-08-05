@@ -90,6 +90,7 @@
     appearance: {
       accentColor: '#ff3b5c',
       compactCalendar: false,
+      brandPackage: 'B',
     },
     notifications: {
       // Включени по подразбиране — приложението е за напомняния; OS-ът пита
@@ -158,6 +159,7 @@
     if (merged.calendarSync.provider !== 'none' && !merged.calendarSync.setupComplete) {
       merged.calendarSync.setupComplete = true;
     }
+    merged.appearance.brandPackage = String(merged.appearance.brandPackage || 'B').toUpperCase() === 'A' ? 'A' : 'B';
     return merged;
   }
 
