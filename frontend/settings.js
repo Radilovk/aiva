@@ -112,7 +112,7 @@
     },
     hardwareShortcut: {
       // Тригерът е фиксиран: двата бутона за звук (+ и −) едновременно
-      enabled: false,
+      enabled: true,
     },
   };
 

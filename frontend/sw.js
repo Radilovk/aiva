@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v27';
+const CACHE_NAME = 'aiva-v28';
 const ASSETS = [
   'index.html',
   'landing.html',
