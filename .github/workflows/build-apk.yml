@@ -11,7 +11,7 @@ on:
       - 'scripts/generate-android-apk-assets.mjs'
       - 'scripts/apply-brand-package.mjs'
       - 'scripts/generate-kasy-brand.mjs'
-      - 'scripts/process-kasy-brand-assets.mjs'
+      - 'scripts/prepare-capacitor-shell.mjs'
       - '.github/workflows/build-apk.yml'
 
 jobs:
@@ -46,15 +46,7 @@ jobs:
             @capacitor/app @capacitor/splash-screen
 
       - name: Build Capacitor web shell
-        run: |
-          rm -rf capacitor-shell
-          mkdir -p capacitor-shell
-          rsync -av --exclude='*.md' --exclude='node_modules' \
-            --exclude='android' --exclude='capacitor-shell' \
-            --exclude='.git' --exclude='.github' --exclude='workers' \
-            --exclude='android-res' --exclude='*.txt' \
-            --exclude='admin.html' --exclude='admin.js' \
-            frontend/ capacitor-shell/
+        run: node scripts/prepare-capacitor-shell.mjs
 
       - name: Add Android platform
         run: |

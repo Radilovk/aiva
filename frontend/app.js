@@ -21,30 +21,6 @@ function setRecordBtnLive(live) {
   recordBtn?.classList.toggle('live', live);
 }
 
-function dismissAppSplash() {
-  const splash = document.getElementById('appSplash');
-  if (!splash || splash.classList.contains('hide')) return;
-  splash.classList.add('hide');
-  splash.setAttribute('aria-hidden', 'true');
-  setTimeout(() => splash.remove(), 450);
-}
-
-function initAppSplash() {
-  const dismiss = () => dismissAppSplash();
-  if (document.documentElement.classList.contains('i18n-ready')) {
-    requestAnimationFrame(dismiss);
-  } else {
-    const obs = new MutationObserver(() => {
-      if (document.documentElement.classList.contains('i18n-ready')) {
-        obs.disconnect();
-        requestAnimationFrame(dismiss);
-      }
-    });
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-  }
-  setTimeout(dismiss, 3200);
-}
-
 // --- User ID ---
 function getUserId() {
   let id = localStorage.getItem('aiva_user_id');
@@ -522,7 +498,29 @@ function setAssistantSpeech(text) {
 
 const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още|anything\s+else|need\s+anything|something\s+else|还需要|还需要其他|कुछ\s+और|algo\s+más|شيء\s+آخر|autre\s+chose|besoin\s+d.autre|noch\s+etwas|brauchen\s+sie\s+noch|ещё\s+что|нужно\s+ещё/i;
 const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|no|nope|nothing|that's all|done|enough|нет|没有|नहीं|नहीं\s+धन्यवाद|no\s+gracias|لا|non|nein|ничего|спасибо,\s*нет)\b/i;
-const USER_GOODBYE_RE = /^(спри|стоп|затвори|излез|чао|довиждане|до\s*видане|goodbye|bye|stop|exit|quit)\b/i;
+const USER_GOODBYE_WORDS = [
+  'спри', 'стоп', 'затвори', 'излез', 'чао', 'ciao', 'довиждане', 'до видане',
+  'благодаря', 'мерси', 'thanks', 'thank you', 'danke', 'gracias', 'merci',
+  'obrigado', 'obrigada', 'goodbye', 'bye', 'stop', 'exit', 'quit',
+  'arrivederci', 'sayonara', 'adiós', 'adios', 'adeu', 'paka', 'чао чао',
+];
+
+function normalizeUtterance(text) {
+  return String(text || '').toLowerCase().trim().replace(/[.!?,…]+$/g, '');
+}
+
+function utteranceHasGoodbyeWord(normalized, word) {
+  if (!normalized || !word) return false;
+  if (normalized === word) return true;
+  const tokens = normalized.split(/[\s,;]+/).filter(Boolean);
+  return tokens.some((token) => token === word || token.startsWith(word));
+}
+
+function isUserGoodbye(text) {
+  const normalized = normalizeUtterance(text);
+  if (!normalized) return false;
+  return USER_GOODBYE_WORDS.some((word) => utteranceHasGoodbyeWord(normalized, word));
+}
 // Само изрични сбогувания — фрази като "приятен ден" се появяват и насред разговор
 const ASSISTANT_GOODBYE_RE = /\b(чао|довиждане|до\s*видане|goodbye|bye\s*bye|auf\s+wiedersehen|au\s+revoir|adiós|adios|до\s+свидания)\b/i;
 const ASSISTANT_FAREWELL_RE = /(оставам\s+на\s+разположение|на\s+разположение\s+съм|до\s+скоро|приятен\s+ден|до\s+ново\s+срещане|i\s*'?m\s+here\s+if\s+you\s+need|reach\s+out\s+any\s*time|на\s+услуга)/i;
@@ -534,15 +532,9 @@ function detectClosingQuestion(text) {
 }
 
 function isNegativeCloseResponse(text) {
-  const normalized = String(text || '').toLowerCase().trim().replace(/[.!?,…]+$/g, '');
+  const normalized = normalizeUtterance(text);
   if (!normalized) return false;
   return NEGATIVE_CLOSE_RE.test(normalized);
-}
-
-function isUserGoodbye(text) {
-  const normalized = String(text || '').toLowerCase().trim().replace(/[.!?,…]+$/g, '');
-  if (!normalized) return false;
-  return USER_GOODBYE_RE.test(normalized);
 }
 
 function detectAssistantGoodbye(text) {
@@ -609,7 +601,9 @@ async function startMicAfterGreeting() {
   }
 }
 
-function beginSessionEnd() {
+const SESSION_END_FALLBACK_MS = 45000;
+
+function armSessionEnd() {
   if (sessionEnding) return;
   sessionEnding = true;
   awaitingCloseConfirmation = false;
@@ -619,21 +613,16 @@ function beginSessionEnd() {
     audioStreamer.stop();
     audioStreamer = null;
   }
+}
+
+function finishSessionEndUi() {
   waveform.classList.remove('active');
   recordBtn.classList.remove('recording');
   setRecordBtnLive(false);
+  statusEl?.classList.remove('assistant-speech');
 }
 
-async function finalizeSessionEnd() {
-  if (audioPlayer) {
-    await audioPlayer.waitForDrain(30000);
-  }
-  window.AIVA_HAPTICS?.endSpeechSession?.();
-  if (isSessionActive) disconnectSession();
-}
-
-function scheduleSessionEnd(delayMs = 300) {
-  beginSessionEnd();
+function scheduleSessionEndFallback() {
   if (sessionEndTimer) {
     clearTimeout(sessionEndTimer);
     sessionEndTimer = null;
@@ -641,7 +630,30 @@ function scheduleSessionEnd(delayMs = 300) {
   sessionEndTimer = setTimeout(() => {
     sessionEndTimer = null;
     finalizeSessionEnd();
-  }, delayMs);
+  }, SESSION_END_FALLBACK_MS);
+}
+
+function requestSessionEndAfterFarewell() {
+  armSessionEnd();
+  scheduleSessionEndFallback();
+}
+
+async function finalizeSessionEnd() {
+  if (audioPlayer) {
+    await audioPlayer.waitForDrain(30000);
+    const endMs = audioPlayer.getScheduledPlaybackEndMs?.() || 0;
+    const waitMs = Math.max(0, endMs - performance.now());
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+  finishSessionEndUi();
+  window.AIVA_HAPTICS?.endSpeechSession?.();
+  if (isSessionActive) disconnectSession();
+}
+
+function scheduleSessionEnd() {
+  requestSessionEndAfterFarewell();
 }
 
 function handlePossibleCloseResponse(text, finished = false) {
@@ -649,7 +661,7 @@ function handlePossibleCloseResponse(text, finished = false) {
   const combined = `${pendingUserTranscript}${text}`.trim();
   pendingUserTranscript = finished ? '' : combined;
   if (isNegativeCloseResponse(combined)) {
-    scheduleSessionEnd();
+    requestSessionEndAfterFarewell();
   }
 }
 
@@ -659,7 +671,7 @@ function handleUserTranscriptForSessionControl(text, finished = false) {
     return;
   }
   if (finished && isUserGoodbye(text)) {
-    scheduleSessionEnd();
+    requestSessionEndAfterFarewell();
   }
 }
 
@@ -896,22 +908,9 @@ function updateRangeLabel(dates) {
   }
 }
 
-function paintTasksContainer(html, { animate = false, direction = 1 } = {}) {
-  if (!animate || !tasksContainer.firstElementChild) {
-    tasksContainer.innerHTML = html;
-    return;
-  }
-  tasksContainer.style.setProperty('--nav-dir', String(direction));
-  tasksContainer.classList.add('calendar-nav-out');
-  requestAnimationFrame(() => {
-    tasksContainer.innerHTML = html;
-    tasksContainer.classList.remove('calendar-nav-out');
-    tasksContainer.classList.add('calendar-nav-in');
-    requestAnimationFrame(() => {
-      tasksContainer.classList.remove('calendar-nav-in');
-      calendarNavLock = false;
-    });
-  });
+function paintTasksContainer(html) {
+  tasksContainer.innerHTML = html;
+  calendarNavLock = false;
 }
 
 function renderAgendaView(dates, renderOpts = {}) {
@@ -1741,7 +1740,6 @@ async function handleGeminiMessage(message) {
 
     case MultimodalLiveResponseType.AUDIO:
       assistantTurnComplete = false;
-      window.AIVA_HAPTICS?.beginSpeechSession?.();
       if (audioPlayer) await audioPlayer.play(message.data);
       break;
 
@@ -1759,7 +1757,7 @@ async function handleGeminiMessage(message) {
         // Сбогуването се проверява само на завършен транскрипт — частичните
         // фрагменти дават фалшиви съвпадения и затварят сесията погрешно.
         if (message.data.finished && detectAssistantGoodbye(assistantTranscriptBuffer)) {
-          scheduleSessionEnd();
+          requestSessionEndAfterFarewell();
         }
       }
       break;
@@ -1770,7 +1768,7 @@ async function handleGeminiMessage(message) {
         setAssistantSpeech(assistantTranscriptBuffer);
         detectClosingQuestion(assistantTranscriptBuffer);
         if (detectAssistantGoodbye(assistantTranscriptBuffer)) {
-          scheduleSessionEnd();
+          requestSessionEndAfterFarewell();
         }
       }
       break;
@@ -2308,7 +2306,6 @@ refreshExternalEvents();
 loadDailyBrief();
 initDeviceBanner();
 initPaywallUi();
-initAppSplash();
 
 function initPaywallUi() {
   document.getElementById('paywallDismissBtn')?.addEventListener('click', () => {
@@ -2357,12 +2354,15 @@ function waitForReadyAndListen(attempts = 30) {
 window.addEventListener('aiva:shortcut-triggered', tryAutoStartListening);
 initHardwareShortcut();
 
-// Initialize notification scheduler
+// Initialize notification scheduler + auto permissions on APK
 if (window.AIVA_NOTIFIER) {
-  window.AIVA_NOTIFIER.init().then(() => {
-    if (assistantSettings.notifications?.enabled) {
-      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
+  window.AIVA_NOTIFIER.init().then(async () => {
+    if (window.Capacitor?.isNativePlatform?.()) {
+      await window.AIVA_NATIVE_PERMISSIONS?.bootstrap?.();
+      return;
     }
+    if (!assistantSettings.notifications?.enabled) return;
+    window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
   });
 }
 

@@ -37,6 +37,46 @@
   let isCapacitor = false;
   let LocalNotifications = null;
   let scheduledIds = new Set();
+  let listenersBound = false;
+
+  async function activateCapacitorNotifications() {
+    if (!LocalNotifications) return false;
+    await LocalNotifications.createChannel(getNotificationChannel());
+    await LocalNotifications.createChannel(getSnoozeChannel());
+    if (!listenersBound) {
+      bindCapacitorListeners();
+      listenersBound = true;
+    }
+    await processPendingAndroidActions();
+    isCapacitor = true;
+    return true;
+  }
+
+  function markNotifierReady() {
+    window.dispatchEvent(new CustomEvent('aiva:notifier-ready'));
+  }
+
+  async function ensureNativeReady() {
+    if (!window.Capacitor?.isNativePlatform?.()) return false;
+    if (isCapacitor && LocalNotifications) return true;
+
+    try {
+      LocalNotifications = window.Capacitor.Plugins?.LocalNotifications ||
+        window.Capacitor.registerPlugin('LocalNotifications');
+      if (!LocalNotifications) return false;
+
+      let perm = await LocalNotifications.checkPermissions?.();
+      if (!perm || perm.display === 'prompt' || perm.display === 'prompt-with-rationale') {
+        perm = await LocalNotifications.requestPermissions();
+      }
+      if (perm.display === 'granted') {
+        return activateCapacitorNotifications();
+      }
+    } catch (e) {
+      console.warn('Capacitor notifications unavailable:', e);
+    }
+    return false;
+  }
 
   function getSettings() {
     return window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications || {};
@@ -85,25 +125,9 @@
 
   async function init() {
     if (window.Capacitor?.isNativePlatform?.()) {
-      try {
-        LocalNotifications = window.Capacitor.Plugins?.LocalNotifications ||
-          window.Capacitor.registerPlugin('LocalNotifications');
-        const perm = await LocalNotifications.requestPermissions();
-        if (perm.display === 'granted') {
-          await LocalNotifications.createChannel(getNotificationChannel());
-          await LocalNotifications.createChannel(getSnoozeChannel());
-          isCapacitor = true;
-          bindCapacitorListeners();
-          await processPendingAndroidActions();
-          console.log('🔔 Capacitor notifications ready');
-        }
-      } catch (e) {
-        console.warn('Capacitor notifications unavailable:', e);
-      }
-    }
-
-    if (!isCapacitor && 'Notification' in window && Notification.permission === 'default') {
-      // Don't auto-request — let onboarding/settings handle it
+      await ensureNativeReady();
+    } else if ('Notification' in window && Notification.permission === 'default') {
+      // Don't auto-request on web — settings/onboarding handle it
     }
 
     if (!isCapacitor && 'serviceWorker' in navigator) {
@@ -117,6 +141,7 @@
         }
       });
     }
+    markNotifierReady();
   }
 
   // --- Precise web timer (PWA fallback path) ---
@@ -224,6 +249,10 @@
   async function scheduleNotification({ id, title, body, at, taskId, type, channelId }) {
     if (at <= new Date()) return false;
     if (isInQuietHours(at) && type !== 'snooze') return false;
+
+    if (window.Capacitor?.isNativePlatform?.()) {
+      await ensureNativeReady();
+    }
 
     if (isCapacitor && LocalNotifications) {
       await LocalNotifications.schedule({
@@ -388,9 +417,8 @@
   }
 
   async function requestPermission() {
-    if (isCapacitor && LocalNotifications) {
-      const perm = await LocalNotifications.requestPermissions();
-      return perm.display === 'granted';
+    if (window.Capacitor?.isNativePlatform?.()) {
+      return ensureNativeReady();
     }
     if ('Notification' in window) {
       const perm = await Notification.requestPermission();
@@ -480,6 +508,7 @@
 
   window.AIVA_NOTIFIER = {
     init,
+    ensureNativeReady,
     requestPermission,
     scheduleForTask,
     cancelForTask,

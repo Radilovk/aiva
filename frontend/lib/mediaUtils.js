@@ -423,6 +423,39 @@ class AudioPlayer {
     this._isPlaying = false;
     this._drainResolvers = [];
     this.onPlaybackStateChange = null;
+    this._playbackEndCtxTime = 0;
+    this._hapticsTimers = [];
+    window.__aivaAudioPlayer = this;
+  }
+
+  getScheduledPlaybackEndMs() {
+    if (!this.audioContext) return 0;
+    const remainingSec = Math.max(0, this._playbackEndCtxTime - this.audioContext.currentTime);
+    return performance.now() + remainingSec * 1000;
+  }
+
+  _clearHapticsTimers() {
+    for (const id of this._hapticsTimers) clearTimeout(id);
+    this._hapticsTimers = [];
+  }
+
+  _scheduleHapticsForChunk(float32Data) {
+    if (!this.audioContext || !float32Data?.length) return;
+
+    const durationSec = float32Data.length / this.sampleRate;
+    const now = this.audioContext.currentTime;
+    const delaySec = Math.max(0, this._playbackEndCtxTime - now);
+    this._playbackEndCtxTime = now + delaySec + durationSec;
+
+    const delayMs = delaySec * 1000;
+    const feedTimer = setTimeout(() => {
+      window.AIVA_HAPTICS?.beginSpeechSession?.();
+      window.AIVA_HAPTICS?.feedSpeechPcm?.(float32Data, this.sampleRate);
+    }, delayMs);
+    const tailTimer = setTimeout(() => {
+      window.AIVA_HAPTICS?.touchSpeechSession?.();
+    }, delayMs + durationSec * 1000 + 60);
+    this._hapticsTimers.push(feedTimer, tailTimer);
   }
 
   /**
@@ -521,7 +554,7 @@ class AudioPlayer {
 
     this._setPlaying(true);
     this.workletNode.port.postMessage(float32Data);
-    window.AIVA_HAPTICS?.feedSpeechPcm?.(float32Data, this.sampleRate);
+    this._scheduleHapticsForChunk(float32Data);
   }
 
   /**
@@ -545,6 +578,8 @@ class AudioPlayer {
     if (this.workletNode) {
       this.workletNode.port.postMessage("interrupt");
     }
+    this._clearHapticsTimers();
+    this._playbackEndCtxTime = this.audioContext?.currentTime || 0;
     window.AIVA_HAPTICS?.stopSpeechHaptics?.();
     this._setPlaying(false);
     const resolvers = this._drainResolvers.splice(0);
