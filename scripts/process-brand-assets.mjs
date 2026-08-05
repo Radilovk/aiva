@@ -7,6 +7,7 @@ import { mkdir, writeFile, access, copyFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { renderSquareIcon, trimArt } from './lib/brand-icon-prep.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,6 +40,18 @@ async function resolveSource(kind) {
     }
   }
   throw new Error(`Missing ${kind} source. Add ${FILES[kind][0]} to repo root or brand-assets/source/`);
+}
+
+async function writeSquareWebp(input, dest, size, { fill = 0.92, quality = 82 } = {}) {
+  const buf = await renderSquareIcon(input, {
+    size,
+    fill,
+    transparent: false,
+    bg: BG,
+  }).then((p) => p.webp({ quality, effort: 6 }).toBuffer());
+  await writeFile(dest, buf);
+  const meta = await sharp(buf).metadata();
+  console.log(`  ✓ ${dest.replace(`${ROOT}/`, '')} (${meta.width}×${meta.height}, fill ${Math.round(fill * 100)}%, ${(buf.length / 1024).toFixed(1)} KB)`);
 }
 
 async function writeWebp(input, dest, { width, height, fit = 'contain', quality = 82 } = {}) {
@@ -80,27 +93,29 @@ export async function processBrandAssets() {
   await archiveSources({ brand: brandSrc, button: buttonSrc, splash: splashSrc });
 
   console.log('\nBrand (logo + app icon):');
-  await writeWebp(brandSrc, join(OUT, 'brand.webp'), { width: 512, height: 512 });
-  await writeWebp(brandSrc, join(OUT, 'icon-512.webp'), { width: 512, height: 512 });
-  const icon192 = await sharp(brandSrc)
-    .resize(192, 192, { fit: 'contain', background: BG, position: 'centre' })
-    .png({ compressionLevel: 9 })
-    .toBuffer();
+  await writeSquareWebp(brandSrc, join(OUT, 'brand.webp'), 512, { fill: 0.92 });
+  await writeSquareWebp(brandSrc, join(OUT, 'icon-512.webp'), 512, { fill: 0.92 });
+  const icon192 = await renderSquareIcon(brandSrc, {
+    size: 192,
+    fill: 0.92,
+    transparent: false,
+    bg: BG,
+  }).then((p) => p.png({ compressionLevel: 9 }).toBuffer());
   await writeFile(join(OUT, 'icon-192.png'), icon192);
   console.log(`  ✓ frontend/icons/icon-192.png (192×192, ${(icon192.length / 1024).toFixed(1)} KB)`);
   await writeWebp(brandSrc, join(OUT, 'favicon-32.webp'), { width: 32, height: 32, quality: 78 });
 
-  const notif = await sharp(brandSrc)
-    .resize(96, 96, { fit: 'contain', background: BG })
-    .grayscale()
-    .normalize()
-    .png({ compressionLevel: 9 })
-    .toBuffer();
+  const notif = await renderSquareIcon(brandSrc, {
+    size: 96,
+    fill: 0.9,
+    transparent: false,
+    bg: BG,
+  }).then((p) => p.grayscale().normalize().png({ compressionLevel: 9 }).toBuffer());
   await writeFile(join(OUT, 'ic-stat-notification.png'), notif);
   console.log(`  ✓ frontend/icons/ic-stat-notification.png`);
 
   console.log('\nButton (listen):');
-  await writeWebp(buttonSrc, join(OUT, 'button.webp'), { width: 512, height: 512 });
+  await writeSquareWebp(buttonSrc, join(OUT, 'button.webp'), 512, { fill: 0.92 });
 
   console.log('\nSplash (contain, no crop — preserve aspect):');
   const splashMeta = await sharp(splashSrc).metadata();

@@ -173,7 +173,7 @@ if os.path.exists(STYLES):
         print('✅ Replaced Theme.SplashScreen with AppCompat (full-screen splash)')
 
     splash_items = (
-        '<item name="android:windowBackground">@drawable/splash</item>\n'
+        '<item name="android:windowBackground">@color/splash_background</item>\n'
         '        <item name="android:statusBarColor">@color/splash_background</item>\n'
         '        <item name="android:navigationBarColor">@color/splash_background</item>'
     )
@@ -190,7 +190,12 @@ if os.path.exists(STYLES):
             '',
             styles,
         )
-        if '@drawable/splash' not in styles:
+        if '@color/splash_background' not in styles and 'android:windowBackground">@drawable/splash' in styles:
+            styles = styles.replace(
+                '<item name="android:windowBackground">@drawable/splash</item>',
+                '<item name="android:windowBackground">@color/splash_background</item>',
+            )
+        if '@color/splash_background' not in styles and '@drawable/splash' not in styles:
             styles = styles.replace(
                 '<style name="AppTheme.NoActionBarLaunch"',
                 '<style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar"',
