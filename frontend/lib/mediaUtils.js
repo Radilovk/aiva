@@ -518,6 +518,7 @@ class AudioPlayer {
 
     this._setPlaying(true);
     this.workletNode.port.postMessage(float32Data);
+    window.AIVA_HAPTICS?.feedSpeechPcm?.(float32Data, this.sampleRate);
   }
 
   /**
@@ -541,6 +542,7 @@ class AudioPlayer {
     if (this.workletNode) {
       this.workletNode.port.postMessage("interrupt");
     }
+    window.AIVA_HAPTICS?.stopSpeechHaptics?.();
     this._setPlaying(false);
     const resolvers = this._drainResolvers.splice(0);
     for (const resolve of resolvers) resolve();

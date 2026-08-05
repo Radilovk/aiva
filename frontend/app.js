@@ -138,6 +138,7 @@ function onAssistantPlaybackStateChange(isPlaying) {
     setMicUplinkMuted(true);
     return;
   }
+  window.AIVA_HAPTICS?.stopSpeechHaptics?.();
   tryUnmuteMicAfterAssistant();
 }
 
