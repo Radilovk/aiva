@@ -85,13 +85,13 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: KASY-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: KASY-release
+          path: android/app/build/outputs/apk/release/app-release.apk
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
@@ -99,7 +99,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v-$(date +%Y%m%d%H%M)-$(git rev-parse --short HEAD)"
-          cp android/app/build/outputs/apk/debug/app-debug.apk KASY.apk
+          cp android/app/build/outputs/apk/release/app-release.apk KASY.apk
           gh release create "$TAG" KASY.apk \
             --title "KASY $TAG" \
             --notes "Автоматичен build от commit $(git rev-parse --short HEAD)" \

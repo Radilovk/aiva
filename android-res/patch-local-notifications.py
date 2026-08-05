@@ -184,4 +184,44 @@ if os.path.exists(STYLES):
             f.write(styles)
         print('✅ Patched launch theme with splash drawable')
 
+BUILD_GRADLE = 'android/app/build.gradle'
+if os.path.exists(BUILD_GRADLE):
+    with open(BUILD_GRADLE, 'r') as f:
+        gradle = f.read()
+    gradle_changed = False
+
+    if 'abiFilters' not in gradle:
+        gradle = gradle.replace(
+            'versionName "1.0"',
+            'versionName "1.0"\n'
+            '        ndk {\n'
+            '            abiFilters "arm64-v8a"\n'
+            '        }',
+            1,
+        )
+        gradle_changed = True
+
+    old_release = """    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }"""
+    new_release = """    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+        }
+    }"""
+    if 'shrinkResources' not in gradle and old_release in gradle:
+        gradle = gradle.replace(old_release, new_release, 1)
+        gradle_changed = True
+
+    if gradle_changed:
+        with open(BUILD_GRADLE, 'w') as f:
+            f.write(gradle)
+        print('✅ Patched build.gradle (arm64 release, minify + shrink)')
+
 print('✅ Android patches applied successfully')

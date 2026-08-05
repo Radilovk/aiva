@@ -44,7 +44,6 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         applyDarkSystemBars();
-        requestEssentialPermissions();
         if (pendingListenStart) {
             pendingListenStart = false;
             notifyShortcutToJs();

@@ -3,7 +3,7 @@
  * Slim web bundle for Android APK — excludes brand archives and web-only assets.
  *   node scripts/prepare-capacitor-shell.mjs [outDir]
  */
-import { cp, rm, mkdir, readdir, stat } from 'node:fs/promises';
+import { cp, rm, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,6 +31,10 @@ const EXCLUDE_FILES = new Set([
   'favicon-32.webp',
   'icon-192.webp',
   'icon-512.webp',
+  'icon-512.png',
+  'maskable-512.png',
+  'apple-touch-icon.png',
+  'apple-touch-icon.webp',
   'apple-touch-icon.webp',
   'maskable-512.webp',
   'listen-120.webp',
@@ -64,9 +68,25 @@ async function copyTree(srcDir, destDir, rel = '') {
   }
 }
 
+async function patchApkManifest(outDir) {
+  const manifestPath = join(outDir, 'manifest.json');
+  try {
+    const raw = await readFile(manifestPath, 'utf8');
+    const manifest = JSON.parse(raw);
+    manifest.icons = (manifest.icons || []).filter((icon) => {
+      const src = String(icon.src || '');
+      return src.includes('icon-192') && !src.includes('maskable');
+    });
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  } catch {
+    /* manifest optional */
+  }
+}
+
 async function main() {
   await rm(OUT, { recursive: true, force: true });
   await copyTree(SRC, OUT);
+  await patchApkManifest(OUT);
   console.log(`✓ Capacitor shell → ${OUT} (slim APK bundle)`);
 }
 
