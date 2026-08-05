@@ -6,7 +6,12 @@
   const SILENCE_RMS = 0.014;
   const VOWEL_RMS = 0.03;
   const CONSONANT_ZCR = 0.1;
-  const IDLE_END_MS = 2800; // keep session alive between streamed chunks + playback tail
+  const IDLE_END_MS = 600;
+
+  function isPlaybackScheduled() {
+    const endMs = window.__aivaAudioPlayer?.getScheduledPlaybackEndMs?.();
+    return typeof endMs === 'number' && endMs > performance.now() + 40;
+  }
 
   let audioCtx = null;
   let speechEnabled = true;
@@ -165,7 +170,7 @@
         return;
       }
       const idle = performance.now() - lastFeedAt;
-      if (idle > IDLE_END_MS) {
+      if (idle > IDLE_END_MS && !isPlaybackScheduled()) {
         endSpeechSession();
         return;
       }

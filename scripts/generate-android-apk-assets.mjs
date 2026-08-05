@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Generate Android launcher icons + native splash into android/app/src/main/res.
- * Uses alpha-trimmed art so adaptive icons fill the squircle (no tiny circle in white box).
+ * Splash: kasyspl.png (your upload). Icons: kasyico.png with larger safe-zone fill.
  */
 import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -16,14 +16,13 @@ const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res');
 const ICON_SRC = join(ROOT, 'brand-assets', 'source', 'kasyico.png');
 const ICON_FALLBACK = join(ROOT, 'frontend', 'icons', 'icon-512.png');
-const SPLASH_SRC = join(ROOT, 'android-res', 'drawable', 'splash.png');
+const SPLASH_FALLBACK = join(ROOT, 'android-res', 'drawable', 'splash.png');
 const NOTIF_SRC = join(ROOT, 'frontend', 'icons', 'ic-stat-notification.png');
 
 const BRAND_BG = '#050508';
-/** Foreground fill — 84% uses Android adaptive safe zone well for circular art */
-const FOREGROUND_FILL = 0.84;
-/** Legacy launcher — slightly larger on dark bg */
-const LEGACY_FILL = 0.88;
+/** Larger fill — adaptive icon squircle was cropping too aggressively */
+const FOREGROUND_FILL = 0.94;
+const LEGACY_FILL = 0.96;
 
 const MIPMAP_SIZES = [
   ['mipmap-mdpi', 48],
@@ -51,9 +50,40 @@ async function exists(path) {
 }
 
 async function resolveIconSource() {
-  if (await exists(ICON_SRC)) return ICON_SRC;
-  if (await exists(join(ROOT, 'kasyico.png'))) return join(ROOT, 'kasyico.png');
+  const candidates = [
+    ICON_SRC,
+    join(ROOT, 'kasyico.png'),
+    join(ROOT, 'brand-assets', 'package-a', 'kasyico.png'),
+    ICON_FALLBACK,
+  ];
+  for (const p of candidates) {
+    if (await exists(p)) return p;
+  }
   return ICON_FALLBACK;
+}
+
+async function resolveSplashSource() {
+  const candidates = [
+    join(ROOT, 'kasyspl.png'),
+    join(ROOT, 'brand-assets', 'source', 'kasyspl.png'),
+    join(ROOT, 'brand-assets', 'package-a', 'kasyspl.png'),
+    join(ROOT, 'frontend', 'icons', 'pack-a', 'splash-android.png'),
+    SPLASH_FALLBACK,
+  ];
+  for (const p of candidates) {
+    if (await exists(p)) return p;
+  }
+  return SPLASH_FALLBACK;
+}
+
+function splashPipeline(input, w, h) {
+  return sharp(input)
+    .resize(w, h, {
+      fit: 'contain',
+      background: BRAND_BG,
+      position: 'centre',
+    })
+    .png({ compressionLevel: 9, effort: 10 });
 }
 
 async function writeLauncherIcons(iconInput) {
@@ -81,19 +111,20 @@ async function writeLauncherIcons(iconInput) {
   }
 }
 
-async function writeSplashAssets() {
+async function writeSplashAssets(splashInput) {
+  const androidResDrawable = join(ROOT, 'android-res', 'drawable');
+  await mkdir(androidResDrawable, { recursive: true });
   await mkdir(join(OUT, 'drawable'), { recursive: true });
-  const fallback = await sharp(SPLASH_SRC).png().toBuffer();
-  await writeFile(join(OUT, 'drawable', 'splash.png'), fallback);
-  console.log('  ✓ drawable/splash.png');
+
+  const baseBuf = await splashPipeline(splashInput, 720, 1280).toBuffer();
+  await writeFile(join(androidResDrawable, 'splash.png'), baseBuf);
+  await writeFile(join(OUT, 'drawable', 'splash.png'), baseBuf);
+  console.log('  ✓ drawable/splash.png (kasyspl, contain)');
 
   for (const [dir, w, h] of SPLASH_PORT) {
     const folder = join(OUT, dir);
     await mkdir(folder, { recursive: true });
-    const buf = await sharp(SPLASH_SRC)
-      .resize(w, h, { fit: 'cover', position: 'centre' })
-      .png({ compressionLevel: 9, effort: 10 })
-      .toBuffer();
+    const buf = await splashPipeline(splashInput, w, h).toBuffer();
     await writeFile(join(folder, 'splash.png'), buf);
     console.log(`  ✓ ${dir}/splash.png (${w}x${h})`);
   }
@@ -139,10 +170,12 @@ async function copyNotificationIcon() {
 
 async function main() {
   const iconInput = await resolveIconSource();
+  const splashInput = await resolveSplashSource();
   console.log(`Android branding → ${OUT}`);
   console.log(`  Icon source: ${iconInput}`);
+  console.log(`  Splash source: ${splashInput}`);
   await writeLauncherIcons(iconInput);
-  await writeSplashAssets();
+  await writeSplashAssets(splashInput);
   await writeBrandColors();
   await writeAdaptiveIconXml();
   await copyNotificationIcon();

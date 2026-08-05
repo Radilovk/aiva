@@ -62,14 +62,15 @@ async function archiveSource(src, destName) {
   await copyFile(src, join(PACKAGE_OUT, destName));
 }
 
-async function squareIcon(input, size, outName, { fill = 0.86, transparent = false } = {}) {
+async function squareIcon(input, size, outName, { fill = 0.92, transparent = false } = {}) {
   const buf = await renderIconSquare(input, { size, fill, transparent }).then((p) => p.toBuffer());
   await writePngWebp(buf, outName.replace(/\.png$/, ''));
   console.log(`  ✓ ${outName} (${size}px, fill ${Math.round(fill * 100)}%)`);
 }
 
 async function portraitSplash(input, width, height, outName) {
-  const webp = await sharp(input).resize(width, height, { fit: 'cover', position: 'centre' })
+  const webp = await sharp(input)
+    .resize(width, height, { fit: 'contain', background: '#050508', position: 'centre' })
     .webp({ quality: 78, effort: 6 }).toBuffer();
   const base = outName.replace(/\.(png|webp)$/, '');
   await writeFile(join(OUT, `${base}.webp`), webp);
@@ -104,7 +105,8 @@ async function ogImage(splashInput) {
 }
 
 async function androidSplash(splashInput) {
-  const buf = await sharp(splashInput).resize(720, 1280, { fit: 'cover', position: 'centre' })
+  const buf = await sharp(splashInput)
+    .resize(720, 1280, { fit: 'contain', background: '#050508', position: 'centre' })
     .png({ compressionLevel: 9, effort: 10, palette: true }).toBuffer();
   await writeFile(join(OUT, 'splash-android.png'), buf);
   console.log('  ✓ splash-android.png');
@@ -157,10 +159,10 @@ export async function runPackageA() {
   await brandMarkFromButton(buttonSrc);
 
   console.log('Icons (alpha-trim + scaled fill):');
-  await squareIcon(iconSrc, 32, 'favicon-32.png', { fill: 0.9 });
-  await squareIcon(iconSrc, 192, 'icon-192.png', { fill: 0.86 });
-  await squareIcon(iconSrc, 512, 'icon-512.png', { fill: 0.86 });
-  await squareIcon(iconSrc, 180, 'apple-touch-icon.png', { fill: 0.86 });
+  await squareIcon(iconSrc, 32, 'favicon-32.png', { fill: 0.94 });
+  await squareIcon(iconSrc, 192, 'icon-192.png', { fill: 0.92 });
+  await squareIcon(iconSrc, 512, 'icon-512.png', { fill: 0.92 });
+  await squareIcon(iconSrc, 180, 'apple-touch-icon.png', { fill: 0.92 });
   const maskBuf = await renderMaskable(listenSrc, 512).then((p) => p.toBuffer());
   await writePngWebp(maskBuf, 'maskable-512');
   console.log('  ✓ maskable-512.png (safe zone)');

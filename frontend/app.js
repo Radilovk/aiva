@@ -21,30 +21,6 @@ function setRecordBtnLive(live) {
   recordBtn?.classList.toggle('live', live);
 }
 
-function dismissAppSplash() {
-  const splash = document.getElementById('appSplash');
-  if (!splash || splash.classList.contains('hide')) return;
-  splash.classList.add('hide');
-  splash.setAttribute('aria-hidden', 'true');
-  setTimeout(() => splash.remove(), 450);
-}
-
-function initAppSplash() {
-  const dismiss = () => dismissAppSplash();
-  if (document.documentElement.classList.contains('i18n-ready')) {
-    requestAnimationFrame(dismiss);
-  } else {
-    const obs = new MutationObserver(() => {
-      if (document.documentElement.classList.contains('i18n-ready')) {
-        obs.disconnect();
-        requestAnimationFrame(dismiss);
-      }
-    });
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-  }
-  setTimeout(dismiss, 3200);
-}
-
 // --- User ID ---
 function getUserId() {
   let id = localStorage.getItem('aiva_user_id');
@@ -627,6 +603,11 @@ function beginSessionEnd() {
 async function finalizeSessionEnd() {
   if (audioPlayer) {
     await audioPlayer.waitForDrain(30000);
+    const endMs = audioPlayer.getScheduledPlaybackEndMs?.() || 0;
+    const waitMs = Math.max(0, endMs - performance.now());
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
   }
   window.AIVA_HAPTICS?.endSpeechSession?.();
   if (isSessionActive) disconnectSession();
@@ -896,22 +877,9 @@ function updateRangeLabel(dates) {
   }
 }
 
-function paintTasksContainer(html, { animate = false, direction = 1 } = {}) {
-  if (!animate || !tasksContainer.firstElementChild) {
-    tasksContainer.innerHTML = html;
-    return;
-  }
-  tasksContainer.style.setProperty('--nav-dir', String(direction));
-  tasksContainer.classList.add('calendar-nav-out');
-  requestAnimationFrame(() => {
-    tasksContainer.innerHTML = html;
-    tasksContainer.classList.remove('calendar-nav-out');
-    tasksContainer.classList.add('calendar-nav-in');
-    requestAnimationFrame(() => {
-      tasksContainer.classList.remove('calendar-nav-in');
-      calendarNavLock = false;
-    });
-  });
+function paintTasksContainer(html) {
+  tasksContainer.innerHTML = html;
+  calendarNavLock = false;
 }
 
 function renderAgendaView(dates, renderOpts = {}) {
@@ -1741,7 +1709,6 @@ async function handleGeminiMessage(message) {
 
     case MultimodalLiveResponseType.AUDIO:
       assistantTurnComplete = false;
-      window.AIVA_HAPTICS?.beginSpeechSession?.();
       if (audioPlayer) await audioPlayer.play(message.data);
       break;
 
@@ -2308,7 +2275,6 @@ refreshExternalEvents();
 loadDailyBrief();
 initDeviceBanner();
 initPaywallUi();
-initAppSplash();
 
 function initPaywallUi() {
   document.getElementById('paywallDismissBtn')?.addEventListener('click', () => {
@@ -2359,10 +2325,12 @@ initHardwareShortcut();
 
 // Initialize notification scheduler
 if (window.AIVA_NOTIFIER) {
-  window.AIVA_NOTIFIER.init().then(() => {
-    if (assistantSettings.notifications?.enabled) {
-      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
+  window.AIVA_NOTIFIER.init().then(async () => {
+    if (!assistantSettings.notifications?.enabled) return;
+    if (window.Capacitor?.isNativePlatform?.()) {
+      await window.AIVA_NOTIFIER.requestPermission();
     }
+    window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
   });
 }
 

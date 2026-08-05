@@ -98,29 +98,7 @@
 
   function updateHeaderStatus() {
     const chip = document.getElementById('calendarSyncChip');
-    if (!chip) return;
-    const sync = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
-    const notif = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.notifications || {};
-
-    if (sync.setupComplete && sync.provider === 'subscribe') {
-      chip.hidden = false;
-      chip.textContent = t('chipSync');
-      chip.title = t('tipSync');
-    } else if (sync.setupComplete && sync.provider === 'native') {
-      chip.hidden = false;
-      chip.textContent = t('chipDevice');
-      chip.title = t('tipDevice');
-    } else if (sync.setupComplete && sync.provider === 'manual') {
-      chip.hidden = false;
-      chip.textContent = t('chipManual');
-      chip.title = t('tipManual');
-    } else {
-      chip.hidden = true;
-    }
-
-    if (notif.enabled && !chip.hidden) {
-      chip.textContent += ' · 🔔';
-    }
+    if (chip) chip.hidden = true;
   }
 
   function updateBanner(hasDatedTasks) {
@@ -311,10 +289,6 @@
 
     document.getElementById('calendarBannerConnect')?.addEventListener('click', () => {
       showModal(null);
-    });
-
-    document.getElementById('calendarSyncChip')?.addEventListener('click', () => {
-      window.location.href = './settings.html#calendar-sync';
     });
 
     modal.addEventListener('click', (e) => {
