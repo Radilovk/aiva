@@ -422,9 +422,7 @@ public class AivaActionsPlugin extends Plugin {
                 }
                 return new Intent(Settings.ACTION_WIFI_SETTINGS);
             case "bluetooth":
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    return new Intent(Settings.Panel.ACTION_BLUETOOTH);
-                }
+                // Settings.Panel has no ACTION_BLUETOOTH — only WIFI, NFC, VOLUME, INTERNET_CONNECTIVITY
                 return new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
             case "location":
                 return new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
