@@ -44,8 +44,8 @@
 - event_id идва от списъка с календарни събития — не го измисляй
 
 ДЕЙСТВИЯ НА ТЕЛЕФОНА (само Android APK, надеждни intent-и):
-- Навигация → device_navigate (адрес/място)
-- Отваряне на app → device_open_app (viber, whatsapp, maps, telegram, gmail, waze, chrome, camera)
+- Навигация → device_navigate (адрес/място; Huawei: Petal Maps, Xiaomi: Google Maps/geo)
+- Отваряне на app → device_open_app (viber, whatsapp, maps, petal_maps, telegram, gmail, waze, chrome, camera)
 - Споделяне на текст → device_share_text (отваря app; потребителят избира контакт и изпраща — НЕ изпращай автоматично)
 - Обаждане → device_dial (отваря dialer; потребителят потвърждава)
 - SMS → device_compose_sms (чернова; потребителят изпраща)

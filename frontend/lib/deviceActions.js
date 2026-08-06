@@ -2,18 +2,39 @@
  * Device Actions — reliable phone interactions via Android intents (APK)
  * or web fallbacks (PWA). No UI automation; user confirms sends/calls in
  * the target app where required.
+ *
+ * OEM notes (2025–2026):
+ * - Huawei/Honor: Petal Maps deep links (mapapp://) before geo:/browser
+ * - Xiaomi/MIUI/HyperOS: Activity context for settings; smsto: for SMS
+ * - Stock/Samsung: Google Maps / standard intents
  */
 (function () {
   const APP_CATALOG = {
-    viber: { packageName: 'com.viber.voip', label: 'Viber' },
-    whatsapp: { packageName: 'com.whatsapp', label: 'WhatsApp' },
-    telegram: { packageName: 'org.telegram.messenger', label: 'Telegram' },
-    gmail: { packageName: 'com.google.android.gm', label: 'Gmail' },
-    maps: { packageName: 'com.google.android.apps.maps', label: 'Google Maps' },
-    waze: { packageName: 'com.waze', label: 'Waze' },
-    chrome: { packageName: 'com.android.chrome', label: 'Chrome' },
-    camera: { packageName: 'com.android.camera2', label: 'Camera' },
-    settings: { packageName: 'android.settings.SETTINGS', label: 'Settings', isAction: true },
+    viber: { packageNames: ['com.viber.voip'], label: 'Viber' },
+    whatsapp: { packageNames: ['com.whatsapp'], label: 'WhatsApp' },
+    telegram: { packageNames: ['org.telegram.messenger'], label: 'Telegram' },
+    gmail: { packageNames: ['com.google.android.gm'], label: 'Gmail' },
+    maps: {
+      packageNames: ['com.google.android.apps.maps', 'com.huawei.maps.app'],
+      label: 'Maps',
+    },
+    petal_maps: { packageNames: ['com.huawei.maps.app'], label: 'Petal Maps' },
+    waze: { packageNames: ['com.waze'], label: 'Waze' },
+    chrome: {
+      packageNames: ['com.android.chrome', 'com.mi.globalbrowser', 'com.huawei.browser'],
+      label: 'Chrome',
+    },
+    camera: {
+      packageNames: [
+        'com.android.camera2',
+        'com.android.camera',
+        'com.huawei.camera',
+        'com.miui.camera',
+        'com.samsung.android.camera',
+      ],
+      label: 'Camera',
+    },
+    settings: { isAction: true, panel: 'main', label: 'Settings' },
   };
 
   const ACTION_LABELS = {
@@ -29,6 +50,7 @@
     search_maps: 'Търсене в карти',
     find_contacts: 'Търсене в контакти',
     schedule_reminder: 'Напомняне',
+    diagnostics: 'Диагностика',
   };
 
   function getPlugin() {
@@ -43,6 +65,10 @@
   function isEnabled() {
     const settings = window.AIVA_SETTINGS?.loadAssistantSettings?.();
     return settings?.deviceActions?.enabled !== false;
+  }
+
+  function getUserLanguage() {
+    return window.AIVA_SETTINGS?.loadAssistantSettings?.()?.profile?.language || 'bg';
   }
 
   async function nativeCall(method, payload) {
@@ -61,8 +87,16 @@
     const key = String(appId || '').trim().toLowerCase();
     if (!key) return null;
     if (APP_CATALOG[key]) return APP_CATALOG[key];
-    if (key.includes('.')) return { packageName: key, label: key };
+    if (key.includes('.')) return { packageNames: [key], label: key };
     return null;
+  }
+
+  function appPackageNames(app) {
+    if (!app) return [];
+    if (Array.isArray(app.packageNames) && app.packageNames.length) {
+      return app.packageNames;
+    }
+    return app.packageName ? [app.packageName] : [];
   }
 
   async function navigate(destination, mode = 'drive') {
@@ -70,7 +104,11 @@
     if (!dest) return { ok: false, error: 'destination required' };
 
     if (isNativeAndroid()) {
-      return nativeCall('navigateTo', { destination: dest, mode });
+      return nativeCall('navigateTo', {
+        destination: dest,
+        mode,
+        language: getUserLanguage(),
+      });
     }
 
     const encoded = encodeURIComponent(dest);
@@ -89,9 +127,13 @@
 
     if (isNativeAndroid()) {
       if (app.isAction) {
-        return nativeCall('openSystemSettings', { panel: 'main' });
+        return nativeCall('openSystemSettings', { panel: app.panel || 'main' });
       }
-      return nativeCall('openApp', { packageName: app.packageName });
+      const packageNames = appPackageNames(app);
+      if (!packageNames.length) {
+        return { ok: false, error: 'no package names for app' };
+      }
+      return nativeCall('openApp', { packageNames });
     }
 
     return { ok: false, error: 'open_app requires Android APK' };
@@ -113,11 +155,12 @@
     const body = String(text || '').trim();
     if (!body) return { ok: false, error: 'text required' };
     const app = appId ? resolveAppId(appId) : null;
+    const packages = app ? appPackageNames(app) : [];
 
     if (isNativeAndroid()) {
       return nativeCall('shareText', {
         text: body,
-        packageName: app?.packageName,
+        packageName: packages[0],
         title: 'KASY',
       });
     }
@@ -236,6 +279,30 @@
     return { ok: false, error: 'notifications unavailable' };
   }
 
+  async function runDiagnostics() {
+    if (!isNativeAndroid()) {
+      return { ok: true, platform: 'web', native: false };
+    }
+    return nativeCall('runDiagnostics', {});
+  }
+
+  async function listAvailableApps() {
+    if (!isNativeAndroid()) {
+      return { ok: true, apps: [], platform: 'web' };
+    }
+    return nativeCall('listAvailableApps', {});
+  }
+
+  async function canShareWith(appId) {
+    const app = resolveAppId(appId);
+    const packages = app ? appPackageNames(app) : [];
+    if (!packages.length) return { ok: false, error: `unknown app: ${appId}` };
+    if (!isNativeAndroid()) {
+      return { ok: true, available: !!navigator.share, installed: null };
+    }
+    return nativeCall('canShareWith', { packageName: packages[0] });
+  }
+
   async function handleTool(name, args) {
     if (!isEnabled()) {
       return { ok: false, error: 'device actions disabled in settings' };
@@ -291,7 +358,7 @@
     return [
       createTool(
         'device_navigate',
-        'Стартира навигация до адрес или място. Работи с Google Maps, Waze, Huawei Maps (geo fallback).',
+        'Стартира навигация до адрес или място. Huawei: Petal Maps; Xiaomi/други: Google Maps, Waze, geo fallback.',
         {
           destination: { type: 'string', description: 'Адрес или име на място' },
           mode: { type: 'string', enum: ['drive', 'walk'], description: 'Режим на пътуване' },
@@ -300,9 +367,9 @@
       ),
       createTool(
         'device_open_app',
-        `Отваря инсталирано приложение. Поддържани alias: ${apps}`,
+        `Отваря инсталирано приложение. Alias: ${apps}. На Huawei пробвай petal_maps; на Xiaomi fallback пакети за camera/chrome.`,
         {
-          app: { type: 'string', description: 'Име на приложение (viber, whatsapp, maps, ...)' },
+          app: { type: 'string', description: 'Име на приложение (viber, whatsapp, maps, petal_maps, ...)' },
         },
         ['app']
       ),
@@ -314,7 +381,7 @@
       ),
       createTool(
         'device_share_text',
-        'Споделя текст — отваря share sheet или конкретно app (viber, whatsapp, telegram). Потребителят избира контакт и изпраща.',
+        'Споделя текст — share sheet или конкретно app (viber, whatsapp, telegram). Потребителят избира контакт и изпраща.',
         {
           text: { type: 'string', description: 'Текст за споделяне' },
           app: { type: 'string', description: 'Опционално: viber, whatsapp, telegram' },
@@ -329,7 +396,7 @@
       ),
       createTool(
         'device_compose_sms',
-        'Отваря SMS app с попълнен номер и текст (потребителят изпраща).',
+        'Отваря SMS app с попълнен номер и текст (потребителят изпраща). Надеждно на MIUI чрез smsto: intent.',
         {
           phone: { type: 'string', description: 'Телефонен номер' },
           message: { type: 'string', description: 'Текст на съобщението' },
@@ -392,6 +459,7 @@
 
   function listTestActions() {
     return [
+      { id: 'diagnostics', label: '🔍 Диагностика OEM', run: () => runDiagnostics() },
       { id: 'navigate', label: 'Навигация → София', run: () => navigate('София, България') },
       { id: 'maps_search', label: 'Търси „бензиностанция“', run: () => searchMaps('бензиностанция') },
       { id: 'open_maps', label: 'Отвори Maps', run: () => openApp('maps') },
@@ -431,6 +499,9 @@
     searchMaps,
     findContacts,
     scheduleReminder,
+    runDiagnostics,
+    listAvailableApps,
+    canShareWith,
     handleTool,
     getGeminiTools,
     listTestActions,

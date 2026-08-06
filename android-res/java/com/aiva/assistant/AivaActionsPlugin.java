@@ -1,5 +1,7 @@
 package com.aiva.assistant;
 
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -22,12 +24,19 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Reliable Android device actions via system intents (no UI automation).
- * Works across stock Android, Xiaomi, Huawei, Samsung, etc. — with graceful
- * fallbacks when Google apps are missing (e.g. Huawei → geo: URI).
+ * OEM-aware device actions via Android intents (no UI automation).
+ *
+ * Tested strategy (2025–2026):
+ * - Huawei/Honor (no GMS): Petal Maps deep links → geo: URI
+ * - Xiaomi/MIUI/HyperOS: foreground Activity start + smsto: SENDTO for SMS
+ * - Stock/Samsung: Google Maps / standard intents
+ *
+ * @see https://developer.huawei.com/consumer/en/doc/HMSCore-Guides/petal-maps-application-navigation-0000001060038018
+ * @see https://developer.android.com/training/package-visibility/declaring
  */
 @CapacitorPlugin(
     name = "AivaActions",
@@ -37,14 +46,57 @@ import java.util.List;
 )
 public class AivaActionsPlugin extends Plugin {
 
-    private boolean launch(Intent intent) {
+    private static final String PKG_GOOGLE_MAPS = "com.google.android.apps.maps";
+    private static final String PKG_PETAL_MAPS = "com.huawei.maps.app";
+    private static final String PKG_WAZE = "com.waze";
+    private static final String PKG_WHATSAPP = "com.whatsapp";
+
+    private String detectOem() {
+        String m = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase();
+        if (m.contains("xiaomi") || m.contains("redmi") || m.contains("poco")) return "xiaomi";
+        if (m.contains("huawei") || m.contains("honor")) return "huawei";
+        if (m.contains("samsung")) return "samsung";
+        if (m.contains("oppo") || m.contains("realme")) return "oppo";
+        if (m.contains("vivo") || m.contains("iqoo")) return "vivo";
+        return "stock";
+    }
+
+    private boolean isInstalled(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return false;
         try {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
+            getContext().getPackageManager().getPackageInfo(packageName, 0);
             return true;
-        } catch (Exception e) {
+        } catch (PackageManager.NameNotFoundException e) {
             return false;
         }
+    }
+
+    /** Prefer Activity context — required for Settings panels on MIUI/HyperOS. */
+    private LaunchResult launch(Intent intent) {
+        try {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            Activity activity = getActivity();
+            if (activity != null) {
+                activity.startActivity(intent);
+            } else {
+                getContext().startActivity(intent);
+            }
+            return LaunchResult.ok(null);
+        } catch (ActivityNotFoundException e) {
+            return LaunchResult.fail("activity_not_found");
+        } catch (SecurityException e) {
+            return LaunchResult.fail("security_denied");
+        } catch (Exception e) {
+            return LaunchResult.fail(e.getMessage() != null ? e.getMessage() : "launch_failed");
+        }
+    }
+
+    private LaunchResult tryLaunch(Intent intent, String method) {
+        LaunchResult result = launch(intent);
+        if (result.ok) {
+            result.method = method;
+        }
+        return result;
     }
 
     private void resolveOk(PluginCall call, JSObject extra) {
@@ -60,6 +112,15 @@ public class AivaActionsPlugin extends Plugin {
         call.resolve(result);
     }
 
+    private String navMode(String mode) {
+        if (mode == null) return "drive";
+        String m = mode.toLowerCase();
+        if ("walk".equals(m) || "walking".equals(m)) return "walk";
+        if ("bicycle".equals(m) || "bike".equals(m)) return "bicycle";
+        if ("bus".equals(m) || "transit".equals(m)) return "bus";
+        return "drive";
+    }
+
     @PluginMethod
     public void navigateTo(PluginCall call) {
         String destination = call.getString("destination");
@@ -67,33 +128,70 @@ public class AivaActionsPlugin extends Plugin {
             resolveErr(call, "destination required");
             return;
         }
-        String encoded = Uri.encode(destination.trim());
-        String mode = call.getString("mode", "drive");
+        String dest = destination.trim();
+        String encoded = Uri.encode(dest);
+        String mode = navMode(call.getString("mode", "drive"));
+        String oem = detectOem();
+        String lang = call.getString("language", "bg");
 
-        // 1) Google Maps navigation (best on GMS devices)
-        Intent nav = new Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + encoded));
-        nav.setPackage("com.google.android.apps.maps");
-        if (launch(nav)) {
-            resolveOk(call, new JSObject().put("method", "google_navigation"));
-            return;
+        List<IntentAttempt> attempts = new ArrayList<>();
+
+        if ("huawei".equals(oem) || isInstalled(PKG_PETAL_MAPS)) {
+            attempts.add(new IntentAttempt(
+                "petal_mapapp",
+                new Intent(Intent.ACTION_VIEW, Uri.parse(
+                    "mapapp://navigation?saddr=&daddr=" + encoded + "&language=" + lang + "&type=" + mode
+                ))
+            ));
+            attempts.add(new IntentAttempt(
+                "petal_route",
+                new Intent(Intent.ACTION_VIEW, Uri.parse(
+                    "petalmaps://route?saddr=&daddr=" + encoded + "&type=" + mode
+                ))
+            ));
+            if (isInstalled(PKG_PETAL_MAPS)) {
+                Intent petalGeo = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + encoded));
+                petalGeo.setPackage(PKG_PETAL_MAPS);
+                attempts.add(new IntentAttempt("petal_geo", petalGeo));
+            }
         }
 
-        // 2) Any maps app via geo URI (Huawei Petal Maps, Waze sideload, etc.)
-        Intent geo = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + encoded));
-        if (launch(geo)) {
-            resolveOk(call, new JSObject().put("method", "geo_uri"));
-            return;
+        if (isInstalled(PKG_GOOGLE_MAPS)) {
+            Intent gNav = new Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + encoded));
+            gNav.setPackage(PKG_GOOGLE_MAPS);
+            attempts.add(new IntentAttempt("google_navigation", gNav));
         }
 
-        // 3) Browser fallback
-        String travel = "driving".equalsIgnoreCase(mode) ? "driving" : "walking";
-        Intent browser = new Intent(
-            Intent.ACTION_VIEW,
-            Uri.parse("https://www.google.com/maps/dir/?api=1&destination=" + encoded + "&travelmode=" + travel)
-        );
-        if (launch(browser)) {
-            resolveOk(call, new JSObject().put("method", "browser_maps"));
-            return;
+        if (isInstalled(PKG_WAZE)) {
+            Intent waze = new Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://waze.com/ul?q=" + encoded + "&navigate=yes"));
+            waze.setPackage(PKG_WAZE);
+            attempts.add(new IntentAttempt("waze", waze));
+        }
+
+        // Universal — any maps app (Petal on Huawei sideload, etc.)
+        attempts.add(new IntentAttempt(
+            "geo_uri",
+            new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + encoded))
+        ));
+
+        String travel = "walk".equals(mode) ? "walking" : "driving";
+        attempts.add(new IntentAttempt(
+            "browser_maps",
+            new Intent(Intent.ACTION_VIEW, Uri.parse(
+                "https://www.google.com/maps/dir/?api=1&destination=" + encoded + "&travelmode=" + travel
+            ))
+        ));
+
+        for (IntentAttempt attempt : attempts) {
+            LaunchResult lr = tryLaunch(attempt.intent, attempt.method);
+            if (lr.ok) {
+                JSObject result = new JSObject();
+                result.put("method", lr.method);
+                result.put("oem", oem);
+                resolveOk(call, result);
+                return;
+            }
         }
 
         resolveErr(call, "no maps app available");
@@ -101,21 +199,39 @@ public class AivaActionsPlugin extends Plugin {
 
     @PluginMethod
     public void openApp(PluginCall call) {
-        String packageName = call.getString("packageName");
-        if (packageName == null || packageName.trim().isEmpty()) {
+        JSArray packages = call.getArray("packageNames");
+        String single = call.getString("packageName");
+        List<String> names = new ArrayList<>();
+        if (packages != null) {
+            for (int i = 0; i < packages.length(); i++) {
+                try {
+                    String pkg = packages.getString(i);
+                    if (pkg != null && !pkg.trim().isEmpty()) names.add(pkg.trim());
+                } catch (Exception ignored) { /* skip */ }
+            }
+        }
+        if (single != null && !single.trim().isEmpty()) {
+            names.add(single.trim());
+        }
+        if (names.isEmpty()) {
             resolveErr(call, "packageName required");
             return;
         }
-        packageName = packageName.trim();
 
         PackageManager pm = getContext().getPackageManager();
-        Intent launch = pm.getLaunchIntentForPackage(packageName);
-        if (launch != null && launch(launch)) {
-            resolveOk(call, new JSObject().put("packageName", packageName));
-            return;
+        for (String packageName : names) {
+            Intent launch = pm.getLaunchIntentForPackage(packageName);
+            if (launch == null) continue;
+            LaunchResult lr = tryLaunch(launch, "launch_intent");
+            if (lr.ok) {
+                JSObject result = new JSObject();
+                result.put("packageName", packageName);
+                resolveOk(call, result);
+                return;
+            }
         }
 
-        resolveErr(call, "app not installed: " + packageName);
+        resolveErr(call, "app not installed: " + String.join(", ", names));
     }
 
     @PluginMethod
@@ -129,12 +245,12 @@ public class AivaActionsPlugin extends Plugin {
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
             trimmed = "https://" + trimmed;
         }
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(trimmed));
-        if (launch(intent)) {
+        LaunchResult lr = tryLaunch(new Intent(Intent.ACTION_VIEW, Uri.parse(trimmed)), "browser");
+        if (lr.ok) {
             resolveOk(call, new JSObject().put("url", trimmed));
-            return;
+        } else {
+            resolveErr(call, "cannot open url");
         }
-        resolveErr(call, "cannot open url");
     }
 
     @PluginMethod
@@ -144,25 +260,41 @@ public class AivaActionsPlugin extends Plugin {
             resolveErr(call, "text required");
             return;
         }
+        String body = text.trim();
         String packageName = call.getString("packageName");
 
-        Intent send = new Intent(Intent.ACTION_SEND);
-        send.setType("text/plain");
-        send.putExtra(Intent.EXTRA_TEXT, text.trim());
         if (packageName != null && !packageName.trim().isEmpty()) {
-            send.setPackage(packageName.trim());
-            if (launch(send)) {
-                resolveOk(call, new JSObject().put("packageName", packageName.trim()));
+            String pkg = packageName.trim();
+            // WhatsApp deep link fallback (works when setPackage fails on some MIUI builds)
+            if (PKG_WHATSAPP.equals(pkg) || "com.whatsapp".equals(pkg)) {
+                LaunchResult wa = tryLaunch(new Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://wa.me/?text=" + Uri.encode(body))), "whatsapp_deeplink");
+                if (wa.ok) {
+                    resolveOk(call, new JSObject().put("method", "whatsapp_deeplink"));
+                    return;
+                }
+            }
+            Intent targeted = new Intent(Intent.ACTION_SEND);
+            targeted.setType("text/plain");
+            targeted.putExtra(Intent.EXTRA_TEXT, body);
+            targeted.setPackage(pkg);
+            LaunchResult lr = tryLaunch(targeted, "share_targeted");
+            if (lr.ok) {
+                resolveOk(call, new JSObject().put("packageName", pkg));
                 return;
             }
         }
 
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_TEXT, body);
         Intent chooser = Intent.createChooser(send, call.getString("title", "Share"));
-        if (launch(chooser)) {
+        LaunchResult lr = tryLaunch(chooser, "share_chooser");
+        if (lr.ok) {
             resolveOk(call, new JSObject().put("method", "chooser"));
-            return;
+        } else {
+            resolveErr(call, "cannot share");
         }
-        resolveErr(call, "cannot share");
     }
 
     @PluginMethod
@@ -173,12 +305,15 @@ public class AivaActionsPlugin extends Plugin {
             return;
         }
         String digits = phone.trim().replaceAll("[^+0-9*#]", "");
-        Intent intent = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + digits));
-        if (launch(intent)) {
+        LaunchResult lr = tryLaunch(
+            new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + digits)),
+            "dial"
+        );
+        if (lr.ok) {
             resolveOk(call, new JSObject().put("phone", digits));
-            return;
+        } else {
+            resolveErr(call, "cannot open dialer");
         }
-        resolveErr(call, "cannot open dialer");
     }
 
     @PluginMethod
@@ -190,13 +325,25 @@ public class AivaActionsPlugin extends Plugin {
             return;
         }
         String digits = phone.trim().replaceAll("[^+0-9]", "");
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("sms:" + digits));
-        intent.putExtra("sms_body", message != null ? message : "");
-        if (launch(intent)) {
+
+        // smsto: + SENDTO is most reliable on MIUI / HyperOS / stock
+        Intent sendTo = new Intent(Intent.ACTION_SENDTO);
+        sendTo.setData(Uri.parse("smsto:" + digits));
+        sendTo.putExtra("sms_body", message != null ? message : "");
+        LaunchResult lr = tryLaunch(sendTo, "smsto_sendto");
+        if (lr.ok) {
             resolveOk(call, new JSObject().put("phone", digits));
             return;
         }
-        resolveErr(call, "cannot open sms app");
+
+        Intent viewSms = new Intent(Intent.ACTION_VIEW, Uri.parse("sms:" + digits));
+        viewSms.putExtra("sms_body", message != null ? message : "");
+        lr = tryLaunch(viewSms, "sms_view");
+        if (lr.ok) {
+            resolveOk(call, new JSObject().put("phone", digits));
+        } else {
+            resolveErr(call, "cannot open sms app");
+        }
     }
 
     @PluginMethod
@@ -214,14 +361,15 @@ public class AivaActionsPlugin extends Plugin {
         intent.putExtra(AlarmClock.EXTRA_MINUTES, minutes);
         intent.putExtra(AlarmClock.EXTRA_MESSAGE, message);
         intent.putExtra(AlarmClock.EXTRA_SKIP_UI, false);
-        if (launch(intent)) {
+        LaunchResult lr = tryLaunch(intent, "alarm");
+        if (lr.ok) {
             JSObject result = new JSObject();
             result.put("hour", hour);
             result.put("minutes", minutes);
             resolveOk(call, result);
-            return;
+        } else {
+            resolveErr(call, "no clock app available");
         }
-        resolveErr(call, "no clock app available");
     }
 
     @PluginMethod
@@ -244,44 +392,52 @@ public class AivaActionsPlugin extends Plugin {
     @PluginMethod
     public void openSystemSettings(PluginCall call) {
         String panel = call.getString("panel", "main");
-        Intent intent;
+        Intent intent = buildSettingsIntent(panel.toLowerCase());
 
-        switch (panel.toLowerCase()) {
-            case "wifi":
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    intent = new Intent(Settings.Panel.ACTION_WIFI);
-                } else {
-                    intent = new Intent(Settings.ACTION_WIFI_SETTINGS);
-                }
-                break;
-            case "bluetooth":
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    intent = new Intent(Settings.Panel.ACTION_BLUETOOTH);
-                } else {
-                    intent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
-                }
-                break;
-            case "location":
-                intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                break;
-            case "battery":
-                intent = new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS);
-                break;
-            case "app":
-            case "app_details":
-                intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                intent.setData(Uri.parse("package:" + getContext().getPackageName()));
-                break;
-            default:
-                intent = new Intent(Settings.ACTION_SETTINGS);
-                break;
-        }
-
-        if (launch(intent)) {
+        LaunchResult lr = tryLaunch(intent, "settings_" + panel);
+        if (lr.ok) {
             resolveOk(call, new JSObject().put("panel", panel));
             return;
         }
+
+        // MIUI/Huawei sometimes block Settings.Panel — fall back to full settings page
+        if (!"main".equals(panel.toLowerCase())) {
+            lr = tryLaunch(buildSettingsIntent("main"), "settings_main_fallback");
+            if (lr.ok) {
+                JSObject result = new JSObject();
+                result.put("panel", panel);
+                result.put("fallback", "main");
+                resolveOk(call, result);
+                return;
+            }
+        }
         resolveErr(call, "cannot open settings");
+    }
+
+    private Intent buildSettingsIntent(String panel) {
+        switch (panel) {
+            case "wifi":
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    return new Intent(Settings.Panel.ACTION_WIFI);
+                }
+                return new Intent(Settings.ACTION_WIFI_SETTINGS);
+            case "bluetooth":
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    return new Intent(Settings.Panel.ACTION_BLUETOOTH);
+                }
+                return new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+            case "location":
+                return new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            case "battery":
+                return new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS);
+            case "app":
+            case "app_details":
+                Intent app = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                app.setData(Uri.parse("package:" + getContext().getPackageName()));
+                return app;
+            default:
+                return new Intent(Settings.ACTION_SETTINGS);
+        }
     }
 
     @PluginMethod
@@ -292,30 +448,31 @@ public class AivaActionsPlugin extends Plugin {
             return;
         }
         String encoded = Uri.encode(query.trim());
+        String oem = detectOem();
 
-        Intent maps = new Intent(
-            Intent.ACTION_VIEW,
-            Uri.parse("https://www.google.com/maps/search/?api=1&query=" + encoded)
-        );
-        maps.setPackage("com.google.android.apps.maps");
-        if (launch(maps)) {
-            resolveOk(call, new JSObject().put("method", "google_maps_search"));
-            return;
+        List<IntentAttempt> attempts = new ArrayList<>();
+        if ("huawei".equals(oem) || isInstalled(PKG_PETAL_MAPS)) {
+            Intent petal = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + encoded));
+            petal.setPackage(PKG_PETAL_MAPS);
+            attempts.add(new IntentAttempt("petal_search", petal));
         }
-
-        Intent geo = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + encoded));
-        if (launch(geo)) {
-            resolveOk(call, new JSObject().put("method", "geo_search"));
-            return;
+        if (isInstalled(PKG_GOOGLE_MAPS)) {
+            Intent maps = new Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://www.google.com/maps/search/?api=1&query=" + encoded));
+            maps.setPackage(PKG_GOOGLE_MAPS);
+            attempts.add(new IntentAttempt("google_maps_search", maps));
         }
+        attempts.add(new IntentAttempt("geo_search",
+            new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + encoded))));
+        attempts.add(new IntentAttempt("browser_search", new Intent(Intent.ACTION_VIEW,
+            Uri.parse("https://www.google.com/maps/search/?api=1&query=" + encoded))));
 
-        Intent browser = new Intent(
-            Intent.ACTION_VIEW,
-            Uri.parse("https://www.google.com/maps/search/?api=1&query=" + encoded)
-        );
-        if (launch(browser)) {
-            resolveOk(call, new JSObject().put("method", "browser_search"));
-            return;
+        for (IntentAttempt attempt : attempts) {
+            LaunchResult lr = tryLaunch(attempt.intent, attempt.method);
+            if (lr.ok) {
+                resolveOk(call, new JSObject().put("method", lr.method));
+                return;
+            }
         }
         resolveErr(call, "cannot search maps");
     }
@@ -394,27 +551,27 @@ public class AivaActionsPlugin extends Plugin {
 
     @PluginMethod
     public void listAvailableApps(PluginCall call) {
-        JSArray apps = new JSArray();
         String[] known = {
-            "com.viber.voip", "com.whatsapp", "org.telegram.messenger",
-            "com.google.android.gm", "com.google.android.apps.maps",
-            "com.waze", "com.android.chrome", "com.android.camera2",
-            "com.huawei.maps.app", "com.huawei.android.launcher",
+            "com.viber.voip", PKG_WHATSAPP, "org.telegram.messenger",
+            "com.google.android.gm", PKG_GOOGLE_MAPS, PKG_WAZE,
+            "com.android.chrome", "com.android.camera2", "com.android.camera",
+            PKG_PETAL_MAPS, "com.miui.securitycenter", "com.huawei.browser",
+            "com.mi.globalbrowser", "com.sec.android.app.clockpackage",
         };
+        JSArray apps = new JSArray();
         PackageManager pm = getContext().getPackageManager();
         for (String pkg : known) {
+            if (!isInstalled(pkg)) continue;
             try {
-                pm.getPackageInfo(pkg, 0);
                 JSObject row = new JSObject();
                 row.put("packageName", pkg);
                 row.put("label", pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString());
                 apps.put(row);
-            } catch (PackageManager.NameNotFoundException ignored) {
-                // not installed
-            }
+            } catch (Exception ignored) { /* skip */ }
         }
         JSObject result = new JSObject();
         result.put("apps", apps);
+        result.put("oem", detectOem());
         resolveOk(call, result);
     }
 
@@ -432,6 +589,90 @@ public class AivaActionsPlugin extends Plugin {
             .queryIntentActivities(probe, PackageManager.MATCH_DEFAULT_ONLY);
         JSObject result = new JSObject();
         result.put("available", handlers != null && !handlers.isEmpty());
+        result.put("installed", isInstalled(packageName.trim()));
         resolveOk(call, result);
+    }
+
+    /** Self-test: which handlers are installed / launchable on this device. */
+    @PluginMethod
+    public void runDiagnostics(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("oem", detectOem());
+        out.put("manufacturer", Build.MANUFACTURER);
+        out.put("brand", Build.BRAND);
+        out.put("sdkInt", Build.VERSION.SDK_INT);
+
+        JSArray checks = new JSArray();
+        checks.put(diag("google_maps", isInstalled(PKG_GOOGLE_MAPS)));
+        checks.put(diag("petal_maps", isInstalled(PKG_PETAL_MAPS)));
+        checks.put(diag("waze", isInstalled(PKG_WAZE)));
+        checks.put(diag("viber", isInstalled("com.viber.voip")));
+        checks.put(diag("whatsapp", isInstalled(PKG_WHATSAPP)));
+        checks.put(diag("telegram", isInstalled("org.telegram.messenger")));
+        checks.put(diag("contacts_permission", hasContactsPermission()));
+
+        // Dry-run launch probes (don't actually open — check resolve where possible)
+        checks.put(diagLaunch("geo_uri", new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=test"))));
+        checks.put(diagLaunch("tel_dial", new Intent(Intent.ACTION_DIAL, Uri.parse("tel:123"))));
+        checks.put(diagLaunch("smsto", new Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:123"))));
+        checks.put(diagLaunch("alarm", new Intent(AlarmClock.ACTION_SET_ALARM)));
+
+        out.put("checks", checks);
+        out.put("ok", true);
+        call.resolve(out);
+    }
+
+    private JSObject diag(String name, boolean value) {
+        JSObject row = new JSObject();
+        row.put("name", name);
+        row.put("ok", value);
+        return row;
+    }
+
+    private JSObject diagLaunch(String name, Intent intent) {
+        JSObject row = new JSObject();
+        row.put("name", name);
+        try {
+            Activity activity = getActivity();
+            Context ctx = activity != null ? activity : getContext();
+            boolean can = intent.resolveActivity(ctx.getPackageManager()) != null;
+            row.put("ok", can);
+            row.put("resolvable", can);
+        } catch (Exception e) {
+            row.put("ok", false);
+            row.put("error", e.getMessage());
+        }
+        return row;
+    }
+
+    private static final class IntentAttempt {
+        final String method;
+        final Intent intent;
+
+        IntentAttempt(String method, Intent intent) {
+            this.method = method;
+            this.intent = intent;
+        }
+    }
+
+    private static final class LaunchResult {
+        final boolean ok;
+        final String error;
+        String method;
+
+        private LaunchResult(boolean ok, String error) {
+            this.ok = ok;
+            this.error = error;
+        }
+
+        static LaunchResult ok(String method) {
+            LaunchResult r = new LaunchResult(true, null);
+            r.method = method;
+            return r;
+        }
+
+        static LaunchResult fail(String error) {
+            return new LaunchResult(false, error);
+        }
     }
 }
