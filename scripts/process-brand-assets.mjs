@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { renderSquareIcon } from './lib/brand-icon-prep.mjs';
-import { renderApkLegacy } from './lib/android-icon.mjs';
+import { renderApkLegacy, APP_WINDOW_BG } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -105,6 +105,17 @@ export async function processBrandAssets() {
   const m512 = await sharp(icon512Buf).metadata();
   console.log(`  ✓ frontend/icons/icon-512.png (${m512.width}×${m512.height})`);
   console.log(`  ✓ frontend/icons/icon-512.webp (${(icon512Webp.length / 1024).toFixed(1)} KB)`);
+
+  // iOS изисква непрозрачна apple-touch икона — кръглият диск върху тъмния
+  // бранд фон (iOS сам заобля ъглите)
+  const appleTouch = await sharp({
+    create: { width: 180, height: 180, channels: 4, background: APP_WINDOW_BG },
+  })
+    .composite([{ input: await renderApkLegacy(icon512Src, 180).then((p) => p.png().toBuffer()) }])
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+  await writeFile(join(OUT, 'apple-touch-icon.png'), appleTouch);
+  console.log('  ✓ frontend/icons/apple-touch-icon.png (180×180, opaque)');
 
   // Из суровия източник (не от кръглия диск) — status-bar иконата е силует
   const notif = await sharp(icon192Src)

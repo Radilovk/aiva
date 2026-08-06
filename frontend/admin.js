@@ -9,8 +9,6 @@ const temperatureField = document.getElementById('temperature');
 const temperatureValue = document.getElementById('temperatureValue');
 const responseAudioField = document.getElementById('responseAudio');
 const responseTextField = document.getElementById('responseText');
-const inputAudioTranscriptionField = document.getElementById('inputAudioTranscription');
-const outputAudioTranscriptionField = document.getElementById('outputAudioTranscription');
 const googleGroundingField = document.getElementById('googleGrounding');
 const vadDisabledField = document.getElementById('vadDisabled');
 const silenceDurationField = document.getElementById('silenceDuration');
@@ -57,8 +55,6 @@ function renderSettings(settings) {
   temperatureValue.textContent = Number(settings.temperature).toFixed(1);
   responseAudioField.checked = settings.responseModalities.includes('AUDIO');
   responseTextField.checked = settings.responseModalities.includes('TEXT');
-  inputAudioTranscriptionField.checked = settings.inputAudioTranscription;
-  outputAudioTranscriptionField.checked = settings.outputAudioTranscription;
   googleGroundingField.checked = settings.googleGrounding;
   vadDisabledField.checked = settings.automaticActivityDetection.disabled;
   silenceDurationField.value = settings.automaticActivityDetection.silence_duration_ms;
@@ -93,8 +89,6 @@ function collectSettings() {
     voiceName: voiceField.value,
     temperature: Number(temperatureField.value),
     responseModalities: getModalities(existing),
-    inputAudioTranscription: inputAudioTranscriptionField.checked,
-    outputAudioTranscription: outputAudioTranscriptionField.checked,
     googleGrounding: googleGroundingField.checked,
     automaticActivityDetection: {
       disabled: vadDisabledField.checked,
@@ -144,8 +138,8 @@ function renderPreview(settings) {
           },
         },
       },
-      inputAudioTranscription: settings.inputAudioTranscription ? {} : undefined,
-      outputAudioTranscription: settings.outputAudioTranscription ? {} : undefined,
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
       googleGrounding: settings.googleGrounding,
       realtimeInputConfig: {
         automaticActivityDetection: settings.automaticActivityDetection,
