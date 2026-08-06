@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v43';
+const CACHE_NAME = 'aiva-v44';
 const ASSETS = [
   'index.html',
   'landing.html',
@@ -98,6 +98,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Код и конфигурация: мрежата е източник на истината, кешът е само за
+  // офлайн. Cache-first тук замразяваше стари версии на app.js/settings.js
+  // на устройствата, докато някой не вдигне ръчно CACHE_NAME.
+  const dest = event.request.destination;
+  if (dest === 'script' || dest === 'style' || dest === 'worker'
+    || dest === 'audioworklet' || dest === 'manifest' || url.pathname.endsWith('.json')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Изображения, шрифтове и др. статични ресурси: кешът е пръв, мрежата
+  // обновява на заден план
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const networkFetch = fetch(event.request).then((response) => {

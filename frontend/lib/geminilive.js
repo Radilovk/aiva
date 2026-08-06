@@ -180,6 +180,9 @@ class GeminiLiveAPI {
     this.connected = false;
     this.webSocket = null;
     this.lastSetupMessage = null; // Store the last setup message
+    // Session resumption: сървърът праща handle, с който при прекъсната
+    // връзка сесията се възстановява с целия контекст на разговора
+    this.sessionResumptionHandle = null;
 
     // Default callbacks
     this.onReceiveResponse = (message) => {
@@ -257,6 +260,12 @@ class GeminiLiveAPI {
     this.setupWebSocketToService();
   }
 
+  /** Нов ефимерен токен за reconnect — URL-ът носи token-а като параметър. */
+  updateToken(token) {
+    this.token = token;
+    this.serviceUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(this.token)}`;
+  }
+
   disconnect() {
     if (this.webSocket) {
       this.webSocket.close();
@@ -282,6 +291,14 @@ class GeminiLiveAPI {
 
     try {
       const messageData = JSON.parse(jsonData);
+      // Session resumption handle — пази се в клиента, не стига до app слоя
+      if (messageData?.sessionResumptionUpdate) {
+        const update = messageData.sessionResumptionUpdate;
+        if (update.resumable && update.newHandle) {
+          this.sessionResumptionHandle = update.newHandle;
+        }
+        return;
+      }
       // Parse all response types from this message (audio + transcription can coexist)
       const responses = parseResponseMessages(messageData);
       for (const response of responses) {
@@ -373,6 +390,11 @@ class GeminiLiveAPI {
     if (this.outputAudioTranscription) {
       sessionSetupMessage.setup.outputAudioTranscription = {};
     }
+
+    // Винаги искаме resumption handle; при наличен — възстановяваме сесията
+    sessionSetupMessage.setup.sessionResumption = this.sessionResumptionHandle
+      ? { handle: this.sessionResumptionHandle }
+      : {};
 
     if (this.googleGrounding) {
       // The Live API accepts multiple tool entries, so keep the custom

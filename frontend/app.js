@@ -98,6 +98,9 @@ let sessionEnding = false;
 let sessionEndTimer = null;
 let awaitingGreetingMic = false;
 let greetingMicTimer = null;
+let reconnectAttempts = 0;
+let resumingSession = false;
+const MAX_RECONNECT_ATTEMPTS = 2;
 
 function setMicUplinkMuted(muted) {
   audioStreamer?.setUplinkMuted(muted);
@@ -110,11 +113,63 @@ async function tryUnmuteMicAfterAssistant() {
 
 function onAssistantPlaybackStateChange(isPlaying) {
   if (isPlaying) {
-    setMicUplinkMuted(true);
+    // При barge-in микрофонът остава отворен, докато асистентът говори —
+    // ехото се маха от echoCancellation на capture потока, а сървърният VAD
+    // праща INTERRUPTED при реално прекъсване от потребителя.
+    if (!assistantSettings.bargeInEnabled || sessionEnding) {
+      setMicUplinkMuted(true);
+    }
     window.AIVA_HAPTICS?.touchSpeechSession?.();
     return;
   }
   tryUnmuteMicAfterAssistant();
+}
+
+// --- Wake lock: екранът не гасне по време на гласова сесия (изгаснал екран
+// суспендира WebView-то и убива микрофона тихо) ---
+let wakeLock = null;
+
+async function acquireWakeLock() {
+  if (wakeLock || !('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (_e) {
+    wakeLock = null;
+  }
+}
+
+function releaseWakeLock() {
+  try {
+    wakeLock?.release?.();
+  } catch (_e) { /* ok */ }
+  wakeLock = null;
+}
+
+document.addEventListener('visibilitychange', () => {
+  // ОС освобождава wake lock-а при скриване — при връщане го взимаме пак
+  if (document.visibilityState === 'visible' && isSessionActive) acquireWakeLock();
+});
+
+// --- Тишина: ако моделът така и не извика end_session и никой не казва
+// нищо, сесията не бива да виси с отворен микрофон безкрайно ---
+const SESSION_IDLE_TIMEOUT_MS = 120000;
+let sessionIdleTimer = null;
+
+function clearSessionIdleTimer() {
+  if (sessionIdleTimer) {
+    clearTimeout(sessionIdleTimer);
+    sessionIdleTimer = null;
+  }
+}
+
+function touchSessionActivity() {
+  if (!isSessionActive && !isConnecting) return;
+  clearSessionIdleTimer();
+  sessionIdleTimer = setTimeout(() => {
+    sessionIdleTimer = null;
+    if (isSessionActive && !sessionEnding) disconnectSession();
+  }, SESSION_IDLE_TIMEOUT_MS);
 }
 
 // --- save_task tool (Gemini function declaration format) ---
@@ -560,11 +615,11 @@ const SESSION_END_FALLBACK_MS = 15000;
 function armSessionEnd() {
   if (sessionEnding) return;
   sessionEnding = true;
+  // Само заглушаваме uplink-а. Спирането на микрофона (audioStreamer.stop)
+  // затваря capture AudioContext-а и Android превключва аудио маршрута
+  // насред прощалната реплика — гласът насича/глъхне. Реалното спиране
+  // става в disconnectSession, след като аудиото дозвучи.
   setMicUplinkMuted(true);
-  if (audioStreamer) {
-    audioStreamer.stop();
-    audioStreamer = null;
-  }
 }
 
 function finishSessionEndUi() {
@@ -618,6 +673,45 @@ async function finalizeSessionEnd() {
  */
 function scheduleSessionEnd() {
   requestSessionEndAfterFarewell({ finalizeIfIdle: true });
+}
+
+/**
+ * WS падна. При нормален край или неактивна сесия — обичайното затваряне;
+ * при жива сесия — до MAX_RECONNECT_ATTEMPTS опита за възстановяване със
+ * session resumption handle (контекстът на разговора се запазва).
+ */
+async function handleSocketClose() {
+  if (!isSessionActive) {
+    // WS затворен още преди SETUP_COMPLETE (отхвърлен setup, лош токен) —
+    // иначе UI остава завинаги на „Свързване…"
+    if (isConnecting) {
+      showError(t('errConnect'));
+      disconnectSession();
+    }
+    return;
+  }
+  if (sessionEnding) {
+    disconnectSession();
+    return;
+  }
+  if (!client || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    showError(t('errConnect'));
+    disconnectSession();
+    return;
+  }
+  reconnectAttempts += 1;
+  resumingSession = true;
+  setStatus(t('connecting'), true);
+  await new Promise((resolve) => setTimeout(resolve, 700 * reconnectAttempts));
+  if (!isSessionActive || sessionEnding || !client) return;
+  try {
+    client.updateToken(await fetchToken());
+    client.connect();
+  } catch (e) {
+    console.error('Reconnect failed:', e);
+    showError(t('errConnect'));
+    disconnectSession();
+  }
 }
 
 let errorToastTimer = null;
@@ -1674,10 +1768,30 @@ function getTaskById(id) {
 
 // --- Gemini message handling (from official script.js pattern) ---
 async function handleGeminiMessage(message) {
+  touchSessionActivity();
   switch (message.type) {
     case MultimodalLiveResponseType.SETUP_COMPLETE:
+      reconnectAttempts = 0;
+      acquireWakeLock();
       setStatus(t('listening'), true);
       waveform.classList.add('active');
+      if (resumingSession) {
+        // Възстановена сесия след прекъсната връзка: без ново поздравление,
+        // микрофонът продължава (стриймърът не е спиран при WS drop)
+        resumingSession = false;
+        isSessionActive = true;
+        try {
+          await ensureMicStreaming();
+          // Прекъснатият ход на асистента е загубен — отпушваме uplink-а,
+          // за да не остане микрофонът ням след възстановяване
+          setMicUplinkMuted(false);
+        } catch (e) {
+          console.error('Mic resume failed:', e);
+          showError(t('errMicrophone'));
+          disconnectSession();
+        }
+        break;
+      }
       awaitingGreetingMic = true;
       try {
         isSessionActive = true;
@@ -1895,12 +2009,14 @@ async function connectSession() {
 
     client.onReceiveResponse = handleGeminiMessage;
     client.onOpen = () => setStatus(t('connecting'), true);
-    client.onClose = () => {
-      if (isSessionActive) disconnectSession();
-    };
+    client.onClose = () => handleSocketClose();
     client.onError = (msg) => {
-      showError(msg || t('errConnect'));
-      disconnectSession();
+      // При активна сесия onClose поема опита за reconnect; грешка преди
+      // установена сесия е фатална и се показва веднага.
+      if (!isSessionActive) {
+        showError(msg || t('errConnect'));
+        disconnectSession();
+      }
     };
 
     if (!audioPlayer) {
@@ -1926,6 +2042,10 @@ function disconnectSession() {
   const wasActive = isSessionActive;
   clearSessionEndState();
   clearGreetingMicTimer();
+  clearSessionIdleTimer();
+  releaseWakeLock();
+  reconnectAttempts = 0;
+  resumingSession = false;
   awaitingGreetingMic = false;
   if (audioStreamer) {
     audioStreamer.stop();

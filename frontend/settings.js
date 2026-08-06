@@ -66,8 +66,9 @@
     temperature: 1.0,
     responseModalities: ['AUDIO'],
     textOutputEnabled: true,
-    inputAudioTranscription: true,
-    outputAudioTranscription: true,
+    // Прекъсване на асистента с глас (barge-in): микрофонът остава отворен
+    // докато той говори; ехото се чисти от echoCancellation на capture-а
+    bargeInEnabled: true,
     googleGrounding: true,
     automaticActivityDetection: {
       disabled: false,
@@ -163,8 +164,12 @@
     } else if (!merged.instructionsCustomized) {
       merged.systemInstructions = DEFAULT_ASSISTANT_SETTINGS.systemInstructions;
     }
-    merged.inputAudioTranscription = !!merged.textOutputEnabled;
-    merged.outputAudioTranscription = !!merged.textOutputEnabled;
+    // Транскрипцията е винаги включена в клиента (нужна за end_session);
+    // старите ключове inputAudioTranscription/outputAudioTranscription са
+    // вече без ефект и не се поддържат.
+    delete merged.inputAudioTranscription;
+    delete merged.outputAudioTranscription;
+    merged.bargeInEnabled = merged.bargeInEnabled !== false;
     merged.temperature = Math.min(2, Math.max(0, Number(merged.temperature) || 0));
     merged.defaults.priority = Math.min(5, Math.max(1, parseInt(String(merged.defaults.priority), 10) || 3));
     merged.defaults.estimatedMinutes = Math.max(0, parseInt(String(merged.defaults.estimatedMinutes), 10) || 0);

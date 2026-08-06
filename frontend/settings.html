@@ -523,6 +523,11 @@
         <div class="toggle" id="toggleTextOutput"></div>
       </div>
       <div class="field-hint" data-i18n="textOutputHint">Показва разговора като текст на избрания език</div>
+      <div class="toggle-row">
+        <span class="toggle-label" data-i18n="bargeIn">Прекъсване с глас</span>
+        <div class="toggle" id="toggleBargeIn"></div>
+      </div>
+      <div class="field-hint" data-i18n="bargeInHint">Можеш да прекъсваш асистента, докато говори. Изключи при проблеми с ехо.</div>
     </div>
 
     <!-- Hardware Shortcut -->
@@ -811,6 +816,7 @@
       document.getElementById('temperature').value = settings.temperature;
       setToggle('toggleGrounding', settings.googleGrounding);
       setToggle('toggleTextOutput', settings.textOutputEnabled);
+      setToggle('toggleBargeIn', settings.bargeInEnabled);
 
       // Hardware shortcut (fixed +−+− pattern)
       setToggle('toggleShortcutEnabled', settings.hardwareShortcut?.enabled);
@@ -1194,6 +1200,7 @@
         temperature: parseFloat(document.getElementById('temperature').value) || 1.0,
         googleGrounding: getToggle('toggleGrounding'),
         textOutputEnabled: getToggle('toggleTextOutput'),
+        bargeInEnabled: getToggle('toggleBargeIn'),
         profile: {
           ...settings.profile,
           language: document.getElementById('profileLanguage').value,
