@@ -16,23 +16,29 @@ on:
       - 'scripts/prepare-capacitor-shell.mjs'
       - '.github/workflows/build-apk.yml'
 
+# Independent from github-pages environment (pages-build-deployment can queue for hours).
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.4.0
         with:
           node-version: 22
 
       - name: Setup JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.7.0
         with:
           distribution: temurin
           java-version: 21
@@ -110,7 +116,7 @@ jobs:
         run: node scripts/audit-apk.mjs android/app/build/outputs/apk/release/app-release.apk
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: KASY-release
           path: android/app/build/outputs/apk/release/app-release.apk
