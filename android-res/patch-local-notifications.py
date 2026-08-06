@@ -55,6 +55,15 @@ if 'RECORD_AUDIO' not in content:
     )
     print('✅ Added microphone permissions')
 
+if 'READ_CONTACTS' not in content:
+    content = content.replace(
+        '<application',
+        '    <uses-permission android:name="android.permission.READ_CONTACTS" />\n'
+        '    <application',
+        1,
+    )
+    print('✅ Added READ_CONTACTS permission')
+
 # USE_EXACT_ALARM (Android 14+): granted automatically for calendar/alarm apps,
 # so reminders keep firing exactly on time without the revocable
 # SCHEDULE_EXACT_ALARM special-access toggle.

@@ -1931,6 +1931,11 @@ async function handleGeminiMessage(message) {
               result = { success: true, message: 'Сесията приключва.' };
               break;
             default:
+              if (String(call.name || '').startsWith('device_')) {
+                result = await window.AIVA_DEVICE_ACTIONS?.handleTool?.(call.name, call.args || {})
+                  ?? { ok: false, error: 'device actions unavailable' };
+                break;
+              }
               result = client.callFunction(call.name, call.args || {}) ?? 'ok';
               break;
           }
@@ -2071,6 +2076,9 @@ async function connectSession() {
     client.addFunction(new EditCalendarEventTool());
     client.addFunction(new DeleteCalendarEventTool());
     client.addFunction(new EndSessionTool());
+    for (const tool of window.AIVA_DEVICE_ACTIONS?.getGeminiTools?.() || []) {
+      client.addFunction(tool);
+    }
 
     client.onReceiveResponse = handleGeminiMessage;
     client.onOpen = () => setStatus(t('connecting'), true);

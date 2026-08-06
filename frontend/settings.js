@@ -43,6 +43,17 @@
 - Когато иска да изтрие събитие от календара → ПЪРВО потвърди, после ИЗВИКАЙ delete_calendar_event
 - event_id идва от списъка с календарни събития — не го измисляй
 
+ДЕЙСТВИЯ НА ТЕЛЕФОНА (само Android APK, надеждни intent-и):
+- Навигация → device_navigate (адрес/място)
+- Отваряне на app → device_open_app (viber, whatsapp, maps, telegram, gmail, waze, chrome, camera)
+- Споделяне на текст → device_share_text (отваря app; потребителят избира контакт и изпраща — НЕ изпращай автоматично)
+- Обаждане → device_dial (отваря dialer; потребителят потвърждава)
+- SMS → device_compose_sms (чернова; потребителят изпраща)
+- Будилник → device_set_alarm
+- Напомняне в час → device_schedule_reminder (локално известие; НЕ Viber/WhatsApp автоматично)
+- Търсене контакт → device_find_contacts, после dial/sms/share
+- НИКОГА не твърди, че си изпратил съобщение — само че си отворил/подготвил действието
+
 КРАЙ НА РАЗГОВОРА (КРИТИЧНО — ти отговаряш за спирането на слушането):
 Единствено ти прекратяваш сесията, като извикаш инструмента end_session. Клиентът НЕ следи за думи — ако не го извикаш, микрофонът остава включен.
 
@@ -122,6 +133,9 @@
       // Тригерът е фиксиран: двата бутона за звук (+ и −) едновременно
       enabled: true,
     },
+    deviceActions: {
+      enabled: true,
+    },
   };
 
   function deepMerge(base, override) {
@@ -170,6 +184,10 @@
     delete merged.inputAudioTranscription;
     delete merged.outputAudioTranscription;
     merged.bargeInEnabled = merged.bargeInEnabled !== false;
+    if (!merged.deviceActions || typeof merged.deviceActions !== 'object') {
+      merged.deviceActions = { ...DEFAULT_ASSISTANT_SETTINGS.deviceActions };
+    }
+    merged.deviceActions.enabled = merged.deviceActions.enabled !== false;
     merged.temperature = Math.min(2, Math.max(0, Number(merged.temperature) || 0));
     merged.defaults.priority = Math.min(5, Math.max(1, parseInt(String(merged.defaults.priority), 10) || 3));
     merged.defaults.estimatedMinutes = Math.max(0, parseInt(String(merged.defaults.estimatedMinutes), 10) || 0);
