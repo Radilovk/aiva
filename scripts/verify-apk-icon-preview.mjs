@@ -1,71 +1,54 @@
 #!/usr/bin/env node
 /**
- * Verify NutriPlan/Icon.md pipeline: 432px adaptive fg, 66.7% safe zone.
+ * Verify the circular launcher icon before building the APK:
+ * corners transparent (round shape), disc opaque, artwork inside the disc.
+ * Writes a preview to .artifacts/icon-preview/.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import {
-  renderAdaptiveForeground,
-  renderLegacyLauncher,
-  SAFE_ZONE_RATIO,
-  APK_ICON_BG,
+  renderApkCircle,
+  resolveMasterIcon,
+  APK_CIRCLE_FILL,
 } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 const OUT = join(ROOT, '.artifacts', 'icon-preview');
-const ICON = join(ROOT, 'frontend', 'icons', 'icon-512.png');
-const ADAPTIVE_CANVAS = 432;
-const LEGACY_SIZE = 192;
-
-function squircleMaskSvg(size) {
-  const r = size * 0.22;
-  return Buffer.from(
-    `<svg width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${r}" ry="${r}" fill="white"/></svg>`,
-  );
-}
-
-async function clippedArtPixels(fgBuf, size) {
-  const mask = await sharp(squircleMaskSvg(size)).resize(size, size).png().toBuffer();
-  const masked = await sharp(fgBuf)
-    .composite([{ input: mask, blend: 'dest-in' }])
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const orig = await sharp(fgBuf).raw().toBuffer({ resolveWithObject: true });
-  let clipped = 0;
-  const n = size * size;
-  for (let i = 0; i < n; i += 1) {
-    const oi = i * 4;
-    const oa = orig.data[oi + 3];
-    const ma = masked.data[oi + 3];
-    if (oa > 20 && ma < 12) clipped += 1;
-  }
-  return clipped;
-}
+const SIZE = 192; // xxxhdpi launcher bitmap
 
 async function main() {
   await mkdir(OUT, { recursive: true });
-  const fgBuf = await (await renderAdaptiveForeground(ICON, ADAPTIVE_CANVAS)).png().toBuffer();
-  const legacyBuf = await renderLegacyLauncher(ICON, LEGACY_SIZE).png().toBuffer();
-  const fgMeta = await sharp(fgBuf).metadata();
-  const clipped = await clippedArtPixels(fgBuf, ADAPTIVE_CANVAS);
+  const master = await resolveMasterIcon();
+  const iconBuf = await (await renderApkCircle(master, SIZE)).png().toBuffer();
+  await writeFile(join(OUT, 'apk-launcher-icon.png'), iconBuf);
 
-  await writeFile(join(OUT, 'apk-adaptive-fg-432.png'), fgBuf);
-  await writeFile(join(OUT, 'apk-legacy-192.png'), legacyBuf);
+  const { data, info } = await sharp(iconBuf).raw().toBuffer({ resolveWithObject: true });
+  const alphaAt = (x, y) => data[(y * info.width + x) * 4 + 3];
+  const c = SIZE / 2;
+  const rim = Math.floor(SIZE * 0.02);
 
-  console.log(`Icon preview → ${OUT}/ (bg ${APK_ICON_BG}, safe ${SAFE_ZONE_RATIO.toFixed(3)})`);
-  console.log(`Adaptive fg: ${fgMeta.width}×${fgMeta.height} (expect ${ADAPTIVE_CANVAS})`);
-  console.log(`Squircle clipped opaque pixels: ${clipped}`);
+  const checks = [
+    ['canvas is 192×192', info.width === SIZE && info.height === SIZE],
+    ['corners transparent (round icon)',
+      alphaAt(0, 0) === 0 && alphaAt(SIZE - 1, 0) === 0
+      && alphaAt(0, SIZE - 1) === 0 && alphaAt(SIZE - 1, SIZE - 1) === 0],
+    ['disc opaque at center', alphaAt(c, c) === 255],
+    ['disc opaque at mid-edges',
+      alphaAt(c, rim) > 200 && alphaAt(c, SIZE - 1 - rim) > 200
+      && alphaAt(rim, c) > 200 && alphaAt(SIZE - 1 - rim, c) > 200],
+  ];
 
-  if (fgMeta.width !== ADAPTIVE_CANVAS || fgMeta.height !== ADAPTIVE_CANVAS) {
-    throw new Error(`Adaptive foreground must be ${ADAPTIVE_CANVAS}px, got ${fgMeta.width}`);
+  console.log(`Icon preview → ${OUT}/ (circular, art ${Math.round(APK_CIRCLE_FILL * 100)}% of disc)`);
+  let failed = 0;
+  for (const [name, ok] of checks) {
+    console.log(`${ok ? '✓' : '✗'} ${name}`);
+    if (!ok) failed += 1;
   }
-  if (clipped > 0) {
-    throw new Error(`Foreground clipped by squircle (${clipped}px)`);
-  }
+  if (failed > 0) throw new Error(`${failed} icon check(s) failed`);
 }
 
 main().catch((e) => {

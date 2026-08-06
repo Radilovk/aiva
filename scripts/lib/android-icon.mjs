@@ -1,11 +1,16 @@
 /**
- * Android launcher icons — NutriPlan / Icon.md pipeline.
+ * Android launcher icon — pre-shaped circular bitmap, no adaptive layers.
  *
- * Legacy: direct resize of maskable master PNG.
- * Adaptive: foreground at 66.7% safe zone on 108dp canvas (per density),
- *           background via @color/ic_launcher_background.
+ * The app intentionally ships only legacy `ic_launcher` / `ic_launcher_round`
+ * bitmaps: a circular neon-glow disc with the robot artwork and transparent
+ * corners. Launchers that honor an app's own icon shape (MIUI/HyperOS,
+ * OneUI, EMUI and most OEM launchers) display it as-is — a large round icon
+ * instead of the artwork shrunk into a launcher-masked square tile.
+ * Launchers that force their own mask (e.g. Pixel) plate the bitmap; that
+ * trade-off is chosen deliberately over an adaptive square.
  */
 import { createRequire } from 'node:module';
+import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { trimAlphaArt } from './brand-icon-prep.mjs';
@@ -14,109 +19,105 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
+/** App window / WebView chrome — stays dark. */
 export const APP_WINDOW_BG = '#050508';
-/** Adaptive icon background — matches maskable master tile (NutriPlan uses #042F2E). */
+
+/** Darkest edge of the icon disc — matches the app background. */
 export const APK_ICON_BG = '#050508';
 
-/** 66.7% safe zone — avoids clipping by launcher masks (Icon.md). */
-export const SAFE_ZONE_RATIO = 2 / 3;
+/** Artwork diameter relative to the disc (widest at mid-height, stays inside). */
+export const APK_CIRCLE_FILL = 0.88;
 
-export const LEGACY_SIZES = [
-  ['mipmap-mdpi', 48],
-  ['mipmap-hdpi', 72],
-  ['mipmap-xhdpi', 96],
-  ['mipmap-xxhdpi', 144],
-  ['mipmap-xxxhdpi', 192],
+/** Density scales shared by every mipmap bucket (48 dp launcher icons). */
+export const DENSITY_SCALES = [
+  ['mdpi', 1],
+  ['hdpi', 1.5],
+  ['xhdpi', 2],
+  ['xxhdpi', 3],
+  ['xxxhdpi', 4],
 ];
 
-/** Adaptive layers are 108dp × density multiplier — NOT legacy launcher sizes. */
-export const ADAPTIVE_SIZES = [
-  ['mipmap-mdpi', 108],
-  ['mipmap-hdpi', 162],
-  ['mipmap-xhdpi', 216],
-  ['mipmap-xxhdpi', 324],
-  ['mipmap-xxxhdpi', 432],
+export const LEGACY_DP = 48;
+
+/**
+ * Master launcher artwork — must keep its alpha channel. Derived outputs
+ * (frontend/icons/*) are never used as a source.
+ */
+export const MASTER_ICON_CANDIDATES = [
+  join(ROOT, 'brand-assets', 'source', 'icon-512.png'),
+  join(ROOT, 'PSX_20260805_210455.png'),
+  join(ROOT, 'brand-assets', 'source', 'PSX_20260805_210455.png'),
 ];
 
-const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
-
-function parseBg(hex) {
-  return {
-    r: parseInt(hex.slice(1, 3), 16),
-    g: parseInt(hex.slice(3, 5), 16),
-    b: parseInt(hex.slice(5, 7), 16),
-    alpha: 1,
-  };
-}
-
-/** Strip flattened black matte from robot exports. */
-export async function prepApkIconSource(input) {
-  let buf = await sharp(input).ensureAlpha().png().toBuffer();
-  try {
-    buf = await sharp(buf).trim({ threshold: 32 }).png().toBuffer();
-  } catch {
-    /* no matte */
+export async function resolveMasterIcon() {
+  for (const p of MASTER_ICON_CANDIDATES) {
+    try {
+      await access(p);
+      return p;
+    } catch {
+      /* try next */
+    }
   }
-  return trimAlphaArt(buf);
+  throw new Error('Missing launcher icon source (brand-assets/source/icon-512.png or PSX_20260805_210455.png)');
 }
 
 /**
- * Maskable master PNG (512×512): brand bg + logo in 66.7% safe zone.
- * Used as single source for PWA + APK (Icon.md).
+ * Neon-glow disc sampled from the icon1.png master art: bright magenta
+ * behind the robot fading to near-black at the rim, transparent outside.
  */
-export async function buildMaskableMaster(input, size = 512) {
-  const trimmed = await prepApkIconSource(input);
-  const safe = Math.floor(size * SAFE_ZONE_RATIO);
-  const logo = await sharp(trimmed)
-    .resize(safe, safe, { fit: 'inside', withoutEnlargement: false })
+function glowDiscSvg(size) {
+  const c = size / 2;
+  return Buffer.from(
+    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#E3AEDC"/>
+      <stop offset="45%" stop-color="#7A3A6C"/>
+      <stop offset="78%" stop-color="#1E0C1A"/>
+      <stop offset="100%" stop-color="${APK_ICON_BG}"/>
+    </radialGradient>
+  </defs>
+  <circle cx="${c}" cy="${c}" r="${c}" fill="url(#glow)"/>
+</svg>`,
+  );
+}
+
+async function fitLogo(input, size, fill) {
+  const trimmed = await trimAlphaArt(input);
+  const inner = Math.max(1, Math.round(size * fill));
+  const resized = await sharp(trimmed)
+    .resize(inner, inner, { fit: 'inside', withoutEnlargement: false })
     .png()
     .toBuffer();
+  const meta = await sharp(resized).metadata();
+  const left = Math.floor((size - meta.width) / 2);
+  const top = Math.floor((size - meta.height) / 2);
+  return { resized, left, top };
+}
+
+/** The launcher icon: glow disc + robot, transparent corners. */
+export async function renderApkCircle(input, size, { fill = APK_CIRCLE_FILL } = {}) {
+  const disc = await sharp(glowDiscSvg(size)).png().toBuffer();
+  const { resized, left, top } = await fitLogo(input, size, fill);
   return sharp({
     create: {
       width: size,
       height: size,
       channels: 4,
-      background: parseBg(APK_ICON_BG),
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
     },
-  }).composite([{ input: logo, gravity: 'center' }]);
+  }).composite([{ input: disc }, { input: resized, left, top }]);
 }
 
-/** Legacy launcher — direct resize, no extra overlay (Icon.md). */
-export function renderLegacyLauncher(input, size) {
-  return sharp(input).resize(size, size, { fit: 'contain', background: parseBg(APK_ICON_BG) });
+export function renderApkLegacy(input, size, options = {}) {
+  return renderApkCircle(input, size, options);
 }
 
-/**
- * Adaptive foreground — transparent canvas, master scaled to 66.7% safe zone.
- * ImageMagick equivalent: xc:none + resize SAFE + gravity center.
- */
-export async function renderAdaptiveForeground(input, canvasSize) {
-  const safe = Math.floor(canvasSize * SAFE_ZONE_RATIO);
-  const scaled = await sharp(input)
-    .resize(safe, safe, { fit: 'inside', background: TRANSPARENT })
-    .png()
-    .toBuffer();
-  return sharp({
-    create: {
-      width: canvasSize,
-      height: canvasSize,
-      channels: 4,
-      background: TRANSPARENT,
-    },
-  }).composite([{ input: scaled, gravity: 'center' }]);
+export function renderApkRound(input, size, options = {}) {
+  return renderApkCircle(input, size, options);
 }
 
-/** Monochrome notification mask — alpha extract (Icon.md). */
-export async function renderNotificationMask(input, size) {
-  const resized = await sharp(input)
-    .resize(size, size, { fit: 'contain', background: TRANSPARENT })
-    .ensureAlpha()
-    .png()
-    .toBuffer();
-  return sharp(resized).extractChannel('alpha').png().toBuffer();
-}
-
-// Back-compat aliases
+// Back-compat aliases used by older scripts
 export const APK_BG = APP_WINDOW_BG;
-export const APK_ICON_FILL = SAFE_ZONE_RATIO;
-export const APK_FOREGROUND_FILL = SAFE_ZONE_RATIO;
+export const APK_ICON_FILL = APK_CIRCLE_FILL;
+export const APK_ROUND_FILL = APK_CIRCLE_FILL;

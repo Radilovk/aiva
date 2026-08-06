@@ -92,14 +92,22 @@ let touchStartX = null;
 let calendarNavLock = false;
 let voiceFocusTask = null;
 let cachedCalendarEvents = [];
-let awaitingCloseConfirmation = false;
-let pendingUserTranscript = '';
 let assistantTranscriptBuffer = '';
 let assistantTurnComplete = false;
 let sessionEnding = false;
 let sessionEndTimer = null;
+let sessionEndFinalizing = false;
+let lastAssistantAudioAt = 0;
+let farewellEndRequestedAt = 0;
+let farewellTurnCompleteReceived = false;
+let userTranscriptBuffer = '';
+let userGoodbyeTimer = null;
 let awaitingGreetingMic = false;
 let greetingMicTimer = null;
+let reconnectAttempts = 0;
+let resumingSession = false;
+let disconnectInProgress = false;
+const MAX_RECONNECT_ATTEMPTS = 2;
 
 function setMicUplinkMuted(muted) {
   audioStreamer?.setUplinkMuted(muted);
@@ -112,11 +120,67 @@ async function tryUnmuteMicAfterAssistant() {
 
 function onAssistantPlaybackStateChange(isPlaying) {
   if (isPlaying) {
-    setMicUplinkMuted(true);
+    // При barge-in микрофонът остава отворен, докато асистентът говори —
+    // ехото се маха от echoCancellation на capture потока, а сървърният VAD
+    // праща INTERRUPTED при реално прекъсване от потребителя.
+    if (!assistantSettings.bargeInEnabled || sessionEnding) {
+      setMicUplinkMuted(true);
+    }
     window.AIVA_HAPTICS?.touchSpeechSession?.();
     return;
   }
+  if (sessionEnding) {
+    tryFinalizeSessionEnd();
+    return;
+  }
   tryUnmuteMicAfterAssistant();
+}
+
+// --- Wake lock: екранът не гасне по време на гласова сесия (изгаснал екран
+// суспендира WebView-то и убива микрофона тихо) ---
+let wakeLock = null;
+
+async function acquireWakeLock() {
+  if (wakeLock || !('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (_e) {
+    wakeLock = null;
+  }
+}
+
+function releaseWakeLock() {
+  try {
+    wakeLock?.release?.();
+  } catch (_e) { /* ok */ }
+  wakeLock = null;
+}
+
+document.addEventListener('visibilitychange', () => {
+  // ОС освобождава wake lock-а при скриване — при връщане го взимаме пак
+  if (document.visibilityState === 'visible' && isSessionActive) acquireWakeLock();
+});
+
+// --- Тишина: ако моделът така и не извика end_session и никой не казва
+// нищо, сесията не бива да виси с отворен микрофон безкрайно ---
+const SESSION_IDLE_TIMEOUT_MS = 120000;
+let sessionIdleTimer = null;
+
+function clearSessionIdleTimer() {
+  if (sessionIdleTimer) {
+    clearTimeout(sessionIdleTimer);
+    sessionIdleTimer = null;
+  }
+}
+
+function touchSessionActivity() {
+  if (!isSessionActive && !isConnecting) return;
+  clearSessionIdleTimer();
+  sessionIdleTimer = setTimeout(() => {
+    sessionIdleTimer = null;
+    if (isSessionActive && !sessionEnding) void disconnectSession();
+  }, SESSION_IDLE_TIMEOUT_MS);
 }
 
 // --- save_task tool (Gemini function declaration format) ---
@@ -358,7 +422,7 @@ class EndSessionTool extends FunctionCallDefinition {
   constructor() {
     super(
       'end_session',
-      'Приключва гласовата сесия. Използвай го САМО след като вече си произнесъл на глас кратко сбогуване на езика на потребителя.',
+      'Спира слушането и затваря гласовата сесия. ЗАДЪЛЖИТЕЛНО го извикай в същия ход, веднага след като произнесеш сбогуването — ти си единственият, който може да спре микрофона. Никога не го споменавай на глас.',
       {
         type: 'object',
         properties: {
@@ -491,65 +555,46 @@ function setStatus(text, active = false, mode = 'default') {
 }
 
 function setAssistantSpeech(text) {
+  // Транскрипцията тече винаги, но се показва само ако е включен текстовият изход.
+  if (!assistantSettings.textOutputEnabled) return;
   const trimmed = String(text || '').trim();
   if (!trimmed) return;
   setStatus(trimmed, true, 'assistant');
 }
 
-const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още|anything\s+else|need\s+anything|something\s+else|还需要|还需要其他|कुछ\s+और|algo\s+más|شيء\s+آخر|autre\s+chose|besoin\s+d.autre|noch\s+etwas|brauchen\s+sie\s+noch|ещё\s+что|нужно\s+ещё/i;
-const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|no|nope|nothing|that's all|done|enough|нет|没有|नहीं|नहीं\s+धन्यवाद|no\s+gracias|لا|non|nein|ничего|спасибо,\s*нет)\b/i;
-const USER_GOODBYE_WORDS = [
-  'спри', 'стоп', 'затвори', 'излез', 'чао', 'ciao', 'довиждане', 'до видане',
-  'благодаря', 'мерси', 'thanks', 'thank you', 'danke', 'gracias', 'merci',
-  'obrigado', 'obrigada', 'goodbye', 'bye', 'stop', 'exit', 'quit',
-  'arrivederci', 'sayonara', 'adiós', 'adios', 'adeu', 'paka', 'чао чао',
-];
+// Край на разговора: основно end_session от модела; клиентът също следи
+// сбогувания в транскрипцията и при нужда затваря (без фалшиви „благодаря" насред разговор).
 
-function normalizeUtterance(text) {
-  return String(text || '').toLowerCase().trim().replace(/[.!?,…]+$/g, '');
-}
-
-function utteranceHasGoodbyeWord(normalized, word) {
-  if (!normalized || !word) return false;
-  if (normalized === word) return true;
-  const tokens = normalized.split(/[\s,;]+/).filter(Boolean);
-  return tokens.some((token) => token === word || token.startsWith(word));
-}
-
-function isUserGoodbye(text) {
-  const normalized = normalizeUtterance(text);
-  if (!normalized) return false;
-  return USER_GOODBYE_WORDS.some((word) => utteranceHasGoodbyeWord(normalized, word));
-}
-// Само изрични сбогувания — фрази като "приятен ден" се появяват и насред разговор
-const ASSISTANT_GOODBYE_RE = /\b(чао|довиждане|до\s*видане|goodbye|bye\s*bye|auf\s+wiedersehen|au\s+revoir|adiós|adios|до\s+свидания)\b/i;
-const ASSISTANT_FAREWELL_RE = /(оставам\s+на\s+разположение|на\s+разположение\s+съм|до\s+скоро|приятен\s+ден|до\s+ново\s+срещане|i\s*'?m\s+here\s+if\s+you\s+need|reach\s+out\s+any\s*time|на\s+услуга)/i;
-
-function detectClosingQuestion(text) {
-  if (CLOSING_QUESTION_RE.test(String(text || '').toLowerCase())) {
-    awaitingCloseConfirmation = true;
+function clearUserGoodbyeTimer() {
+  if (userGoodbyeTimer) {
+    clearTimeout(userGoodbyeTimer);
+    userGoodbyeTimer = null;
   }
 }
 
-function isNegativeCloseResponse(text) {
-  const normalized = normalizeUtterance(text);
-  if (!normalized) return false;
-  return NEGATIVE_CLOSE_RE.test(normalized);
+function maybeScheduleSessionEndFromFarewell(source) {
+  if (sessionEnding || awaitingGreetingMic || !isSessionActive) return;
+  const text = assistantTranscriptBuffer;
+  if (!window.AIVA_SESSION_END?.looksLikeAssistantFarewell?.(text)) return;
+  scheduleSessionEnd();
 }
 
-function detectAssistantGoodbye(text) {
-  if (!text || sessionEnding) return false;
-  const lower = String(text).toLowerCase();
-  return ASSISTANT_GOODBYE_RE.test(lower) || ASSISTANT_FAREWELL_RE.test(lower);
+function handleUserGoodbyeTranscript(text, finished) {
+  if (!finished || sessionEnding || awaitingGreetingMic || !isSessionActive) return;
+  if (!window.AIVA_SESSION_END?.looksLikeUserGoodbye?.(text)) return;
+  clearUserGoodbyeTimer();
+  userGoodbyeTimer = setTimeout(() => {
+    userGoodbyeTimer = null;
+    if (!sessionEnding && isSessionActive) scheduleSessionEnd();
+  }, USER_GOODBYE_END_MS);
 }
-
-function resetSessionCloseState() {
-  awaitingCloseConfirmation = false;
-  pendingUserTranscript = '';
-}
-
 function clearSessionEndState() {
   sessionEnding = false;
+  sessionEndFinalizing = false;
+  farewellEndRequestedAt = 0;
+  farewellTurnCompleteReceived = false;
+  clearUserGoodbyeTimer();
+  userTranscriptBuffer = '';
   if (sessionEndTimer) {
     clearTimeout(sessionEndTimer);
     sessionEndTimer = null;
@@ -580,7 +625,7 @@ function scheduleGreetingMicFallback(delayMs = 8000) {
     } catch (e) {
       console.error('Greeting mic fallback failed:', e);
       showError(t('errMicrophone'));
-      disconnectSession();
+      void disconnectSession({ immediate: true });
     }
   }, delayMs);
 }
@@ -590,29 +635,30 @@ async function startMicAfterGreeting() {
   awaitingGreetingMic = false;
   clearGreetingMicTimer();
   if (audioPlayer) {
-    await audioPlayer.waitForDrain(4000);
+    await waitForFarewellPlaybackIdle(8000);
   }
   try {
     await ensureMicStreaming();
   } catch (e) {
     console.error('Mic start after greeting failed:', e);
     showError(t('errMicrophone'));
-    disconnectSession();
+    await disconnectSession({ immediate: true });
   }
 }
 
-const SESSION_END_FALLBACK_MS = 45000;
+const SESSION_END_FALLBACK_MS = 15000;
+const FAREWELL_AUDIO_GAP_MS = 450;
+const FAREWELL_PLAYBACK_STABLE_MS = 400;
+const USER_GOODBYE_END_MS = 8000;
 
 function armSessionEnd() {
   if (sessionEnding) return;
   sessionEnding = true;
-  awaitingCloseConfirmation = false;
-  pendingUserTranscript = '';
+  // Само заглушаваме uplink-а. Спирането на микрофона (audioStreamer.stop)
+  // затваря capture AudioContext-а и Android превключва аудио маршрута
+  // насред прощалната реплика — гласът насича/глъхне. Реалното спиране
+  // става в disconnectSession, след като аудиото дозвучи.
   setMicUplinkMuted(true);
-  if (audioStreamer) {
-    audioStreamer.stop();
-    audioStreamer = null;
-  }
 }
 
 function finishSessionEndUi() {
@@ -622,63 +668,154 @@ function finishSessionEndUi() {
   statusEl?.classList.remove('assistant-speech');
 }
 
-function scheduleSessionEndFallback() {
+function clearSessionEndFallback() {
   if (sessionEndTimer) {
     clearTimeout(sessionEndTimer);
     sessionEndTimer = null;
   }
+}
+
+function scheduleSessionEndFallback() {
+  clearSessionEndFallback();
   sessionEndTimer = setTimeout(() => {
     sessionEndTimer = null;
     finalizeSessionEnd();
   }, SESSION_END_FALLBACK_MS);
 }
 
-function requestSessionEndAfterFarewell() {
-  armSessionEnd();
+function isFarewellAudioPending() {
+  if (!audioPlayer) return false;
+  if (audioPlayer.isPlaying) return true;
+  const endMs = audioPlayer.getScheduledPlaybackEndMs?.() || 0;
+  if (endMs > performance.now() + 80) return true;
+  // TTS пристига на порции — между chunk-овете има кратки паузи
+  if (performance.now() - lastAssistantAudioAt < FAREWELL_AUDIO_GAP_MS) return true;
+  return false;
+}
+
+async function waitForFarewellPlaybackIdle(timeoutMs = 30000) {
+  const deadline = performance.now() + timeoutMs;
+  let stableSince = 0;
+
+  while (performance.now() < deadline) {
+    if (!isFarewellAudioPending()) {
+      if (!stableSince) stableSince = performance.now();
+      if (performance.now() - stableSince >= FAREWELL_PLAYBACK_STABLE_MS) return;
+    } else {
+      stableSince = 0;
+      if (audioPlayer) {
+        await audioPlayer.waitForDrain(Math.max(500, deadline - performance.now()));
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  }
+}
+
+function tryFinalizeSessionEnd() {
+  if (!sessionEnding || sessionEndFinalizing) return;
+
+  const audioPending = isFarewellAudioPending();
+  const waitedMs = farewellEndRequestedAt
+    ? performance.now() - farewellEndRequestedAt
+    : 0;
+
+  if (farewellTurnCompleteReceived && !audioPending) {
+    finalizeSessionEnd();
+    return;
+  }
+
+  // end_session преди farewell audio: чакаме TURN_COMPLETE и/или аудио
+  if (!audioPending && waitedMs > 600 && !farewellTurnCompleteReceived) {
+    finalizeSessionEnd();
+    return;
+  }
+
   scheduleSessionEndFallback();
 }
 
 async function finalizeSessionEnd() {
-  if (audioPlayer) {
-    await audioPlayer.waitForDrain(30000);
-    const endMs = audioPlayer.getScheduledPlaybackEndMs?.() || 0;
-    const waitMs = Math.max(0, endMs - performance.now());
-    if (waitMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
-    }
+  if (sessionEndFinalizing) return;
+  sessionEndFinalizing = true;
+  clearSessionEndFallback();
+  try {
+    await waitForFarewellPlaybackIdle(30000);
+    finishSessionEndUi();
+    window.AIVA_HAPTICS?.endSpeechSession?.();
+    if (isSessionActive) await disconnectSession();
+  } finally {
+    sessionEndFinalizing = false;
   }
-  finishSessionEndUi();
-  window.AIVA_HAPTICS?.endSpeechSession?.();
-  if (isSessionActive) disconnectSession();
 }
 
+/**
+ * Извиква се от end_session tool call-а на асистента. Uplink-ът се заглушава
+ * веднага, а микрофонът и сесията се затварят чак след като сбогуването
+ * дозвучи — вж. finalizeSessionEnd.
+ */
 function scheduleSessionEnd() {
-  requestSessionEndAfterFarewell();
-}
-
-function handlePossibleCloseResponse(text, finished = false) {
-  if (!awaitingCloseConfirmation || !text) return;
-  const combined = `${pendingUserTranscript}${text}`.trim();
-  pendingUserTranscript = finished ? '' : combined;
-  if (isNegativeCloseResponse(combined)) {
-    requestSessionEndAfterFarewell();
+  farewellEndRequestedAt = performance.now();
+  if (!sessionEnding) {
+    armSessionEnd();
   }
+  // Ако end_session пристигне преди farewell audio, assistantTurnComplete
+  // може още да е true от предишния ход — не финализираме докато не дойде
+  // TURN_COMPLETE на текущия сбогуствен ход или аудиото дозвучи.
+  if (!farewellTurnCompleteReceived) {
+    assistantTurnComplete = false;
+  }
+  tryFinalizeSessionEnd();
 }
 
-function handleUserTranscriptForSessionControl(text, finished = false) {
-  if (awaitingCloseConfirmation) {
-    handlePossibleCloseResponse(text, finished);
+/**
+ * WS падна. При нормален край или неактивна сесия — обичайното затваряне;
+ * при жива сесия — до MAX_RECONNECT_ATTEMPTS опита за възстановяване със
+ * session resumption handle (контекстът на разговора се запазва).
+ */
+async function handleSocketClose() {
+  if (!isSessionActive) {
+    // WS затворен още преди SETUP_COMPLETE (отхвърлен setup, лош токен) —
+    // иначе UI остава завинаги на „Свързване…"
+    if (isConnecting) {
+      showError(t('errConnect'));
+      void disconnectSession();
+    }
     return;
   }
-  if (finished && isUserGoodbye(text)) {
-    requestSessionEndAfterFarewell();
+  if (sessionEnding) {
+    // Сървърът често затваря WS веднага след end_session — не спираме
+    // capture-а тук, а чакаме сбогуването да дозвучи преди disconnect.
+    tryFinalizeSessionEnd();
+    return;
+  }
+  if (!client || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    showError(t('errConnect'));
+    void disconnectSession();
+    return;
+  }
+  reconnectAttempts += 1;
+  resumingSession = true;
+  setStatus(t('connecting'), true);
+  await new Promise((resolve) => setTimeout(resolve, 700 * reconnectAttempts));
+  if (!isSessionActive || sessionEnding || !client) return;
+  try {
+    client.updateToken(await fetchToken());
+    client.connect();
+  } catch (e) {
+    console.error('Reconnect failed:', e);
+    showError(t('errConnect'));
+    void disconnectSession();
   }
 }
 
+let errorToastTimer = null;
 function showError(msg) {
   errorToast.textContent = msg;
   errorToast.classList.add('visible');
-  setTimeout(() => errorToast.classList.remove('visible'), 5000);
+  if (errorToastTimer) clearTimeout(errorToastTimer);
+  errorToastTimer = setTimeout(() => {
+    errorToastTimer = null;
+    errorToast.classList.remove('visible');
+  }, 5000);
 }
 
 window.showCalendarSyncToast = function showCalendarSyncToast(task) {
@@ -1724,10 +1861,30 @@ function getTaskById(id) {
 
 // --- Gemini message handling (from official script.js pattern) ---
 async function handleGeminiMessage(message) {
+  touchSessionActivity();
   switch (message.type) {
     case MultimodalLiveResponseType.SETUP_COMPLETE:
+      reconnectAttempts = 0;
+      acquireWakeLock();
       setStatus(t('listening'), true);
       waveform.classList.add('active');
+      if (resumingSession) {
+        // Възстановена сесия след прекъсната връзка: без ново поздравление,
+        // микрофонът продължава (стриймърът не е спиран при WS drop)
+        resumingSession = false;
+        isSessionActive = true;
+        try {
+          await ensureMicStreaming();
+          // Прекъснатият ход на асистента е загубен — отпушваме uplink-а,
+          // за да не остане микрофонът ням след възстановяване
+          setMicUplinkMuted(false);
+        } catch (e) {
+          console.error('Mic resume failed:', e);
+          showError(t('errMicrophone'));
+          void disconnectSession({ immediate: true });
+        }
+        break;
+      }
       awaitingGreetingMic = true;
       try {
         isSessionActive = true;
@@ -1739,31 +1896,31 @@ async function handleGeminiMessage(message) {
       } catch (e) {
         console.error('Session greeting failed:', e);
         showError(t('errConnect'));
-        disconnectSession();
+        void disconnectSession();
       }
       break;
 
     case MultimodalLiveResponseType.AUDIO:
       assistantTurnComplete = false;
+      lastAssistantAudioAt = performance.now();
       if (audioPlayer) await audioPlayer.play(message.data);
-      break;
-
-    case MultimodalLiveResponseType.INPUT_TRANSCRIPTION:
-      if (message.data?.text) {
-        handleUserTranscriptForSessionControl(message.data.text, message.data.finished === true);
-      }
       break;
 
     case MultimodalLiveResponseType.OUTPUT_TRANSCRIPTION:
       if (message.data?.text) {
         assistantTranscriptBuffer += message.data.text;
         setAssistantSpeech(assistantTranscriptBuffer);
-        detectClosingQuestion(assistantTranscriptBuffer);
-        // Сбогуването се проверява само на завършен транскрипт — частичните
-        // фрагменти дават фалшиви съвпадения и затварят сесията погрешно.
-        if (message.data.finished && detectAssistantGoodbye(assistantTranscriptBuffer)) {
-          requestSessionEndAfterFarewell();
+        if (message.data.finished) {
+          maybeScheduleSessionEndFromFarewell('output_transcription');
         }
+      }
+      break;
+
+    case MultimodalLiveResponseType.INPUT_TRANSCRIPTION:
+      if (message.data?.text) {
+        userTranscriptBuffer += message.data.text;
+        handleUserGoodbyeTranscript(userTranscriptBuffer, message.data.finished);
+        if (message.data.finished) userTranscriptBuffer = '';
       }
       break;
 
@@ -1771,10 +1928,6 @@ async function handleGeminiMessage(message) {
       if (message.data) {
         assistantTranscriptBuffer = String(message.data);
         setAssistantSpeech(assistantTranscriptBuffer);
-        detectClosingQuestion(assistantTranscriptBuffer);
-        if (detectAssistantGoodbye(assistantTranscriptBuffer)) {
-          requestSessionEndAfterFarewell();
-        }
       }
       break;
 
@@ -1816,6 +1969,16 @@ async function handleGeminiMessage(message) {
               result = { success: true, message: 'Сесията приключва.' };
               break;
             default:
+              if (String(call.name || '').startsWith('device_')) {
+                result = await window.AIVA_DEVICE_ACTIONS?.handleTool?.(call.name, call.args || {})
+                  ?? { ok: false, error: 'device actions unavailable' };
+                break;
+              }
+              if (String(call.name || '').startsWith('memory_')) {
+                result = await window.AIVA_MEMORY?.handleTool?.(call.name, call.args || {})
+                  ?? { ok: false, error: 'memory unavailable' };
+                break;
+              }
               result = client.callFunction(call.name, call.args || {}) ?? 'ok';
               break;
           }
@@ -1829,25 +1992,24 @@ async function handleGeminiMessage(message) {
     }
 
     case MultimodalLiveResponseType.TURN_COMPLETE:
+      maybeScheduleSessionEndFromFarewell('turn_complete');
       assistantTranscriptBuffer = '';
-      pendingUserTranscript = '';
       assistantTurnComplete = true;
       if (awaitingGreetingMic) {
         startMicAfterGreeting();
       } else if (sessionEnding) {
-        if (sessionEndTimer) {
-          clearTimeout(sessionEndTimer);
-          sessionEndTimer = null;
-        }
-        finalizeSessionEnd();
+        farewellTurnCompleteReceived = true;
+        clearSessionEndFallback();
+        tryFinalizeSessionEnd();
       } else if (!sessionEnding) {
         tryUnmuteMicAfterAssistant();
       }
       break;
 
     case MultimodalLiveResponseType.INTERRUPTED:
-      // Ignore spurious interrupts during greeting or while assistant speaks
-      if (awaitingGreetingMic || audioStreamer?.uplinkMuted) break;
+      // Ignore spurious interrupts during greeting or while assistant speaks;
+      // при приключване сбогуването трябва да дозвучи докрай
+      if (awaitingGreetingMic || sessionEnding || audioStreamer?.uplinkMuted) break;
       if (audioPlayer) audioPlayer.interrupt();
       assistantTranscriptBuffer = '';
       assistantTurnComplete = false;
@@ -1922,7 +2084,6 @@ async function connectSession() {
     const model = assistantSettings.model || LIVE_MODEL;
 
     client = new GeminiLiveAPI(token, model);
-    resetSessionCloseState();
     assistantTranscriptBuffer = '';
     assistantTurnComplete = false;
     let extraContext = buildTasksContextForAssistant()
@@ -1931,14 +2092,22 @@ async function connectSession() {
       extraContext += `\n\nФОКУС: Потребителят иска да обсъди или редактира задача ID ${voiceFocusTask.id}: "${voiceFocusTask.content}". Започни с кратко потвърждение и предложи помощ (редакция, съвет, изтриване, маркиране като готова).`;
       voiceFocusTask = null;
     }
+    const deviceCtx = await window.AIVA_DEVICE_CONTEXT?.collect?.();
+    if (deviceCtx) {
+      extraContext += `\n\n${window.AIVA_DEVICE_CONTEXT.formatForPrompt(deviceCtx)}`;
+    }
+    await window.AIVA_DEVICE_CONTEXT?.ensureMemorySeed?.();
+    const memorySection = await window.AIVA_MEMORY?.buildPromptSection?.();
+    if (memorySection) extraContext += `\n\n${memorySection}`;
     const instructions = buildSessionInstructions(
       assistantSettings.systemInstructions,
       assistantSettings.profile,
       extraContext
     );
     client.systemInstructions = instructions;
-    client.inputAudioTranscription = assistantSettings.textOutputEnabled;
-    client.outputAudioTranscription = assistantSettings.textOutputEnabled;
+    // Транскрипцията е винаги включена: нужна за UI и надеждно затваряне при сбогуване.
+    client.inputAudioTranscription = true;
+    client.outputAudioTranscription = true;
     client.responseModalities = assistantSettings.responseModalities;
     client.voiceName = assistantSettings.voiceName;
     client.temperature = assistantSettings.temperature;
@@ -1956,16 +2125,29 @@ async function connectSession() {
     client.addFunction(new ReadCalendarEventsTool());
     client.addFunction(new EditCalendarEventTool());
     client.addFunction(new DeleteCalendarEventTool());
-    client.addFunction(new EndSessionTool());
+    const endSessionTool = new EndSessionTool();
+    const sessionLang = assistantSettings.profile?.language || 'bg';
+    if (window.AIVA_SESSION_END?.getEndSessionToolDescription) {
+      endSessionTool.description = window.AIVA_SESSION_END.getEndSessionToolDescription(sessionLang);
+    }
+    client.addFunction(endSessionTool);
+    for (const tool of window.AIVA_DEVICE_ACTIONS?.getGeminiTools?.() || []) {
+      client.addFunction(tool);
+    }
+    for (const tool of window.AIVA_MEMORY?.getGeminiTools?.() || []) {
+      client.addFunction(tool);
+    }
 
     client.onReceiveResponse = handleGeminiMessage;
     client.onOpen = () => setStatus(t('connecting'), true);
-    client.onClose = () => {
-      if (isSessionActive) disconnectSession();
-    };
+    client.onClose = () => handleSocketClose();
     client.onError = (msg) => {
-      showError(msg || t('errConnect'));
-      disconnectSession();
+      // При активна сесия onClose поема опита за reconnect; грешка преди
+      // установена сесия е фатална и се показва веднага.
+      if (!isSessionActive) {
+        showError(msg || t('errConnect'));
+        void disconnectSession();
+      }
     };
 
     if (!audioPlayer) {
@@ -1975,52 +2157,73 @@ async function connectSession() {
     } else {
       audioPlayer.onPlaybackStateChange = onAssistantPlaybackStateChange;
     }
+    if (audioPlayer?.audioContext?.state === 'suspended') {
+      await audioPlayer.audioContext.resume().catch(() => {});
+    }
+    await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(true);
 
     client.connect();
   } catch (e) {
     console.error('connectSession:', e);
     showError(e.message || t('errConnect'));
-    disconnectSession();
+    void disconnectSession();
   } finally {
     isConnecting = false;
     recordBtn.disabled = false;
   }
 }
 
-function disconnectSession() {
+async function disconnectSession(options = {}) {
+  const { immediate = false } = options;
+  if (disconnectInProgress) return;
+  disconnectInProgress = true;
+
   const wasActive = isSessionActive;
   clearSessionEndState();
   clearGreetingMicTimer();
+  clearSessionIdleTimer();
+  releaseWakeLock();
+  reconnectAttempts = 0;
+  resumingSession = false;
   awaitingGreetingMic = false;
-  if (audioStreamer) {
-    audioStreamer.stop();
-    audioStreamer = null;
-  }
-  if (client?.webSocket) {
-    client.webSocket.close();
-  }
-  client = null;
-  isSessionActive = false;
-  isConnecting = false;
-  resetSessionCloseState();
-  assistantTranscriptBuffer = '';
-  assistantTurnComplete = false;
-  recordBtn.classList.remove('recording');
-  setRecordBtnLive(false);
-  recordBtn.disabled = false;
-  waveform.classList.remove('active');
-  statusEl.classList.remove('assistant-speech');
-  setStatus(t('tapToRecord'));
-  recordBtn.setAttribute('aria-label', t('record'));
-  if (wasActive) {
-    window.AIVA_HAPTICS?.onListeningStop?.();
+
+  try {
+    if (!immediate && audioPlayer && (audioPlayer.isPlaying || isFarewellAudioPending())) {
+      await waitForFarewellPlaybackIdle(2500);
+    }
+    audioPlayer?.interrupt?.();
+    await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(false);
+    if (audioStreamer) {
+      audioStreamer.stop();
+      audioStreamer = null;
+    }
+    if (client?.webSocket) {
+      client.webSocket.close();
+    }
+    client = null;
+    isSessionActive = false;
+    isConnecting = false;
+    assistantTranscriptBuffer = '';
+    assistantTurnComplete = false;
+    recordBtn.classList.remove('recording');
+    setRecordBtnLive(false);
+    recordBtn.disabled = false;
+    waveform.classList.remove('active');
+    statusEl?.classList.remove('assistant-speech');
+    setStatus(t('tapToRecord'));
+    recordBtn.setAttribute('aria-label', t('record'));
+    if (wasActive) {
+      window.AIVA_HAPTICS?.onListeningStop?.();
+    }
+  } finally {
+    disconnectInProgress = false;
   }
 }
 
 // --- Events ---
 recordBtn.addEventListener('click', () => {
   if (isSessionActive || isConnecting) {
-    disconnectSession();
+    void disconnectSession({ immediate: true });
   } else {
     connectSession();
   }
@@ -2392,3 +2595,6 @@ document.addEventListener('visibilitychange', () => {
     audioStreamer.audioContext.resume().catch(() => {});
   }
 });
+
+window.AIVA_DEVICE_CONTEXT?.collect?.().catch(() => {});
+window.AIVA_MEMORY?.hydrate?.().catch(() => {});

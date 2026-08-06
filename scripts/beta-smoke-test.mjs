@@ -309,6 +309,33 @@ async function testLiveApi() {
   }
 }
 
+async function testDeviceActions() {
+  console.log('\n[device actions]');
+  const ctx = createSandbox();
+  ctx.FunctionCallDefinition = class FunctionCallDefinition {
+    constructor(name) { this.name = name; }
+    functionToCall() { return 'pending'; }
+  };
+  const code = readFileSync(join(FRONTEND, 'lib/deviceActions.js'), 'utf8');
+  vm.runInContext(code, ctx, { filename: 'deviceActions.js' });
+  const api = ctx.window.AIVA_DEVICE_ACTIONS;
+  if (!api) {
+    fail('AIVA_DEVICE_ACTIONS loads');
+    return;
+  }
+  ok('AIVA_DEVICE_ACTIONS loads');
+
+  if (!api.APP_CATALOG.maps?.packageNames?.includes('com.huawei.maps.app')) {
+    fail('Petal Maps in catalog');
+  } else {
+    ok('Petal Maps fallback in maps catalog');
+  }
+
+  const tools = api.getGeminiTools();
+  if (tools.length !== 12) fail('device gemini tools count', String(tools.length));
+  else ok('12 device gemini tools');
+}
+
 async function main() {
   console.log('KASY beta smoke tests');
   console.log(`API: ${API_BASE}`);
@@ -317,6 +344,7 @@ async function main() {
   testIcsUtils();
   await testBillingI18n();
   await testI18n();
+  await testDeviceActions();
   await testLiveApi();
 
   console.log(`\n${passed} passed, ${failed} failed`);

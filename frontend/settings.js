@@ -43,23 +43,31 @@
 - Когато иска да изтрие събитие от календара → ПЪРВО потвърди, после ИЗВИКАЙ delete_calendar_event
 - event_id идва от списъка с календарни събития — не го измисляй
 
-ЗАВЪРШВАНЕ НА СЕСИЯТА:
-- След като изпълниш заявката, попитай САМО: „Имаш ли нужда от още нещо?“
-- Ако потребителят каже не / не благодаря / нищо / готово → ИЗВИКАЙ end_session
-- Ако иска още нещо → продължи да помагаш
+ДЕЙСТВИЯ НА ТЕЛЕФОНА (само Android APK, надеждни intent-и):
+- Навигация → device_navigate (адрес/място; Huawei: Petal Maps, Xiaomi: Google Maps/geo)
+- Отваряне на app → device_open_app (viber, whatsapp, maps, petal_maps, telegram, gmail, waze, chrome, camera)
+- Споделяне на текст → device_share_text (отваря app; потребителят избира контакт и изпраща — НЕ изпращай автоматично)
+- Обаждане → device_dial (отваря dialer; потребителят потвърждава)
+- SMS → device_compose_sms (чернова; потребителят изпраща)
+- Будилник → device_set_alarm
+- Напомняне в час → device_schedule_reminder (локално известие; НЕ Viber/WhatsApp автоматично)
+- Търсене контакт → device_find_contacts, после dial/sms/share
+- НИКОГА не твърди, че си изпратил съобщение — само че си отворил/подготвил действието
 
-ИЗЛИЗАНЕ ОТ РЕЖИМ НА СЛУШАНЕ:
-- Ако потребителят поиска да спре, затвори или излезе от слушането (напр. „спри“, „затвори“, „стоп“, „излез“, „чао“, „довиждане“) → ПЪРВО произнеси на глас кратко сбогуване на неговия език
-- Сбогуването трябва да звучи естествено и да отговаря на тона му — например „Чао и до скоро, оставам на разположение.“ или по-свободен вариант според ситуацията
-- След като си го казал на глас, ИЗВИКАЙ end_session
-- НИКОГА не извиквай end_session преди да си произнесъл сбогуването`,
+ПОСТОЯННА ПАМЕТ:
+- В началото на сесията получаваш секция ПОСТОЯННА ПАМЕТ със запомнени факти
+- Записвай само полезни, трайни факти (предпочитания, работен контекст, важни детайли за потребителя)
+- memory_save — запис/редакция по key; memory_list — преглед; memory_delete — изтриване
+- Не записвай временни неща („сега отивам да пазарувам") — само ако потребителят иска да го запомниш`,
+    instructionsCustomized: false,
     model: 'gemini-3.1-flash-live-preview',
     voiceName: 'Kore',
     temperature: 1.0,
     responseModalities: ['AUDIO'],
     textOutputEnabled: true,
-    inputAudioTranscription: true,
-    outputAudioTranscription: true,
+    // Прекъсване на асистента с глас (barge-in): микрофонът остава отворен
+    // докато той говори; ехото се чисти от echoCancellation на capture-а
+    bargeInEnabled: true,
     googleGrounding: true,
     automaticActivityDetection: {
       disabled: false,
@@ -113,6 +121,9 @@
       // Тригерът е фиксиран: двата бутона за звук (+ и −) едновременно
       enabled: true,
     },
+    deviceActions: {
+      enabled: true,
+    },
   };
 
   function deepMerge(base, override) {
@@ -144,8 +155,27 @@
     if (merged.textOutputEnabled === undefined) {
       merged.textOutputEnabled = merged.inputAudioTranscription !== false;
     }
-    merged.inputAudioTranscription = !!merged.textOutputEnabled;
-    merged.outputAudioTranscription = !!merged.textOutputEnabled;
+    // Инструкциите се развиват с приложението. Записан текст се пази само
+    // ако потребителят изрично го е персонализирал (флаг от admin панела);
+    // иначе замразен стар default в localStorage би блокирал поправките.
+    const defaultInstructions = DEFAULT_ASSISTANT_SETTINGS.systemInstructions.trim();
+    const savedInstructions = String(merged.systemInstructions || '').trim();
+    if (!savedInstructions || savedInstructions === defaultInstructions) {
+      merged.systemInstructions = DEFAULT_ASSISTANT_SETTINGS.systemInstructions;
+      merged.instructionsCustomized = false;
+    } else if (!merged.instructionsCustomized) {
+      merged.systemInstructions = DEFAULT_ASSISTANT_SETTINGS.systemInstructions;
+    }
+    // Транскрипцията е винаги включена в клиента (нужна за end_session);
+    // старите ключове inputAudioTranscription/outputAudioTranscription са
+    // вече без ефект и не се поддържат.
+    delete merged.inputAudioTranscription;
+    delete merged.outputAudioTranscription;
+    merged.bargeInEnabled = merged.bargeInEnabled !== false;
+    if (!merged.deviceActions || typeof merged.deviceActions !== 'object') {
+      merged.deviceActions = { ...DEFAULT_ASSISTANT_SETTINGS.deviceActions };
+    }
+    merged.deviceActions.enabled = merged.deviceActions.enabled !== false;
     merged.temperature = Math.min(2, Math.max(0, Number(merged.temperature) || 0));
     merged.defaults.priority = Math.min(5, Math.max(1, parseInt(String(merged.defaults.priority), 10) || 3));
     merged.defaults.estimatedMinutes = Math.max(0, parseInt(String(merged.defaults.estimatedMinutes), 10) || 0);
@@ -203,6 +233,12 @@
       const addr = window.AIVA_I18N?.tf?.('addressUserAs', { name: userName })
         || `Address the user by name: ${userName}`;
       instructions += `\n- ${addr}`;
+    }
+    if (window.AIVA_SESSION_END?.buildDeviceDateTimeContext) {
+      instructions += `\n\n${window.AIVA_SESSION_END.buildDeviceDateTimeContext(lang)}`;
+    }
+    if (window.AIVA_SESSION_END?.getSessionEndInstructions) {
+      instructions += `\n\n${window.AIVA_SESSION_END.getSessionEndInstructions(lang)}`;
     }
     if (extraContext) {
       instructions += extraContext;

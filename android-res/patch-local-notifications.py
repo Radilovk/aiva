@@ -55,6 +55,59 @@ if 'RECORD_AUDIO' not in content:
     )
     print('✅ Added microphone permissions')
 
+if 'READ_CONTACTS' not in content:
+    content = content.replace(
+        '<application',
+        '    <uses-permission android:name="android.permission.READ_CONTACTS" />\n'
+        '    <application',
+        1,
+    )
+    print('✅ Added READ_CONTACTS permission')
+
+# Android 11+ package visibility — lets isInstalled() / resolveActivity() see maps,
+# messaging, and dialer handlers without QUERY_ALL_PACKAGES.
+QUERIES_BLOCK = """
+    <queries>
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="com.huawei.maps.app" />
+        <package android:name="com.waze" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.viber.voip" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.mi.globalbrowser" />
+        <package android:name="com.huawei.browser" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="google.navigation" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="smsto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="text/plain" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM" />
+        </intent>
+    </queries>
+"""
+
+if '<queries>' not in content:
+    content = content.replace('<application', QUERIES_BLOCK + '\n    <application', 1)
+    print('✅ Added Android 11+ <queries> for package visibility')
+
 # USE_EXACT_ALARM (Android 14+): granted automatically for calendar/alarm apps,
 # so reminders keep firing exactly on time without the revocable
 # SCHEDULE_EXACT_ALARM special-access toggle.
@@ -220,7 +273,7 @@ if os.path.exists(STYLES):
             f.write(styles)
         print('✅ Patched launch theme: android:windowBackground=@color/app_background')
 
-# Launcher icon: Capacitor ships #FFFFFF background → force brand dark tile
+# Launcher icon: Capacitor ships #FFFFFF background → white box on install screen
 LAUNCHER_BG = 'android/app/src/main/res/values/ic_launcher_background.xml'
 LAUNCHER_BG_FIX = '''<?xml version="1.0" encoding="utf-8"?>
 <resources>
@@ -233,7 +286,7 @@ if os.path.exists(LAUNCHER_BG):
     if '#050508' not in bg:
         with open(LAUNCHER_BG, 'w') as f:
             f.write(LAUNCHER_BG_FIX)
-        print('✅ ic_launcher_background → #050508 (Icon.md brand tile)')
+        print('✅ ic_launcher_background → #050508 (dark brand launcher tile)')
 
 VECTOR_FG = 'android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml'
 if os.path.exists(VECTOR_FG):

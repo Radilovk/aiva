@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Brand assets — maskable master PNG (Icon.md / NutriPlan pipeline).
+ * Brand assets — icons copied as-is (alpha preserved, no crop/resize).
+ * Sources: PSX_*.png or brand-assets/source/icon-{192,512}.png
  */
-import { mkdir, writeFile, access, copyFile } from 'node:fs/promises';
+import { mkdir, writeFile, access, copyFile, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { renderSquareIcon } from './lib/brand-icon-prep.mjs';
-import { buildMaskableMaster, renderLegacyLauncher } from './lib/android-icon.mjs';
+import { renderApkLegacy, APP_WINDOW_BG } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,7 +31,6 @@ const ICON_512_CANDIDATES = [
 
 const BRAND_CANDIDATES = ['brand.jpg', 'brand.jpeg', 'brand.png'];
 const BUTTON_CANDIDATES = ['button.jpg', 'button.jpeg', 'button.png'];
-
 async function exists(path) {
   try {
     await access(path);
@@ -79,37 +79,47 @@ export async function processBrandAssets() {
   const brandSrc = await resolveInDirs(BRAND_CANDIDATES);
   const buttonSrc = await resolveInDirs(BUTTON_CANDIDATES);
 
-  console.log('KASY brand assets (Icon.md maskable pipeline)');
-  console.log(`  robot-192: ${icon192Src}`);
-  console.log(`  robot-512: ${icon512Src}`);
-  console.log(`  brand:     ${brandSrc}`);
-  console.log(`  button:    ${buttonSrc}`);
+  console.log('KASY brand assets');
+  console.log(`  icon-192: ${icon192Src}`);
+  console.log(`  icon-512: ${icon512Src}`);
+  console.log(`  brand:    ${brandSrc}`);
+  console.log(`  button:   ${buttonSrc}`);
 
   await mkdir(OUT, { recursive: true });
   await mkdir(SOURCE_DIR, { recursive: true });
+  await copyFile(icon192Src, join(SOURCE_DIR, 'icon-192.png'));
+  await copyFile(icon512Src, join(SOURCE_DIR, 'icon-512.png'));
 
-  console.log('\nMaskable master icons (66.7% safe zone, bg #050508):');
-  const icon512Buf = await buildMaskableMaster(icon512Src, 512)
+  console.log('\nApp icons (circular neon disc, transparent corners):');
+  const icon192Buf = await renderApkLegacy(icon192Src, 192)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-  const icon192Buf = await buildMaskableMaster(icon192Src, 192)
+  const icon512Buf = await renderApkLegacy(icon512Src, 512)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-
-  await writeFile(join(SOURCE_DIR, 'icon-512.png'), icon512Buf);
-  await writeFile(join(SOURCE_DIR, 'icon-192.png'), icon192Buf);
-  await writeFile(join(OUT, 'icon-512.png'), icon512Buf);
   await writeFile(join(OUT, 'icon-192.png'), icon192Buf);
-
-  const m512 = await sharp(icon512Buf).metadata();
-  console.log(`  ✓ frontend/icons/icon-512.png (${m512.width}×${m512.height}, ${(icon512Buf.length / 1024).toFixed(1)} KB)`);
-
-  const icon512Webp = await sharp(icon512Buf).webp({ quality: 90, effort: 6 }).toBuffer();
-  await writeFile(join(OUT, 'icon-512.webp'), icon512Webp);
-  console.log(`  ✓ frontend/icons/icon-512.webp (${(icon512Webp.length / 1024).toFixed(1)} KB)`);
-
   const m192 = await sharp(icon192Buf).metadata();
   console.log(`  ✓ frontend/icons/icon-192.png (${m192.width}×${m192.height}, ${(icon192Buf.length / 1024).toFixed(1)} KB)`);
 
-  const notif = await renderLegacyLauncher(icon512Buf, 96)
+  await writeFile(join(OUT, 'icon-512.png'), icon512Buf);
+  const icon512Webp = await sharp(icon512Buf).webp({ quality: 90, effort: 6, lossless: false }).toBuffer();
+  await writeFile(join(OUT, 'icon-512.webp'), icon512Webp);
+  const m512 = await sharp(icon512Buf).metadata();
+  console.log(`  ✓ frontend/icons/icon-512.png (${m512.width}×${m512.height})`);
+  console.log(`  ✓ frontend/icons/icon-512.webp (${(icon512Webp.length / 1024).toFixed(1)} KB)`);
+
+  // iOS изисква непрозрачна apple-touch икона — кръглият диск върху тъмния
+  // бранд фон (iOS сам заобля ъглите)
+  const appleTouch = await sharp({
+    create: { width: 180, height: 180, channels: 4, background: APP_WINDOW_BG },
+  })
+    .composite([{ input: await renderApkLegacy(icon512Src, 180).then((p) => p.png().toBuffer()) }])
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+  await writeFile(join(OUT, 'apple-touch-icon.png'), appleTouch);
+  console.log('  ✓ frontend/icons/apple-touch-icon.png (180×180, opaque)');
+
+  // Из суровия източник (не от кръглия диск) — status-bar иконата е силует
+  const notif = await sharp(icon192Src)
+    .resize(96, 96, { fit: 'inside', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .grayscale()
     .normalize()
     .png({ compressionLevel: 9 })

@@ -81,7 +81,8 @@ class PCMProcessor extends AudioWorkletProcessor {
 
     const isPlaying = this.queuedSamples > 0;
     if (this.wasPlaying && !isPlaying) {
-      this.buffering = true;
+      // Do not re-enter buffering between TTS chunks — that caused ~100ms gaps
+      // and audible stutter. Buffering only on cold start and interrupt.
       this.port.postMessage({ type: "drained" });
     }
     this.wasPlaying = isPlaying;

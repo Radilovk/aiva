@@ -523,6 +523,11 @@
         <div class="toggle" id="toggleTextOutput"></div>
       </div>
       <div class="field-hint" data-i18n="textOutputHint">Показва разговора като текст на избрания език</div>
+      <div class="toggle-row">
+        <span class="toggle-label" data-i18n="bargeIn">Прекъсване с глас</span>
+        <div class="toggle" id="toggleBargeIn"></div>
+      </div>
+      <div class="field-hint" data-i18n="bargeInHint">Можеш да прекъсваш асистента, докато говори. Изключи при проблеми с ехо.</div>
     </div>
 
     <!-- Hardware Shortcut -->
@@ -554,6 +559,18 @@
         <button class="btn primary" type="button" id="autostartBtn" data-i18n="deviceAutostartBtn">Отвори настройки за автостарт</button>
         <p class="field-hint" id="autostartHint"></p>
       </div>
+    </div>
+
+    <!-- Device Actions (Android APK test panel) -->
+    <div class="section" id="deviceActionsSection" style="display:none">
+      <div class="section-title">📱 Действия на телефона</div>
+      <p class="field-hint">Надеждни intent действия (навигация, apps, share, SMS, будилник). Тествайте тук преди гласови команди. Viber/WhatsApp не се изпращат автоматично — отварят app с текст.</p>
+      <div class="toggle-row" style="margin-bottom:12px">
+        <span class="toggle-label">Гласови device actions в сесия</span>
+        <div class="toggle" id="toggleDeviceActions"></div>
+      </div>
+      <div id="deviceActionsTestGrid" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      <p class="field-hint" id="deviceActionsTestResult" style="margin-top:10px;min-height:1.2em"></p>
     </div>
 
     <!-- Calendar View -->
@@ -713,6 +730,7 @@
   <script src="lib/voicePreview.js"></script>
   <script src="lib/shortcutBridge.js"></script>
   <script src="lib/deviceProfile.js"></script>
+  <script src="lib/deviceActions.js"></script>
   <script src="lib/icsUtils.js"></script>
   <script src="local-scheduler.js"></script>
   <script src="lib/deviceCalendar.js"></script>
@@ -811,6 +829,8 @@
       document.getElementById('temperature').value = settings.temperature;
       setToggle('toggleGrounding', settings.googleGrounding);
       setToggle('toggleTextOutput', settings.textOutputEnabled);
+      setToggle('toggleBargeIn', settings.bargeInEnabled);
+      setToggle('toggleDeviceActions', settings.deviceActions?.enabled !== false);
 
       // Hardware shortcut (fixed +−+− pattern)
       setToggle('toggleShortcutEnabled', settings.hardwareShortcut?.enabled);
@@ -1194,6 +1214,10 @@
         temperature: parseFloat(document.getElementById('temperature').value) || 1.0,
         googleGrounding: getToggle('toggleGrounding'),
         textOutputEnabled: getToggle('toggleTextOutput'),
+        bargeInEnabled: getToggle('toggleBargeIn'),
+        deviceActions: {
+          enabled: getToggle('toggleDeviceActions'),
+        },
         profile: {
           ...settings.profile,
           language: document.getElementById('profileLanguage').value,
@@ -1481,6 +1505,37 @@
       }
     }
 
+    function initDeviceActions() {
+      const section = document.getElementById('deviceActionsSection');
+      const grid = document.getElementById('deviceActionsTestGrid');
+      const resultEl = document.getElementById('deviceActionsTestResult');
+      if (!section || !grid || !window.AIVA_DEVICE_ACTIONS) return;
+
+      section.style.display = '';
+      grid.innerHTML = '';
+
+      for (const action of window.AIVA_DEVICE_ACTIONS.listTestActions()) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn';
+        btn.textContent = action.label;
+        btn.addEventListener('click', async () => {
+          if (resultEl) resultEl.textContent = '…';
+          try {
+            const res = await action.run();
+            if (resultEl) {
+              resultEl.textContent = res?.ok === false
+                ? `✗ ${res.error || 'error'}`
+                : `✓ ${JSON.stringify(res)}`;
+            }
+          } catch (e) {
+            if (resultEl) resultEl.textContent = `✗ ${e.message || e}`;
+          }
+        });
+        grid.appendChild(btn);
+      }
+    }
+
     async function initBilling() {
       const usageEl = document.getElementById('billingUsage');
       const grid = document.getElementById('billingPlanGrid');
@@ -1587,6 +1642,7 @@
         await handleCloudOauthCallback();
       }
       populateUI();
+      initDeviceActions();
       await initBilling();
       document.getElementById('paywallDismissBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.hidePaywall?.());
       document.getElementById('paywallMonthlyBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.openCheckout?.('plus_monthly'));

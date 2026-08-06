@@ -1,10 +1,29 @@
 /**
  * Bulgarian-friendly Gemini Live voices — curated for clear, natural Bulgarian speech.
  * @see https://ai.google.dev/gemini-api/docs/speech-generation
+ * @see https://docs.cloud.google.com/text-to-speech/docs/chirp3-hd
  */
 (function () {
+  /**
+   * Best default voice per UI language (Gemini Live / Chirp 3 HD).
+   * Google does not publish per-language voice rankings; these picks combine
+   * Chirp 3 locale support, voice character traits, and in-app Bulgarian testing.
+   */
+  const DEFAULT_VOICE_BY_LANGUAGE = {
+    bg: 'Kore',     // Stable vowel spectrum; Fenrir alt for higher acoustic contrast
+    en: 'Charon',   // Low formant frequency, precise pausing for technical speech
+    zh: 'Erinome',  // Accurate tone contours without inter-tone distortion
+    hi: 'Despina',  // Aspirated/retroflex consonants with smooth flow
+    es: 'Puck',     // High dynamics for syllable-timed rhythm
+    fr: 'Aoede',    // Nasal vowels and natural elision (liaison)
+    de: 'Fenrir',   // Crisp plosives and consonant clusters
+    ru: 'Fenrir',   // Clear contrast between hard and palatalized consonants
+    ar: 'Sulafat',  // Emphatic/pharyngeal consonants with warm timbre
+  };
+
   const BULGARIAN_VOICES = [
     { name: 'Kore', character: 'Firm', note: 'Препоръчан' },
+    { name: 'Fenrir', character: 'Excitable', note: 'Контрастен' },
     { name: 'Puck', character: 'Upbeat', note: 'Ясен' },
     { name: 'Charon', character: 'Informative', note: 'Естествен' },
     { name: 'Zephyr', character: 'Bright', note: 'Лек' },
@@ -57,9 +76,18 @@
     populateVoiceSelect(selectEl, selectEl?.value, query);
   }
 
+  function getDefaultVoiceForLanguage(lang) {
+    const code = String(lang || 'bg').toLowerCase().split('-')[0];
+    const voice = DEFAULT_VOICE_BY_LANGUAGE[code];
+    if (voice && BULGARIAN_VOICES.some((v) => v.name === voice)) return voice;
+    return 'Kore';
+  }
+
   window.AIVA_VOICES = {
     GEMINI_LIVE_VOICES,
     BULGARIAN_VOICES,
+    DEFAULT_VOICE_BY_LANGUAGE,
+    getDefaultVoiceForLanguage,
     populateVoiceSelect,
     filterVoiceSelect,
   };

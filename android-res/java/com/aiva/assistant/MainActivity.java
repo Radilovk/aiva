@@ -33,6 +33,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AivaCalendarPlugin.class);
         registerPlugin(AivaShortcutPlugin.class);
         registerPlugin(AivaDevicePlugin.class);
+        registerPlugin(AivaActionsPlugin.class);
         super.onCreate(savedInstanceState);
         applyDarkSystemBars();
         requestEssentialPermissions();

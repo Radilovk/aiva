@@ -12,7 +12,6 @@ on:
       - 'scripts/generate-android-apk-assets.mjs'
       - 'brand-assets/source/**'
       - 'PSX_*.png'
-      - 'Icon.md'
       - 'scripts/lib/android-icon.mjs'
       - 'scripts/prepare-capacitor-shell.mjs'
       - '.github/workflows/build-apk.yml'
@@ -77,6 +76,8 @@ jobs:
              android/app/src/main/java/com/aiva/assistant/
           cp android-res/java/com/aiva/assistant/AivaDevicePlugin.java \
              android/app/src/main/java/com/aiva/assistant/
+          cp android-res/java/com/aiva/assistant/AivaActionsPlugin.java \
+             android/app/src/main/java/com/aiva/assistant/
 
       - name: Patch AndroidManifest and register AivaCalendar plugin
         run: python3 android-res/patch-local-notifications.py
@@ -90,8 +91,10 @@ jobs:
       - name: Verify launcher icon resources
         run: |
           grep -q '#050508' android/app/src/main/res/values/ic_launcher_background.xml
-          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
-          ! test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_background.png
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+          ! test -e android/app/src/main/res/mipmap-anydpi-v26
+          ! test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
           grep -q 'android:windowBackground">@color/app_background' android/app/src/main/res/values/styles.xml
           ! test -f android/app/src/main/res/drawable/splash.xml
           ! test -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
