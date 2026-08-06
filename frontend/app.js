@@ -92,8 +92,6 @@ let touchStartX = null;
 let calendarNavLock = false;
 let voiceFocusTask = null;
 let cachedCalendarEvents = [];
-let awaitingCloseConfirmation = false;
-let pendingUserTranscript = '';
 let assistantTranscriptBuffer = '';
 let assistantTurnComplete = false;
 let sessionEnding = false;
@@ -358,7 +356,7 @@ class EndSessionTool extends FunctionCallDefinition {
   constructor() {
     super(
       'end_session',
-      'Приключва гласовата сесия. Използвай го САМО след като вече си произнесъл на глас кратко сбогуване на езика на потребителя.',
+      'Спира слушането и затваря гласовата сесия. ЗАДЪЛЖИТЕЛНО го извикай в същия ход, веднага след като произнесеш сбогуването — ти си единственият, който може да спре микрофона. Никога не го споменавай на глас.',
       {
         type: 'object',
         properties: {
@@ -499,62 +497,10 @@ function setAssistantSpeech(text) {
   setStatus(trimmed, true, 'assistant');
 }
 
-const CLOSING_QUESTION_RE = /още\s+нещо|нужда\s+от\s+още|нещо\s+друго|мога\s+ли\s+още|anything\s+else|need\s+anything|something\s+else|还需要|还需要其他|कुछ\s+और|algo\s+más|شيء\s+آخر|autre\s+chose|besoin\s+d.autre|noch\s+etwas|brauchen\s+sie\s+noch|ещё\s+что|нужно\s+ещё/i;
-const NEGATIVE_CLOSE_RE = /^(не|не,?\s*(благодаря|мерси)?|няма|нищо|готово|достатъчно|no|nope|nothing|that's all|done|enough|нет|没有|नहीं|नहीं\s+धन्यवाद|no\s+gracias|لا|non|nein|ничего|спасибо,\s*нет)\b/i;
-const USER_GOODBYE_WORDS = [
-  'спри', 'стоп', 'затвори', 'излез', 'чао', 'ciao', 'довиждане', 'до видане',
-  'благодаря', 'мерси', 'thanks', 'thank you', 'danke', 'gracias', 'merci',
-  'obrigado', 'obrigada', 'goodbye', 'bye', 'stop', 'exit', 'quit',
-  'arrivederci', 'sayonara', 'adiós', 'adios', 'adeu', 'paka', 'чао чао',
-];
-// Само точно съвпадение — „край" като префикс би хванало „крайният срок"
-const USER_GOODBYE_EXACT = ['край', 'приключи', 'приключвай', 'the end', 'ende', 'fin'];
-
-function normalizeUtterance(text) {
-  return String(text || '').toLowerCase().trim().replace(/[.!?,…]+$/g, '');
-}
-
-function utteranceHasGoodbyeWord(normalized, word) {
-  if (!normalized || !word) return false;
-  if (normalized === word) return true;
-  const tokens = normalized.split(/[\s,;]+/).filter(Boolean);
-  return tokens.some((token) => token === word || token.startsWith(word));
-}
-
-function isUserGoodbye(text) {
-  const normalized = normalizeUtterance(text);
-  if (!normalized) return false;
-  if (USER_GOODBYE_WORDS.some((word) => utteranceHasGoodbyeWord(normalized, word))) return true;
-  if (USER_GOODBYE_EXACT.includes(normalized)) return true;
-  const tokens = normalized.split(/[\s,;]+/).filter(Boolean);
-  return USER_GOODBYE_EXACT.some((word) => tokens.includes(word));
-}
-// Само изрични сбогувания — фрази като "приятен ден" се появяват и насред разговор
-const ASSISTANT_GOODBYE_RE = /\b(чао|довиждане|до\s*видане|goodbye|bye\s*bye|auf\s+wiedersehen|au\s+revoir|adiós|adios|до\s+свидания)\b/i;
-const ASSISTANT_FAREWELL_RE = /(оставам\s+на\s+разположение|на\s+разположение\s+съм|до\s+скоро|приятен\s+ден|до\s+ново\s+срещане|i\s*'?m\s+here\s+if\s+you\s+need|reach\s+out\s+any\s*time|на\s+услуга)/i;
-
-function detectClosingQuestion(text) {
-  if (CLOSING_QUESTION_RE.test(String(text || '').toLowerCase())) {
-    awaitingCloseConfirmation = true;
-  }
-}
-
-function isNegativeCloseResponse(text) {
-  const normalized = normalizeUtterance(text);
-  if (!normalized) return false;
-  return NEGATIVE_CLOSE_RE.test(normalized);
-}
-
-function detectAssistantGoodbye(text) {
-  if (!text || sessionEnding) return false;
-  const lower = String(text).toLowerCase();
-  return ASSISTANT_GOODBYE_RE.test(lower) || ASSISTANT_FAREWELL_RE.test(lower);
-}
-
-function resetSessionCloseState() {
-  awaitingCloseConfirmation = false;
-  pendingUserTranscript = '';
-}
+// Краят на разговора се решава единствено от асистента чрез инструмента
+// end_session (инструктиран в system instructions) — без клиентско засичане
+// на ключови думи, което даваше и фалшиви затваряния („благодаря" насред
+// разговор), и пропуснати.
 
 function clearSessionEndState() {
   sessionEnding = false;
@@ -614,8 +560,6 @@ const SESSION_END_FALLBACK_MS = 15000;
 function armSessionEnd() {
   if (sessionEnding) return;
   sessionEnding = true;
-  awaitingCloseConfirmation = false;
-  pendingUserTranscript = '';
   setMicUplinkMuted(true);
   if (audioStreamer) {
     audioStreamer.stop();
@@ -667,27 +611,13 @@ async function finalizeSessionEnd() {
   if (isSessionActive) disconnectSession();
 }
 
+/**
+ * Извиква се от end_session tool call-а на асистента. Микрофонът спира
+ * веднага (без да се вижда нищо), а UI-ят и сесията се затварят чак след
+ * като аудиото на последната реплика дозвучи — вж. finalizeSessionEnd.
+ */
 function scheduleSessionEnd() {
-  requestSessionEndAfterFarewell();
-}
-
-function handlePossibleCloseResponse(text, finished = false) {
-  if (!awaitingCloseConfirmation || !text) return;
-  const combined = `${pendingUserTranscript}${text}`.trim();
-  pendingUserTranscript = finished ? '' : combined;
-  if (isNegativeCloseResponse(combined)) {
-    requestSessionEndAfterFarewell();
-  }
-}
-
-function handleUserTranscriptForSessionControl(text, finished = false) {
-  if (awaitingCloseConfirmation) {
-    handlePossibleCloseResponse(text, finished);
-    return;
-  }
-  if (finished && isUserGoodbye(text)) {
-    requestSessionEndAfterFarewell();
-  }
+  requestSessionEndAfterFarewell({ finalizeIfIdle: true });
 }
 
 function showError(msg) {
@@ -1763,22 +1693,10 @@ async function handleGeminiMessage(message) {
       if (audioPlayer) await audioPlayer.play(message.data);
       break;
 
-    case MultimodalLiveResponseType.INPUT_TRANSCRIPTION:
-      if (message.data?.text) {
-        handleUserTranscriptForSessionControl(message.data.text, message.data.finished === true);
-      }
-      break;
-
     case MultimodalLiveResponseType.OUTPUT_TRANSCRIPTION:
       if (message.data?.text) {
         assistantTranscriptBuffer += message.data.text;
         setAssistantSpeech(assistantTranscriptBuffer);
-        detectClosingQuestion(assistantTranscriptBuffer);
-        // Сбогуването се проверява само на завършен транскрипт — частичните
-        // фрагменти дават фалшиви съвпадения и затварят сесията погрешно.
-        if (message.data.finished && detectAssistantGoodbye(assistantTranscriptBuffer)) {
-          requestSessionEndAfterFarewell({ finalizeIfIdle: true });
-        }
       }
       break;
 
@@ -1786,10 +1704,6 @@ async function handleGeminiMessage(message) {
       if (message.data) {
         assistantTranscriptBuffer = String(message.data);
         setAssistantSpeech(assistantTranscriptBuffer);
-        detectClosingQuestion(assistantTranscriptBuffer);
-        if (detectAssistantGoodbye(assistantTranscriptBuffer)) {
-          requestSessionEndAfterFarewell({ finalizeIfIdle: true });
-        }
       }
       break;
 
@@ -1845,7 +1759,6 @@ async function handleGeminiMessage(message) {
 
     case MultimodalLiveResponseType.TURN_COMPLETE:
       assistantTranscriptBuffer = '';
-      pendingUserTranscript = '';
       assistantTurnComplete = true;
       if (awaitingGreetingMic) {
         startMicAfterGreeting();
@@ -1861,8 +1774,9 @@ async function handleGeminiMessage(message) {
       break;
 
     case MultimodalLiveResponseType.INTERRUPTED:
-      // Ignore spurious interrupts during greeting or while assistant speaks
-      if (awaitingGreetingMic || audioStreamer?.uplinkMuted) break;
+      // Ignore spurious interrupts during greeting or while assistant speaks;
+      // при приключване сбогуването трябва да дозвучи докрай
+      if (awaitingGreetingMic || sessionEnding || audioStreamer?.uplinkMuted) break;
       if (audioPlayer) audioPlayer.interrupt();
       assistantTranscriptBuffer = '';
       assistantTurnComplete = false;
@@ -1937,7 +1851,6 @@ async function connectSession() {
     const model = assistantSettings.model || LIVE_MODEL;
 
     client = new GeminiLiveAPI(token, model);
-    resetSessionCloseState();
     assistantTranscriptBuffer = '';
     assistantTurnComplete = false;
     let extraContext = buildTasksContextForAssistant()
@@ -2019,7 +1932,6 @@ function disconnectSession() {
   client = null;
   isSessionActive = false;
   isConnecting = false;
-  resetSessionCloseState();
   assistantTranscriptBuffer = '';
   assistantTurnComplete = false;
   recordBtn.classList.remove('recording');

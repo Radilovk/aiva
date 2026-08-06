@@ -1,4 +1,4 @@
-const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.AIVA_SETTINGS;
+const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings, DEFAULT_ASSISTANT_SETTINGS } = window.AIVA_SETTINGS;
 
 const form = document.getElementById('adminForm');
 const saveState = document.getElementById('saveState');
@@ -87,6 +87,8 @@ function collectSettings() {
   return {
     ...existing,
     systemInstructions: promptField.value.trim(),
+    instructionsCustomized:
+      promptField.value.trim() !== DEFAULT_ASSISTANT_SETTINGS.systemInstructions.trim(),
     model: modelField.value.trim(),
     voiceName: voiceField.value,
     temperature: Number(temperatureField.value),
