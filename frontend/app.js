@@ -100,6 +100,8 @@ let sessionEndFinalizing = false;
 let lastAssistantAudioAt = 0;
 let farewellEndRequestedAt = 0;
 let farewellTurnCompleteReceived = false;
+let userTranscriptBuffer = '';
+let userGoodbyeTimer = null;
 let awaitingGreetingMic = false;
 let greetingMicTimer = null;
 let reconnectAttempts = 0;
@@ -559,16 +561,39 @@ function setAssistantSpeech(text) {
   setStatus(trimmed, true, 'assistant');
 }
 
-// Краят на разговора се решава единствено от асистента чрез инструмента
-// end_session (инструктиран в system instructions) — без клиентско засичане
-// на ключови думи, което даваше и фалшиви затваряния („благодаря" насред
-// разговор), и пропуснати.
+// Край на разговора: основно end_session от модела; клиентът също следи
+// сбогувания в транскрипцията и при нужда затваря (без фалшиви „благодаря" насред разговор).
 
+function clearUserGoodbyeTimer() {
+  if (userGoodbyeTimer) {
+    clearTimeout(userGoodbyeTimer);
+    userGoodbyeTimer = null;
+  }
+}
+
+function maybeScheduleSessionEndFromFarewell(source) {
+  if (sessionEnding || awaitingGreetingMic || !isSessionActive) return;
+  const text = assistantTranscriptBuffer;
+  if (!window.AIVA_SESSION_END?.looksLikeAssistantFarewell?.(text)) return;
+  scheduleSessionEnd();
+}
+
+function handleUserGoodbyeTranscript(text, finished) {
+  if (!finished || sessionEnding || awaitingGreetingMic || !isSessionActive) return;
+  if (!window.AIVA_SESSION_END?.looksLikeUserGoodbye?.(text)) return;
+  clearUserGoodbyeTimer();
+  userGoodbyeTimer = setTimeout(() => {
+    userGoodbyeTimer = null;
+    if (!sessionEnding && isSessionActive) scheduleSessionEnd();
+  }, USER_GOODBYE_END_MS);
+}
 function clearSessionEndState() {
   sessionEnding = false;
   sessionEndFinalizing = false;
   farewellEndRequestedAt = 0;
   farewellTurnCompleteReceived = false;
+  clearUserGoodbyeTimer();
+  userTranscriptBuffer = '';
   if (sessionEndTimer) {
     clearTimeout(sessionEndTimer);
     sessionEndTimer = null;
@@ -623,6 +648,7 @@ async function startMicAfterGreeting() {
 const SESSION_END_FALLBACK_MS = 15000;
 const FAREWELL_AUDIO_GAP_MS = 450;
 const FAREWELL_PLAYBACK_STABLE_MS = 400;
+const USER_GOODBYE_END_MS = 8000;
 
 function armSessionEnd() {
   if (sessionEnding) return;
@@ -1883,6 +1909,17 @@ async function handleGeminiMessage(message) {
       if (message.data?.text) {
         assistantTranscriptBuffer += message.data.text;
         setAssistantSpeech(assistantTranscriptBuffer);
+        if (message.data.finished) {
+          maybeScheduleSessionEndFromFarewell('output_transcription');
+        }
+      }
+      break;
+
+    case MultimodalLiveResponseType.INPUT_TRANSCRIPTION:
+      if (message.data?.text) {
+        userTranscriptBuffer += message.data.text;
+        handleUserGoodbyeTranscript(userTranscriptBuffer, message.data.finished);
+        if (message.data.finished) userTranscriptBuffer = '';
       }
       break;
 
@@ -1949,6 +1986,7 @@ async function handleGeminiMessage(message) {
     }
 
     case MultimodalLiveResponseType.TURN_COMPLETE:
+      maybeScheduleSessionEndFromFarewell('turn_complete');
       assistantTranscriptBuffer = '';
       assistantTurnComplete = true;
       if (awaitingGreetingMic) {
@@ -2054,8 +2092,7 @@ async function connectSession() {
       extraContext
     );
     client.systemInstructions = instructions;
-    // Винаги включени: без транскрипция клиентът не може да засече „чао"/
-    // „край"/„благодаря" и сесията (микрофонът) остава активна след сбогуване.
+    // Транскрипцията е винаги включена: нужна за UI и надеждно затваряне при сбогуване.
     client.inputAudioTranscription = true;
     client.outputAudioTranscription = true;
     client.responseModalities = assistantSettings.responseModalities;
@@ -2075,7 +2112,12 @@ async function connectSession() {
     client.addFunction(new ReadCalendarEventsTool());
     client.addFunction(new EditCalendarEventTool());
     client.addFunction(new DeleteCalendarEventTool());
-    client.addFunction(new EndSessionTool());
+    const endSessionTool = new EndSessionTool();
+    const sessionLang = assistantSettings.profile?.language || 'bg';
+    if (window.AIVA_SESSION_END?.getEndSessionToolDescription) {
+      endSessionTool.description = window.AIVA_SESSION_END.getEndSessionToolDescription(sessionLang);
+    }
+    client.addFunction(endSessionTool);
     for (const tool of window.AIVA_DEVICE_ACTIONS?.getGeminiTools?.() || []) {
       client.addFunction(tool);
     }
