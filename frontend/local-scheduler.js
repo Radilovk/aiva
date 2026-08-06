@@ -510,11 +510,26 @@
     return rem ? tf('countInHourMin', { hrs, mins: rem }) : tf('countInHour', { hrs });
   }
 
+  async function scheduleAt({ at, title, body, id }) {
+    const when = at instanceof Date ? at : new Date(at);
+    if (Number.isNaN(when.getTime())) return false;
+    return scheduleNotification({
+      id: id ?? (Date.now() % 2147483647),
+      title: title || 'KASY',
+      body: body || '',
+      at: when,
+      taskId: null,
+      type: 'device_reminder',
+    });
+  }
+
   window.AIVA_NOTIFIER = {
     init,
     ensureNativeReady,
     requestPermission,
     scheduleForTask,
+    scheduleAt,
+    cancelForTask,
     cancelForTask,
     cancelAll,
     scheduleAll,
