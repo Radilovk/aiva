@@ -10,19 +10,20 @@
    * Chirp 3 locale support, voice character traits, and in-app Bulgarian testing.
    */
   const DEFAULT_VOICE_BY_LANGUAGE = {
-    bg: 'Kore',     // Firm — project-tested for bg-BG (Chirp3-HD-Kore)
-    en: 'Charon',   // Informative — clear professional assistant tone
-    zh: 'Erinome',  // Clear — tonal-language clarity
-    hi: 'Despina',  // Smooth — natural flow for Indic speech
-    es: 'Puck',     // Upbeat — conversational Romance prosody
-    fr: 'Aoede',    // Breezy — flowing French delivery
-    de: 'Charon',   // Informative — precise German articulation
-    ru: 'Kore',     // Firm — clear Slavic pronunciation
-    ar: 'Sulafat',  // Warm — natural Arabic conversational tone
+    bg: 'Kore',     // Stable vowel spectrum; Fenrir alt for higher acoustic contrast
+    en: 'Charon',   // Low formant frequency, precise pausing for technical speech
+    zh: 'Erinome',  // Accurate tone contours without inter-tone distortion
+    hi: 'Despina',  // Aspirated/retroflex consonants with smooth flow
+    es: 'Puck',     // High dynamics for syllable-timed rhythm
+    fr: 'Aoede',    // Nasal vowels and natural elision (liaison)
+    de: 'Fenrir',   // Crisp plosives and consonant clusters
+    ru: 'Fenrir',   // Clear contrast between hard and palatalized consonants
+    ar: 'Sulafat',  // Emphatic/pharyngeal consonants with warm timbre
   };
 
   const BULGARIAN_VOICES = [
     { name: 'Kore', character: 'Firm', note: 'Препоръчан' },
+    { name: 'Fenrir', character: 'Excitable', note: 'Контрастен' },
     { name: 'Puck', character: 'Upbeat', note: 'Ясен' },
     { name: 'Charon', character: 'Informative', note: 'Естествен' },
     { name: 'Zephyr', character: 'Bright', note: 'Лек' },
