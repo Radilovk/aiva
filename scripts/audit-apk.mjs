@@ -42,21 +42,29 @@ async function main() {
 
   execSync(`java -jar ${APKTOOL} d -f "${APK}" -o "${OUT}/decoded"`, { stdio: 'pipe' });
 
-  const fgApk = await readFile(join(OUT, 'decoded', 'res', 'mipmap-xxxhdpi', 'ic_launcher_foreground.png'));
-  const fgApkMd5 = md5(fgApk);
-  const fgMeta = await sharp(fgApk).metadata();
+  const iconApk = await readFile(join(OUT, 'decoded', 'res', 'mipmap-xxxhdpi', 'ic_launcher.png'));
+  const iconApkMd5 = md5(iconApk);
+  const { data: iconRaw, info: iconInfo } = await sharp(iconApk)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const alphaAt = (x, y) => iconRaw[(y * iconInfo.width + x) * 4 + 3];
+  const last = iconInfo.width - 1;
   const styles = await readFile(join(OUT, 'decoded', 'res', 'values', 'styles.xml'), 'utf8');
   const manifest = await readFile(join(OUT, 'decoded', 'AndroidManifest.xml'), 'utf8');
-  const colors = await readFile(join(OUT, 'decoded', 'res', 'values', 'colors.xml'), 'utf8');
 
   const checks = [
-    ['not Capacitor default icon', fgApkMd5 !== CAPACITOR_DEFAULT_FG_MD5, fgApkMd5],
-    ['launcher fg is 432×432 (108dp adaptive)', fgMeta.width === 432 && fgMeta.height === 432, `${fgMeta.width}×${fgMeta.height}`],
+    ['not Capacitor default icon', iconApkMd5 !== CAPACITOR_DEFAULT_FG_MD5, iconApkMd5],
+    ['launcher icon is 192×192', iconInfo.width === 192 && iconInfo.height === 192, `${iconInfo.width}×${iconInfo.height}`],
+    ['launcher icon is round (transparent corners)',
+      alphaAt(0, 0) === 0 && alphaAt(last, 0) === 0 && alphaAt(0, last) === 0 && alphaAt(last, last) === 0],
+    ['launcher icon disc is opaque', alphaAt(Math.floor(last / 2), Math.floor(last / 2)) === 255],
+    ['no adaptive icon XML (launchers must not re-mask)',
+      !(await readFile(join(OUT, 'decoded', 'res', 'mipmap-anydpi-v26', 'ic_launcher.xml'), 'utf8').catch(() => null))],
     ['windowBackground=@color/app_background', /android:windowBackground">@color\/app_background/.test(styles)],
     ['no splash drawable in APK', !(await readFile(join(OUT, 'decoded', 'res', 'drawable', 'splash.xml'), 'utf8').catch(() => null))],
     ['no Capacitor vector fg', !(await readFile(join(OUT, 'decoded', 'res', 'drawable-v24', 'ic_launcher_foreground.xml'), 'utf8').catch(() => null))],
     ['themed icon disabled', /THEMED_ICON_ENABLED.*false/.test(manifest)],
-    ['ic_launcher_background #050508', colors.includes('#ff050508') || colors.includes('#050508')],
   ];
 
   console.log(`APK audit: ${APK}\n`);

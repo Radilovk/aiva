@@ -2,29 +2,23 @@
 /**
  * Android launcher icons from the transparent master artwork (no native splash).
  *
- * Per density bucket:
- *   - ic_launcher_background.png / ic_launcher_foreground.png — adaptive
- *     layers at 108 dp (dark full-bleed bg + artwork in the 72 dp zone)
- *   - ic_launcher.png / ic_launcher_round.png — legacy 48 dp bitmaps,
- *     transparent, artwork nearly full-bleed (Android ≤ 7.1 launchers)
+ * Ships ONLY pre-shaped circular legacy bitmaps (ic_launcher /
+ * ic_launcher_round) and deletes every adaptive-icon resource, so launchers
+ * that honor an app's own icon shape (MIUI/HyperOS, OneUI, EMUI...) show a
+ * large round icon with transparent corners instead of a masked square tile.
  */
-import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, unlink, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import {
   APP_WINDOW_BG,
   APK_ICON_BG,
-  APK_FOREGROUND_FILL,
-  APK_LEGACY_FILL,
-  ADAPTIVE_DP,
+  APK_CIRCLE_FILL,
   LEGACY_DP,
   DENSITY_SCALES,
   resolveMasterIcon,
-  renderApkBackground,
-  renderApkForeground,
-  renderApkLegacy,
-  renderApkRound,
+  renderApkCircle,
 } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
@@ -62,34 +56,30 @@ async function writeLauncherIcons(masterPath) {
     const folder = join(OUT, `mipmap-${density}`);
     await mkdir(folder, { recursive: true });
 
-    const adaptiveSize = Math.round(ADAPTIVE_DP * scale);
-    const legacySize = Math.round(LEGACY_DP * scale);
-
-    const bgBuf = await renderApkBackground(adaptiveSize).png({ compressionLevel: 9 }).toBuffer();
-    const fgBuf = await renderApkForeground(masterPath, adaptiveSize)
-      .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-    const legacyBuf = await renderApkLegacy(masterPath, legacySize)
-      .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-    const roundBuf = await renderApkRound(masterPath, legacySize)
+    const size = Math.round(LEGACY_DP * scale);
+    const buf = await renderApkCircle(masterPath, size)
       .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
-    await writeFile(join(folder, 'ic_launcher_background.png'), bgBuf);
-    await writeFile(join(folder, 'ic_launcher_foreground.png'), fgBuf);
-    await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
-    await writeFile(join(folder, 'ic_launcher_round.png'), roundBuf);
+    await writeFile(join(folder, 'ic_launcher.png'), buf);
+    await writeFile(join(folder, 'ic_launcher_round.png'), buf);
     console.log(
-      `  ✓ mipmap-${density}/ adaptive ${adaptiveSize}px (bg ${APK_ICON_BG}, fg ${Math.round(APK_FOREGROUND_FILL * 100)}%), legacy ${legacySize}px transparent (${Math.round(APK_LEGACY_FILL * 100)}%)`,
+      `  ✓ mipmap-${density}/ ${size}px circular (art ${Math.round(APK_CIRCLE_FILL * 100)}% of disc)`,
     );
   }
 }
 
-async function removeCapacitorDefaultVectors() {
-  const vector = join(OUT, 'drawable-v24', 'ic_launcher_foreground.xml');
-  try {
-    await unlink(vector);
-    console.log('  ✓ removed Capacitor default vector foreground');
-  } catch {
-    /* ok */
+/**
+ * Remove every adaptive-icon resource (Capacitor defaults and our own older
+ * output). With no adaptive icon, launchers fall back to the pre-shaped
+ * circular bitmaps above and cannot re-mask them into square tiles.
+ */
+async function removeAdaptiveIconResources(resDir) {
+  await rm(join(resDir, 'mipmap-anydpi-v26'), { recursive: true, force: true });
+  await unlink(join(resDir, 'drawable-v24', 'ic_launcher_foreground.xml')).catch(() => {});
+  for (const [density] of DENSITY_SCALES) {
+    for (const name of ['ic_launcher_foreground.png', 'ic_launcher_background.png']) {
+      await unlink(join(resDir, `mipmap-${density}`, name)).catch(() => {});
+    }
   }
 }
 
@@ -125,33 +115,12 @@ async function writeBrandColors() {
   }
 }
 
-async function writeAdaptiveIconXml() {
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@mipmap/ic_launcher_background"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-    <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
-</adaptive-icon>
-`;
-  for (const anydpi of [join(OUT, 'mipmap-anydpi-v26'), join(ANDROID_RES, 'mipmap-anydpi-v26')]) {
-    await mkdir(anydpi, { recursive: true });
-    await writeFile(join(anydpi, 'ic_launcher.xml'), xml);
-    await writeFile(join(anydpi, 'ic_launcher_round.xml'), xml);
-  }
-  console.log(`  ✓ adaptive icons (bitmap bg ${APK_ICON_BG}, fg safe zone)`);
-}
-
 async function mirrorToAndroidRes() {
   for (const [density] of DENSITY_SCALES) {
     const srcDir = join(OUT, `mipmap-${density}`);
     const dstDir = join(ANDROID_RES, `mipmap-${density}`);
     await mkdir(dstDir, { recursive: true });
-    for (const name of [
-      'ic_launcher_background.png',
-      'ic_launcher.png',
-      'ic_launcher_round.png',
-      'ic_launcher_foreground.png',
-    ]) {
+    for (const name of ['ic_launcher.png', 'ic_launcher_round.png']) {
       const buf = await readFile(join(srcDir, name));
       await writeFile(join(dstDir, name), buf);
     }
@@ -166,9 +135,10 @@ async function main() {
   console.log(`  master: ${masterPath}`);
   await writeLauncherIcons(masterPath);
   await writeBrandColors();
-  await writeAdaptiveIconXml();
   await writeNotificationIcon(icon192Path);
-  await removeCapacitorDefaultVectors();
+  await removeAdaptiveIconResources(OUT);
+  await removeAdaptiveIconResources(ANDROID_RES);
+  console.log('  ✓ removed adaptive icon resources (circular legacy bitmaps only)');
   if (OUT.includes('android/app')) {
     await mirrorToAndroidRes();
   }

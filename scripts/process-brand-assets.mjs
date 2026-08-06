@@ -90,7 +90,7 @@ export async function processBrandAssets() {
   await copyFile(icon192Src, join(SOURCE_DIR, 'icon-192.png'));
   await copyFile(icon512Src, join(SOURCE_DIR, 'icon-512.png'));
 
-  console.log('\nApp icons (transparent, artwork nearly full-bleed):');
+  console.log('\nApp icons (circular neon disc, transparent corners):');
   const icon192Buf = await renderApkLegacy(icon192Src, 192)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
   const icon512Buf = await renderApkLegacy(icon512Src, 512)
@@ -106,7 +106,8 @@ export async function processBrandAssets() {
   console.log(`  ✓ frontend/icons/icon-512.png (${m512.width}×${m512.height})`);
   console.log(`  ✓ frontend/icons/icon-512.webp (${(icon512Webp.length / 1024).toFixed(1)} KB)`);
 
-  const notif = await sharp(icon192Buf)
+  // Из суровия източник (не от кръглия диск) — status-bar иконата е силует
+  const notif = await sharp(icon192Src)
     .resize(96, 96, { fit: 'inside', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .grayscale()
     .normalize()
