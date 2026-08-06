@@ -40,8 +40,13 @@
     const api = getSettingsApi();
     if (!api) return null;
     const current = api.loadAssistantSettings();
+    const isFirstRun = !current.profile?.onboardingComplete;
+    const voicePatch = (isFirstRun && patch.language)
+      ? { voiceName: window.AIVA_VOICES?.getDefaultVoiceForLanguage?.(patch.language) || current.voiceName }
+      : {};
     const next = api.saveAssistantSettings({
       ...current,
+      ...voicePatch,
       profile: { ...current.profile, ...patch },
     });
     window.AIVA_I18N?.initFromSettings?.(next);

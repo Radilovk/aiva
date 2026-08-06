@@ -1,8 +1,26 @@
 /**
  * Bulgarian-friendly Gemini Live voices — curated for clear, natural Bulgarian speech.
  * @see https://ai.google.dev/gemini-api/docs/speech-generation
+ * @see https://docs.cloud.google.com/text-to-speech/docs/chirp3-hd
  */
 (function () {
+  /**
+   * Best default voice per UI language (Gemini Live / Chirp 3 HD).
+   * Google does not publish per-language voice rankings; these picks combine
+   * Chirp 3 locale support, voice character traits, and in-app Bulgarian testing.
+   */
+  const DEFAULT_VOICE_BY_LANGUAGE = {
+    bg: 'Kore',     // Firm — project-tested for bg-BG (Chirp3-HD-Kore)
+    en: 'Charon',   // Informative — clear professional assistant tone
+    zh: 'Erinome',  // Clear — tonal-language clarity
+    hi: 'Despina',  // Smooth — natural flow for Indic speech
+    es: 'Puck',     // Upbeat — conversational Romance prosody
+    fr: 'Aoede',    // Breezy — flowing French delivery
+    de: 'Charon',   // Informative — precise German articulation
+    ru: 'Kore',     // Firm — clear Slavic pronunciation
+    ar: 'Sulafat',  // Warm — natural Arabic conversational tone
+  };
+
   const BULGARIAN_VOICES = [
     { name: 'Kore', character: 'Firm', note: 'Препоръчан' },
     { name: 'Puck', character: 'Upbeat', note: 'Ясен' },
@@ -57,9 +75,18 @@
     populateVoiceSelect(selectEl, selectEl?.value, query);
   }
 
+  function getDefaultVoiceForLanguage(lang) {
+    const code = String(lang || 'bg').toLowerCase().split('-')[0];
+    const voice = DEFAULT_VOICE_BY_LANGUAGE[code];
+    if (voice && BULGARIAN_VOICES.some((v) => v.name === voice)) return voice;
+    return 'Kore';
+  }
+
   window.AIVA_VOICES = {
     GEMINI_LIVE_VOICES,
     BULGARIAN_VOICES,
+    DEFAULT_VOICE_BY_LANGUAGE,
+    getDefaultVoiceForLanguage,
     populateVoiceSelect,
     filterVoiceSelect,
   };
