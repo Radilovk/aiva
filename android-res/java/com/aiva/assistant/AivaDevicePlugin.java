@@ -3,6 +3,7 @@ package com.aiva.assistant;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
@@ -13,6 +14,9 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+
+import java.util.Locale;
+import java.util.TimeZone;
 
 /**
  * Detects the phone maker and exposes the OEM-specific switches that keep
@@ -63,15 +67,61 @@ public class AivaDevicePlugin extends Plugin {
     @PluginMethod
     public void getDeviceProfile(PluginCall call) {
         String profile = detectProfile();
+        Context ctx = getContext();
         JSObject result = new JSObject();
         result.put("manufacturer", Build.MANUFACTURER);
         result.put("brand", Build.BRAND);
         result.put("model", Build.MODEL);
+        result.put("device", Build.DEVICE);
+        result.put("product", Build.PRODUCT);
+        result.put("hardware", Build.HARDWARE);
         result.put("androidVersion", Build.VERSION.RELEASE);
         result.put("sdkInt", Build.VERSION.SDK_INT);
         result.put("profile", profile);
         result.put("needsAutostart", needsAutostart(profile));
         result.put("batteryOptimizationIgnored", isIgnoringBatteryOptimizations());
+        result.put("timezone", TimeZone.getDefault().getID());
+        result.put("locale", Locale.getDefault().toLanguageTag());
+        result.put("language", Locale.getDefault().getLanguage());
+        result.put("country", Locale.getDefault().getCountry());
+        try {
+            android.util.DisplayMetrics dm = ctx.getResources().getDisplayMetrics();
+            result.put("screenWidthPx", dm.widthPixels);
+            result.put("screenHeightPx", dm.heightPixels);
+            result.put("densityDpi", dm.densityDpi);
+        } catch (Exception ignored) { /* optional */ }
+        try {
+            result.put("appVersion", ctx.getPackageManager()
+                .getPackageInfo(ctx.getPackageName(), 0).versionName);
+        } catch (Exception ignored) { /* optional */ }
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void setVoiceSessionActive(PluginCall call) {
+        boolean active = call.getBoolean("active", false);
+        JSObject result = new JSObject();
+        AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) {
+            result.put("ok", false);
+            call.resolve(result);
+            return;
+        }
+        try {
+            if (active) {
+                am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                am.setSpeakerphoneOn(true);
+            } else {
+                am.setSpeakerphoneOn(false);
+                am.setMode(AudioManager.MODE_NORMAL);
+            }
+            result.put("ok", true);
+            result.put("mode", am.getMode());
+            result.put("speakerphone", am.isSpeakerphoneOn());
+        } catch (Exception e) {
+            result.put("ok", false);
+            result.put("error", e.getMessage());
+        }
         call.resolve(result);
     }
 

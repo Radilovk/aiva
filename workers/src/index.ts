@@ -769,6 +769,43 @@ app.get('/api/calendar.ics', async (c) => {
 
 // --- User profile sync (language for server-side briefs) ---
 
+// --- User profile sync (language for server-side briefs) ---
+
+app.get('/api/memory', async (c) => {
+  const userId = c.req.query('user_id');
+  if (!userId) return c.json({ error: 'user_id е задължителен' }, 400);
+  const raw = await c.env.SESSIONS.get(`memory:${userId}`);
+  if (!raw) return c.json({ entries: [], updated_at: null });
+  try {
+    const parsed = JSON.parse(raw) as { entries?: unknown[]; updated_at?: string };
+    return c.json({ entries: parsed.entries || [], updated_at: parsed.updated_at || null });
+  } catch {
+    return c.json({ entries: [], updated_at: null });
+  }
+});
+
+app.put('/api/memory', async (c) => {
+  const body = await c.req.json<{
+    user_id?: string;
+    entries?: unknown[];
+    updated_at?: string;
+  }>().catch(() => null);
+  if (!body?.user_id) return c.json({ error: 'user_id е задължителен' }, 400);
+  const payload = {
+    entries: Array.isArray(body.entries) ? body.entries : [],
+    updated_at: body.updated_at || new Date().toISOString(),
+  };
+  try {
+    await c.env.SESSIONS.put(`memory:${body.user_id}`, JSON.stringify(payload), {
+      expirationTtl: 365 * 86400,
+    });
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Memory sync error:', e);
+    return c.json({ error: 'Грешка при запис на памет' }, 500);
+  }
+});
+
 app.post('/api/profile', async (c) => {
   const body = await c.req.json<{ user_id?: string; language?: string }>().catch(() => null);
   if (!body?.user_id) {

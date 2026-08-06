@@ -106,6 +106,7 @@ let awaitingGreetingMic = false;
 let greetingMicTimer = null;
 let reconnectAttempts = 0;
 let resumingSession = false;
+let disconnectInProgress = false;
 const MAX_RECONNECT_ATTEMPTS = 2;
 
 function setMicUplinkMuted(muted) {
@@ -178,7 +179,7 @@ function touchSessionActivity() {
   clearSessionIdleTimer();
   sessionIdleTimer = setTimeout(() => {
     sessionIdleTimer = null;
-    if (isSessionActive && !sessionEnding) disconnectSession();
+    if (isSessionActive && !sessionEnding) void disconnectSession();
   }, SESSION_IDLE_TIMEOUT_MS);
 }
 
@@ -624,7 +625,7 @@ function scheduleGreetingMicFallback(delayMs = 8000) {
     } catch (e) {
       console.error('Greeting mic fallback failed:', e);
       showError(t('errMicrophone'));
-      disconnectSession();
+      void disconnectSession({ immediate: true });
     }
   }, delayMs);
 }
@@ -634,14 +635,14 @@ async function startMicAfterGreeting() {
   awaitingGreetingMic = false;
   clearGreetingMicTimer();
   if (audioPlayer) {
-    await audioPlayer.waitForDrain(4000);
+    await waitForFarewellPlaybackIdle(8000);
   }
   try {
     await ensureMicStreaming();
   } catch (e) {
     console.error('Mic start after greeting failed:', e);
     showError(t('errMicrophone'));
-    disconnectSession();
+    await disconnectSession({ immediate: true });
   }
 }
 
@@ -740,7 +741,7 @@ async function finalizeSessionEnd() {
     await waitForFarewellPlaybackIdle(30000);
     finishSessionEndUi();
     window.AIVA_HAPTICS?.endSpeechSession?.();
-    if (isSessionActive) disconnectSession();
+    if (isSessionActive) await disconnectSession();
   } finally {
     sessionEndFinalizing = false;
   }
@@ -776,7 +777,7 @@ async function handleSocketClose() {
     // иначе UI остава завинаги на „Свързване…"
     if (isConnecting) {
       showError(t('errConnect'));
-      disconnectSession();
+      void disconnectSession();
     }
     return;
   }
@@ -788,7 +789,7 @@ async function handleSocketClose() {
   }
   if (!client || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
     showError(t('errConnect'));
-    disconnectSession();
+    void disconnectSession();
     return;
   }
   reconnectAttempts += 1;
@@ -802,7 +803,7 @@ async function handleSocketClose() {
   } catch (e) {
     console.error('Reconnect failed:', e);
     showError(t('errConnect'));
-    disconnectSession();
+    void disconnectSession();
   }
 }
 
@@ -1880,7 +1881,7 @@ async function handleGeminiMessage(message) {
         } catch (e) {
           console.error('Mic resume failed:', e);
           showError(t('errMicrophone'));
-          disconnectSession();
+          void disconnectSession({ immediate: true });
         }
         break;
       }
@@ -1895,7 +1896,7 @@ async function handleGeminiMessage(message) {
       } catch (e) {
         console.error('Session greeting failed:', e);
         showError(t('errConnect'));
-        disconnectSession();
+        void disconnectSession();
       }
       break;
 
@@ -1971,6 +1972,11 @@ async function handleGeminiMessage(message) {
               if (String(call.name || '').startsWith('device_')) {
                 result = await window.AIVA_DEVICE_ACTIONS?.handleTool?.(call.name, call.args || {})
                   ?? { ok: false, error: 'device actions unavailable' };
+                break;
+              }
+              if (String(call.name || '').startsWith('memory_')) {
+                result = await window.AIVA_MEMORY?.handleTool?.(call.name, call.args || {})
+                  ?? { ok: false, error: 'memory unavailable' };
                 break;
               }
               result = client.callFunction(call.name, call.args || {}) ?? 'ok';
@@ -2086,6 +2092,13 @@ async function connectSession() {
       extraContext += `\n\nФОКУС: Потребителят иска да обсъди или редактира задача ID ${voiceFocusTask.id}: "${voiceFocusTask.content}". Започни с кратко потвърждение и предложи помощ (редакция, съвет, изтриване, маркиране като готова).`;
       voiceFocusTask = null;
     }
+    const deviceCtx = await window.AIVA_DEVICE_CONTEXT?.collect?.();
+    if (deviceCtx) {
+      extraContext += `\n\n${window.AIVA_DEVICE_CONTEXT.formatForPrompt(deviceCtx)}`;
+    }
+    await window.AIVA_DEVICE_CONTEXT?.ensureMemorySeed?.();
+    const memorySection = await window.AIVA_MEMORY?.buildPromptSection?.();
+    if (memorySection) extraContext += `\n\n${memorySection}`;
     const instructions = buildSessionInstructions(
       assistantSettings.systemInstructions,
       assistantSettings.profile,
@@ -2121,6 +2134,9 @@ async function connectSession() {
     for (const tool of window.AIVA_DEVICE_ACTIONS?.getGeminiTools?.() || []) {
       client.addFunction(tool);
     }
+    for (const tool of window.AIVA_MEMORY?.getGeminiTools?.() || []) {
+      client.addFunction(tool);
+    }
 
     client.onReceiveResponse = handleGeminiMessage;
     client.onOpen = () => setStatus(t('connecting'), true);
@@ -2130,7 +2146,7 @@ async function connectSession() {
       // установена сесия е фатална и се показва веднага.
       if (!isSessionActive) {
         showError(msg || t('errConnect'));
-        disconnectSession();
+        void disconnectSession();
       }
     };
 
@@ -2141,19 +2157,27 @@ async function connectSession() {
     } else {
       audioPlayer.onPlaybackStateChange = onAssistantPlaybackStateChange;
     }
+    if (audioPlayer?.audioContext?.state === 'suspended') {
+      await audioPlayer.audioContext.resume().catch(() => {});
+    }
+    await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(true);
 
     client.connect();
   } catch (e) {
     console.error('connectSession:', e);
     showError(e.message || t('errConnect'));
-    disconnectSession();
+    void disconnectSession();
   } finally {
     isConnecting = false;
     recordBtn.disabled = false;
   }
 }
 
-function disconnectSession() {
+async function disconnectSession(options = {}) {
+  const { immediate = false } = options;
+  if (disconnectInProgress) return;
+  disconnectInProgress = true;
+
   const wasActive = isSessionActive;
   clearSessionEndState();
   clearGreetingMicTimer();
@@ -2162,34 +2186,44 @@ function disconnectSession() {
   reconnectAttempts = 0;
   resumingSession = false;
   awaitingGreetingMic = false;
-  if (audioStreamer) {
-    audioStreamer.stop();
-    audioStreamer = null;
-  }
-  if (client?.webSocket) {
-    client.webSocket.close();
-  }
-  client = null;
-  isSessionActive = false;
-  isConnecting = false;
-  assistantTranscriptBuffer = '';
-  assistantTurnComplete = false;
-  recordBtn.classList.remove('recording');
-  setRecordBtnLive(false);
-  recordBtn.disabled = false;
-  waveform.classList.remove('active');
-  statusEl.classList.remove('assistant-speech');
-  setStatus(t('tapToRecord'));
-  recordBtn.setAttribute('aria-label', t('record'));
-  if (wasActive) {
-    window.AIVA_HAPTICS?.onListeningStop?.();
+
+  try {
+    if (!immediate && audioPlayer && (audioPlayer.isPlaying || isFarewellAudioPending())) {
+      await waitForFarewellPlaybackIdle(2500);
+    }
+    audioPlayer?.interrupt?.();
+    await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(false);
+    if (audioStreamer) {
+      audioStreamer.stop();
+      audioStreamer = null;
+    }
+    if (client?.webSocket) {
+      client.webSocket.close();
+    }
+    client = null;
+    isSessionActive = false;
+    isConnecting = false;
+    assistantTranscriptBuffer = '';
+    assistantTurnComplete = false;
+    recordBtn.classList.remove('recording');
+    setRecordBtnLive(false);
+    recordBtn.disabled = false;
+    waveform.classList.remove('active');
+    statusEl?.classList.remove('assistant-speech');
+    setStatus(t('tapToRecord'));
+    recordBtn.setAttribute('aria-label', t('record'));
+    if (wasActive) {
+      window.AIVA_HAPTICS?.onListeningStop?.();
+    }
+  } finally {
+    disconnectInProgress = false;
   }
 }
 
 // --- Events ---
 recordBtn.addEventListener('click', () => {
   if (isSessionActive || isConnecting) {
-    disconnectSession();
+    void disconnectSession({ immediate: true });
   } else {
     connectSession();
   }
@@ -2561,3 +2595,6 @@ document.addEventListener('visibilitychange', () => {
     audioStreamer.audioContext.resume().catch(() => {});
   }
 });
+
+window.AIVA_DEVICE_CONTEXT?.collect?.().catch(() => {});
+window.AIVA_MEMORY?.hydrate?.().catch(() => {});
