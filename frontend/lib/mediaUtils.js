@@ -418,7 +418,7 @@ class AudioPlayer {
     this.isInitialized = false;
     this.volume = 1.0;
     this.sampleRate = 24000; // Gemini outputs at 24kHz
-    this.minBufferSamples = options.minBufferSamples ?? 2400;
+    this.minBufferSamples = options.minBufferSamples ?? 720;
     this._playChain = Promise.resolve();
     this._isPlaying = false;
     this._drainResolvers = [];
