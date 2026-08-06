@@ -620,10 +620,15 @@ function scheduleSessionEnd() {
   requestSessionEndAfterFarewell({ finalizeIfIdle: true });
 }
 
+let errorToastTimer = null;
 function showError(msg) {
   errorToast.textContent = msg;
   errorToast.classList.add('visible');
-  setTimeout(() => errorToast.classList.remove('visible'), 5000);
+  if (errorToastTimer) clearTimeout(errorToastTimer);
+  errorToastTimer = setTimeout(() => {
+    errorToastTimer = null;
+    errorToast.classList.remove('visible');
+  }, 5000);
 }
 
 window.showCalendarSyncToast = function showCalendarSyncToast(task) {
