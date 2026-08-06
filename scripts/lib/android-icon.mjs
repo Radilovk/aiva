@@ -1,10 +1,9 @@
 /**
- * Android adaptive icons — Google 108dp layers, OEM-safe (MIUI/HyperOS, OneUI, etc.).
+ * Android launcher icons — NutriPlan / Icon.md pipeline.
  *
- * Spec: https://developer.android.com/develop/ui/views/launch/icon_design_adaptive
- * - Background: opaque, full-bleed 108×108 dp (fills launcher mask)
- * - Foreground: transparent outside logo; logo ~72 dp visible zone
- * - Legacy/round bitmaps: pre-composited for install UI & API < 26
+ * Legacy: direct resize of maskable master PNG.
+ * Adaptive: foreground at 66.7% safe zone on 108dp canvas (per density),
+ *           background via @color/ic_launcher_background.
  */
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -15,15 +14,31 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
-/** App window / WebView chrome — stays dark. */
 export const APP_WINDOW_BG = '#050508';
+/** Adaptive icon background — matches maskable master tile (NutriPlan uses #042F2E). */
+export const APK_ICON_BG = '#050508';
 
-/** Launcher icon background — light full-bleed like Opera/Chrome/Badoo on OEM launchers. */
-export const APK_ICON_BG = '#FFFFFF';
+/** 66.7% safe zone — avoids clipping by launcher masks (Icon.md). */
+export const SAFE_ZONE_RATIO = 2 / 3;
 
-/** Google visible zone = 72 dp / 108 dp. Round/install screens use legacy composite. */
-export const APK_FOREGROUND_FILL = 72 / 108;
-export const APK_ROUND_FILL = 0.78;
+export const LEGACY_SIZES = [
+  ['mipmap-mdpi', 48],
+  ['mipmap-hdpi', 72],
+  ['mipmap-xhdpi', 96],
+  ['mipmap-xxhdpi', 144],
+  ['mipmap-xxxhdpi', 192],
+];
+
+/** Adaptive layers are 108dp × density multiplier — NOT legacy launcher sizes. */
+export const ADAPTIVE_SIZES = [
+  ['mipmap-mdpi', 108],
+  ['mipmap-hdpi', 162],
+  ['mipmap-xhdpi', 216],
+  ['mipmap-xxhdpi', 324],
+  ['mipmap-xxxhdpi', 432],
+];
+
+const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 
 function parseBg(hex) {
   return {
@@ -34,32 +49,28 @@ function parseBg(hex) {
   };
 }
 
-/** Strip flattened black matte; keep robot visor/joints intact. */
+/** Strip flattened black matte from robot exports. */
 export async function prepApkIconSource(input) {
   let buf = await sharp(input).ensureAlpha().png().toBuffer();
   try {
     buf = await sharp(buf).trim({ threshold: 32 }).png().toBuffer();
   } catch {
-    /* no matte to trim */
+    /* no matte */
   }
   return trimAlphaArt(buf);
 }
 
-async function fitLogo(input, size, fill) {
+/**
+ * Maskable master PNG (512×512): brand bg + logo in 66.7% safe zone.
+ * Used as single source for PWA + APK (Icon.md).
+ */
+export async function buildMaskableMaster(input, size = 512) {
   const trimmed = await prepApkIconSource(input);
-  const inner = Math.max(1, Math.round(size * fill));
-  const resized = await sharp(trimmed)
-    .resize(inner, inner, { fit: 'inside', withoutEnlargement: false })
+  const safe = Math.floor(size * SAFE_ZONE_RATIO);
+  const logo = await sharp(trimmed)
+    .resize(safe, safe, { fit: 'inside', withoutEnlargement: false })
     .png()
     .toBuffer();
-  const meta = await sharp(resized).metadata();
-  const left = Math.floor((size - meta.width) / 2);
-  const top = Math.floor((size - meta.height) / 2);
-  return { resized, left, top };
-}
-
-/** Opaque full-bleed background layer (required by AdaptiveIconDrawable). */
-export function renderApkBackground(size) {
   return sharp({
     create: {
       width: size,
@@ -67,39 +78,45 @@ export function renderApkBackground(size) {
       channels: 4,
       background: parseBg(APK_ICON_BG),
     },
-  });
+  }).composite([{ input: logo, gravity: 'center' }]);
 }
 
-/** Transparent foreground — only the robot; OS background shows through corners. */
-export async function renderApkForeground(input, size, { fill = APK_FOREGROUND_FILL } = {}) {
-  const { resized, left, top } = await fitLogo(input, size, fill);
+/** Legacy launcher — direct resize, no extra overlay (Icon.md). */
+export function renderLegacyLauncher(input, size) {
+  return sharp(input).resize(size, size, { fit: 'contain', background: parseBg(APK_ICON_BG) });
+}
+
+/**
+ * Adaptive foreground — transparent canvas, master scaled to 66.7% safe zone.
+ * ImageMagick equivalent: xc:none + resize SAFE + gravity center.
+ */
+export async function renderAdaptiveForeground(input, canvasSize) {
+  const safe = Math.floor(canvasSize * SAFE_ZONE_RATIO);
+  const scaled = await sharp(input)
+    .resize(safe, safe, { fit: 'inside', background: TRANSPARENT })
+    .png()
+    .toBuffer();
   return sharp({
     create: {
-      width: size,
-      height: size,
+      width: canvasSize,
+      height: canvasSize,
       channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
+      background: TRANSPARENT,
     },
-  }).composite([{ input: resized, left, top }]);
+  }).composite([{ input: scaled, gravity: 'center' }]);
 }
 
-/** Legacy + roundIcon bitmaps — pre-composited tile for install UI & API < 26. */
-export async function renderApkLegacy(input, size, { fill = APK_FOREGROUND_FILL } = {}) {
-  const bgBuf = await renderApkBackground(size).png().toBuffer();
-  const fgBuf = await (await renderApkForeground(input, size, { fill })).png().toBuffer();
-  return sharp(bgBuf).composite([{ input: fgBuf }]);
+/** Monochrome notification mask — alpha extract (Icon.md). */
+export async function renderNotificationMask(input, size) {
+  const resized = await sharp(input)
+    .resize(size, size, { fit: 'contain', background: TRANSPARENT })
+    .ensureAlpha()
+    .png()
+    .toBuffer();
+  return sharp(resized).extractChannel('alpha').png().toBuffer();
 }
 
-/** Slightly larger logo for circular masks (android:roundIcon). */
-export function renderApkRound(input, size) {
-  return renderApkLegacy(input, size, { fill: APK_ROUND_FILL });
-}
-
-/** Flatten adaptive layers — preview / Play Store. */
-export async function renderApkFlat(input, size) {
-  return renderApkLegacy(input, size);
-}
-
-// Back-compat aliases used by older scripts
+// Back-compat aliases
 export const APK_BG = APP_WINDOW_BG;
-export const APK_ICON_FILL = APK_FOREGROUND_FILL;
+export const APK_ICON_FILL = SAFE_ZONE_RATIO;
+export const APK_FOREGROUND_FILL = SAFE_ZONE_RATIO;

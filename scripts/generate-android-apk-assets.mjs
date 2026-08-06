@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Android launcher icons from PWA assets (no native splash).
+ * Android launcher icons — NutriPlan / Icon.md pipeline (no native splash).
  */
 import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -9,11 +9,12 @@ import { createRequire } from 'node:module';
 import {
   APP_WINDOW_BG,
   APK_ICON_BG,
-  APK_FOREGROUND_FILL,
-  renderApkBackground,
-  renderApkForeground,
-  renderApkLegacy,
-  renderApkRound,
+  SAFE_ZONE_RATIO,
+  LEGACY_SIZES,
+  ADAPTIVE_SIZES,
+  renderLegacyLauncher,
+  renderAdaptiveForeground,
+  renderNotificationMask,
 } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
@@ -24,15 +25,6 @@ const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res'
 const ANDROID_RES = join(ROOT, 'android-res');
 const SOURCE_DIR = join(ROOT, 'brand-assets', 'source');
 const FRONTEND_ICONS = join(ROOT, 'frontend', 'icons');
-const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
-
-const MIPMAP_SIZES = [
-  ['mipmap-mdpi', 48],
-  ['mipmap-hdpi', 72],
-  ['mipmap-xhdpi', 96],
-  ['mipmap-xxhdpi', 144],
-  ['mipmap-xxxhdpi', 192],
-];
 
 async function exists(path) {
   try {
@@ -55,37 +47,35 @@ async function resolveIcon512() {
   throw new Error('Missing icon-512.png / PSX_20260805_210455.png');
 }
 
-async function resolveIcon192() {
-  const candidates = [
-    join(FRONTEND_ICONS, 'icon-192.png'),
-    join(SOURCE_DIR, 'icon-192.png'),
-    join(ROOT, 'PSX_20260805_210411.png'),
-  ];
-  for (const p of candidates) {
-    if (await exists(p)) return p;
-  }
-  throw new Error('Missing icon-192.png / PSX_20260805_210411.png');
-}
-
 async function writeLauncherIcons(icon512Path) {
-  for (const [dir, size] of MIPMAP_SIZES) {
+  const legacyByDir = new Map(LEGACY_SIZES);
+  const adaptiveByDir = new Map(ADAPTIVE_SIZES);
+
+  for (const [dir] of LEGACY_SIZES) {
     const folder = join(OUT, dir);
     await mkdir(folder, { recursive: true });
+    const legacySize = legacyByDir.get(dir);
+    const adaptiveSize = adaptiveByDir.get(dir);
 
-    const bgBuf = await renderApkBackground(size).png({ compressionLevel: 9 }).toBuffer();
-    const fgBuf = await renderApkForeground(icon512Path, size)
-      .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-    const legacyBuf = await renderApkLegacy(icon512Path, size)
-      .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-    const roundBuf = await renderApkRound(icon512Path, size)
+    const legacyBuf = await renderLegacyLauncher(icon512Path, legacySize)
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    const fgBuf = await renderAdaptiveForeground(icon512Path, adaptiveSize)
       .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
-    await writeFile(join(folder, 'ic_launcher_background.png'), bgBuf);
-    await writeFile(join(folder, 'ic_launcher_foreground.png'), fgBuf);
     await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
-    await writeFile(join(folder, 'ic_launcher_round.png'), roundBuf);
+    await writeFile(join(folder, 'ic_launcher_round.png'), legacyBuf);
+    await writeFile(join(folder, 'ic_launcher_foreground.png'), fgBuf);
+
+    // Remove stale bitmap background if present from older pipeline
+    try {
+      await unlink(join(folder, 'ic_launcher_background.png'));
+    } catch {
+      /* ok */
+    }
+
     console.log(
-      `  ✓ ${dir}/ ${size}px (bg ${APK_ICON_BG}, fg ${Math.round(APK_FOREGROUND_FILL * 100)}% safe zone)`,
+      `  ✓ ${dir}/ legacy ${legacySize}px, adaptive fg ${adaptiveSize}px (${Math.round(SAFE_ZONE_RATIO * 100)}% safe)`,
     );
   }
 }
@@ -100,17 +90,26 @@ async function removeCapacitorDefaultVectors() {
   }
 }
 
-async function writeNotificationIcon(icon192Path) {
+async function writeNotificationIcons(icon512Path) {
+  const notifSizes = [
+    ['drawable-mdpi', 24],
+    ['drawable-hdpi', 36],
+    ['drawable-xhdpi', 48],
+    ['drawable-xxhdpi', 72],
+    ['drawable-xxxhdpi', 96],
+  ];
+  for (const [dir, size] of notifSizes) {
+    const folder = join(OUT, dir);
+    await mkdir(folder, { recursive: true });
+    const buf = await renderNotificationMask(icon512Path, size);
+    await writeFile(join(folder, 'ic_stat_aiva.png'), buf);
+  }
+  const legacy = await renderNotificationMask(icon512Path, 96);
   await mkdir(join(OUT, 'drawable'), { recursive: true });
-  const buf = await sharp(icon192Path)
-    .resize(96, 96, { fit: 'inside', background: TRANSPARENT })
-    .grayscale()
-    .normalize()
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-  await writeFile(join(OUT, 'drawable', 'ic_stat_aiva.png'), buf);
-  await writeFile(join(ANDROID_RES, 'drawable', 'ic_stat_aiva.png'), buf);
-  console.log('  ✓ drawable/ic_stat_aiva.png');
+  await writeFile(join(OUT, 'drawable', 'ic_stat_aiva.png'), legacy);
+  await mkdir(join(ANDROID_RES, 'drawable'), { recursive: true });
+  await writeFile(join(ANDROID_RES, 'drawable', 'ic_stat_aiva.png'), legacy);
+  console.log('  ✓ drawable-*/ic_stat_aiva.png (alpha mask, Icon.md)');
 }
 
 async function writeBrandColors() {
@@ -134,9 +133,8 @@ async function writeBrandColors() {
 async function writeAdaptiveIconXml() {
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@mipmap/ic_launcher_background"/>
+    <background android:drawable="@color/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-    <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>
 `;
   for (const anydpi of [join(OUT, 'mipmap-anydpi-v26'), join(ANDROID_RES, 'mipmap-anydpi-v26')]) {
@@ -144,22 +142,22 @@ async function writeAdaptiveIconXml() {
     await writeFile(join(anydpi, 'ic_launcher.xml'), xml);
     await writeFile(join(anydpi, 'ic_launcher_round.xml'), xml);
   }
-  console.log(`  ✓ adaptive icons (bitmap bg ${APK_ICON_BG}, fg safe zone)`);
+  console.log(`  ✓ adaptive icons (@color/bg ${APK_ICON_BG}, fg mipmap)`);
 }
 
 async function mirrorToAndroidRes() {
-  for (const [dir] of MIPMAP_SIZES) {
+  for (const [dir] of LEGACY_SIZES) {
     const srcDir = join(OUT, dir);
     const dstDir = join(ANDROID_RES, dir);
     await mkdir(dstDir, { recursive: true });
-    for (const name of [
-      'ic_launcher_background.png',
-      'ic_launcher.png',
-      'ic_launcher_round.png',
-      'ic_launcher_foreground.png',
-    ]) {
+    for (const name of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']) {
       const buf = await readFile(join(srcDir, name));
       await writeFile(join(dstDir, name), buf);
+    }
+    try {
+      await unlink(join(dstDir, 'ic_launcher_background.png'));
+    } catch {
+      /* ok */
     }
   }
   console.log('  ✓ mirrored mipmaps → android-res/');
@@ -167,13 +165,12 @@ async function mirrorToAndroidRes() {
 
 async function main() {
   const icon512Path = await resolveIcon512();
-  const icon192Path = await resolveIcon192();
   console.log(`Android branding → ${OUT}`);
   console.log(`  master: ${icon512Path}`);
   await writeLauncherIcons(icon512Path);
   await writeBrandColors();
   await writeAdaptiveIconXml();
-  await writeNotificationIcon(icon192Path);
+  await writeNotificationIcons(icon512Path);
   await removeCapacitorDefaultVectors();
   if (OUT.includes('android/app')) {
     await mirrorToAndroidRes();

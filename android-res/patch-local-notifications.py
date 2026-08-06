@@ -220,20 +220,20 @@ if os.path.exists(STYLES):
             f.write(styles)
         print('✅ Patched launch theme: android:windowBackground=@color/app_background')
 
-# Launcher icon: Capacitor ships #FFFFFF background → white box on install screen
+# Launcher icon: Capacitor ships #FFFFFF background → force brand dark tile
 LAUNCHER_BG = 'android/app/src/main/res/values/ic_launcher_background.xml'
 LAUNCHER_BG_FIX = '''<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#050508</color>
 </resources>
 '''
 if os.path.exists(LAUNCHER_BG):
     with open(LAUNCHER_BG, 'r') as f:
         bg = f.read()
-    if '#FFFFFF' not in bg:
+    if '#050508' not in bg:
         with open(LAUNCHER_BG, 'w') as f:
             f.write(LAUNCHER_BG_FIX)
-        print('✅ ic_launcher_background → #FFFFFF (full-bleed launcher tile)')
+        print('✅ ic_launcher_background → #050508 (Icon.md brand tile)')
 
 VECTOR_FG = 'android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml'
 if os.path.exists(VECTOR_FG):
