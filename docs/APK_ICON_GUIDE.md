@@ -26,17 +26,18 @@ Raw robot PNGs are trimmed and composited into maskable masters by `scripts/proc
 }
 ```
 
-PWA and APK share one visual: **large robot on transparent PNG**; launcher background `#050508` comes from adaptive `@color/ic_launcher_background` (NutriPlan uses `#042F2E`).
+PWA and APK share one visual: dark `#050508` tile, robot centered in the **66.7% safe zone**.
 
 ## 3. How icons are generated
 
 ### Step A — Brand assets (`scripts/process-brand-assets.mjs`)
 
-1. Load raw robot PNG (`icon1.png` or PSX export).
-2. Trim transparent matte padding (`prepApkIconSource`).
-3. Build launcher tile via `renderLauncherSource()`:
+1. Load raw robot PNG (`PSX_*.png` or existing source).
+2. Trim transparent matte padding.
+3. Build maskable master via `buildMaskableMaster()`:
    - Canvas: 512×512 (or 192×192)
-   - **Transparent** background — artwork at natural size (like NutriPlan `icon-512x512.png`)
+   - Background: `#050508`
+   - Artwork: scaled to **66.7%** of canvas (Android maskable safe zone)
 4. Write to `frontend/icons/icon-{192,512}.png` and `brand-assets/source/`.
 
 ### Step B — APK mipmaps (`scripts/generate-android-apk-assets.mjs`)
