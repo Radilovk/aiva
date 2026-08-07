@@ -13,7 +13,8 @@ Fallback: `PSX_20260805_210455.png`.
 
 ## Strategy (same as NutriPlan / aidiet)
 
-- **Transparent PNG** with large artwork — corners are transparent, not a filled dark square
+- Master exports include an opaque black rounded card — `removeOpaqueMatte()` strips it before resize
+- **Transparent PNG** with robot + pink glow only (like NutriPlan apple on transparency)
 - **Legacy** `ic_launcher.png`: direct resize of source (transparent sides stay transparent)
 - **Adaptive foreground**: source scaled to **66.7%** safe zone on transparent 108dp canvas
 - **Adaptive background**: `@color/ic_launcher_background` → `#050508` (shows through transparent areas)
