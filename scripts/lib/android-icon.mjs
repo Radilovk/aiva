@@ -1,10 +1,9 @@
 /**
- * Android launcher icons — NutriPlan / aidiet pipeline.
+ * Android launcher icons — NutriPlan / Icon.md pipeline.
  *
- * Source PNG has transparent corners; artwork is large on the canvas.
- * Legacy: direct resize of source (transparent sides preserved).
- * Adaptive: foreground at 66.7% safe zone on transparent 108dp canvas;
- *           background via @color/ic_launcher_background (#050508).
+ * Legacy: direct resize of maskable master PNG.
+ * Adaptive: foreground at 66.7% safe zone on 108dp canvas (per density),
+ *           background via @color/ic_launcher_background.
  */
 import { createRequire } from 'node:module';
 import { access } from 'node:fs/promises';
@@ -17,9 +16,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
 export const APP_WINDOW_BG = '#050508';
+/** Adaptive icon background — matches maskable master tile (NutriPlan uses #042F2E). */
 export const APK_ICON_BG = '#050508';
 
-/** 66.7% safe zone for adaptive foreground (Icon.md / NutriPlan). */
+/** 66.7% safe zone — avoids clipping by launcher masks (Icon.md). */
 export const SAFE_ZONE_RATIO = 2 / 3;
 
 export const LEGACY_SIZES = [
@@ -30,6 +30,7 @@ export const LEGACY_SIZES = [
   ['mipmap-xxxhdpi', 192],
 ];
 
+/** Adaptive layers are 108dp × density multiplier — NOT legacy launcher sizes. */
 export const ADAPTIVE_SIZES = [
   ['mipmap-mdpi', 108],
   ['mipmap-hdpi', 162],
@@ -49,12 +50,12 @@ export const DENSITY_SCALES = [
   ['xxxhdpi', 4],
 ];
 
-/** Raw masters only — never derived frontend/icons outputs. */
 export const MASTER_ICON_CANDIDATES = [
   join(ROOT, 'brand-assets', 'source', 'icon1.png'),
   join(ROOT, 'brand-assets', 'source', 'icon-512.png'),
   join(ROOT, 'PSX_20260805_210455.png'),
   join(ROOT, 'brand-assets', 'source', 'PSX_20260805_210455.png'),
+  join(ROOT, 'frontend', 'icons', 'icon-512.png'),
 ];
 
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
@@ -79,6 +80,7 @@ export async function prepApkIconSource(input) {
   return trimAlphaArt(buf);
 }
 
+/** First existing master icon on the candidate chain. */
 export async function resolveMasterIcon() {
   for (const path of MASTER_ICON_CANDIDATES) {
     try {
@@ -92,51 +94,8 @@ export async function resolveMasterIcon() {
 }
 
 /**
- * PWA / launcher source tile — transparent canvas, artwork at natural size (NutriPlan icon-512x512.png).
- */
-export async function renderLauncherSource(input, size) {
-  const prepared = await prepApkIconSource(input);
-  return sharp(prepared).resize(size, size, { fit: 'contain', background: TRANSPARENT });
-}
-
-/** Legacy launcher — direct resize, transparent corners (NutriPlan: convert -resize). */
-export function renderLegacyLauncher(input, size) {
-  return sharp(input).resize(size, size, { fit: 'contain', background: TRANSPARENT });
-}
-
-/**
- * Adaptive foreground — transparent canvas; whole source scaled to 66.7% safe zone.
- * ImageMagick: xc:none + resize SAFE + gravity center.
- */
-export async function renderAdaptiveForeground(input, canvasSize) {
-  const safe = Math.floor(canvasSize * SAFE_ZONE_RATIO);
-  const scaled = await sharp(input)
-    .resize(safe, safe, { fit: 'inside', background: TRANSPARENT })
-    .png()
-    .toBuffer();
-  return sharp({
-    create: {
-      width: canvasSize,
-      height: canvasSize,
-      channels: 4,
-      background: TRANSPARENT,
-    },
-  }).composite([{ input: scaled, gravity: 'center' }]);
-}
-
-/** Monochrome notification mask — alpha extract. */
-export async function renderNotificationMask(input, size) {
-  const resized = await sharp(input)
-    .resize(size, size, { fit: 'contain', background: TRANSPARENT })
-    .ensureAlpha()
-    .png()
-    .toBuffer();
-  return sharp(resized).extractChannel('alpha').png().toBuffer();
-}
-
-/**
- * @deprecated Opaque maskable tile — not used for APK (makes icon look small).
- * NutriPlan uses transparent PNG + @color/ic_launcher_background.
+ * Maskable master PNG: opaque brand bg + logo in 66.7% safe zone.
+ * Used as single source for PWA + APK (Icon.md).
  */
 export async function renderMaskableSquare(input, size = 512) {
   const trimmed = await prepApkIconSource(input);
@@ -155,11 +114,47 @@ export async function renderMaskableSquare(input, size = 512) {
   }).composite([{ input: logo, gravity: 'center' }]);
 }
 
-/** @deprecated Alias */
+/** @deprecated Alias — use renderMaskableSquare */
 export async function buildMaskableMaster(input, size = 512) {
   return renderMaskableSquare(input, size);
 }
 
+/** Legacy launcher — direct resize of maskable master (Icon.md). */
+export function renderLegacyLauncher(input, size) {
+  return sharp(input).resize(size, size, { fit: 'contain', background: parseBg(APK_ICON_BG) });
+}
+
+/**
+ * Adaptive foreground — transparent canvas, master scaled to 66.7% safe zone.
+ * ImageMagick equivalent: xc:none + resize SAFE + gravity center.
+ */
+export async function renderAdaptiveForeground(input, canvasSize) {
+  const safe = Math.floor(canvasSize * SAFE_ZONE_RATIO);
+  const scaled = await sharp(input)
+    .resize(safe, safe, { fit: 'inside', background: TRANSPARENT })
+    .png()
+    .toBuffer();
+  return sharp({
+    create: {
+      width: canvasSize,
+      height: canvasSize,
+      channels: 4,
+      background: TRANSPARENT,
+    },
+  }).composite([{ input: scaled, gravity: 'center' }]);
+}
+
+/** Monochrome notification mask — alpha extract (Icon.md). */
+export async function renderNotificationMask(input, size) {
+  const resized = await sharp(input)
+    .resize(size, size, { fit: 'contain', background: TRANSPARENT })
+    .ensureAlpha()
+    .png()
+    .toBuffer();
+  return sharp(resized).extractChannel('alpha').png().toBuffer();
+}
+
+// Back-compat aliases
 export const APK_BG = APP_WINDOW_BG;
 export const APK_ICON_FILL = SAFE_ZONE_RATIO;
 export const APK_FOREGROUND_FILL = SAFE_ZONE_RATIO;
