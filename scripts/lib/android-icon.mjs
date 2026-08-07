@@ -6,7 +6,7 @@
  *           background via @color/ic_launcher_background.
  */
 import { createRequire } from 'node:module';
-import { access } from 'node:fs/promises';
+import { access, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { trimAlphaArt } from './brand-icon-prep.mjs';
@@ -50,11 +50,16 @@ export const DENSITY_SCALES = [
   ['xxxhdpi', 4],
 ];
 
+/** Raw robot art — adaptive foreground + notification mask (transparent safe zone). */
 export const MASTER_ICON_CANDIDATES = [
   join(ROOT, 'brand-assets', 'source', 'icon1.png'),
-  join(ROOT, 'brand-assets', 'source', 'icon-512.png'),
   join(ROOT, 'PSX_20260805_210455.png'),
   join(ROOT, 'brand-assets', 'source', 'PSX_20260805_210455.png'),
+];
+
+/** Processed maskable tile — legacy launcher (opaque corners, Icon.md). */
+export const LAUNCHER_TILE_CANDIDATES = [
+  join(ROOT, 'brand-assets', 'source', 'icon-512.png'),
   join(ROOT, 'frontend', 'icons', 'icon-512.png'),
 ];
 
@@ -80,7 +85,7 @@ export async function prepApkIconSource(input) {
   return trimAlphaArt(buf);
 }
 
-/** First existing master icon on the candidate chain. */
+/** First existing raw art master on the candidate chain. */
 export async function resolveMasterIcon() {
   for (const path of MASTER_ICON_CANDIDATES) {
     try {
@@ -90,7 +95,25 @@ export async function resolveMasterIcon() {
       /* try next */
     }
   }
-  throw new Error('No master icon found. Add brand-assets/source/icon1.png or icon-512.png.');
+  throw new Error('No master icon found. Add brand-assets/source/icon1.png.');
+}
+
+/** Maskable 512×512 tile for legacy launcher (opaque corners). Run process-brand-assets first. */
+export async function resolveLauncherTile() {
+  for (const path of LAUNCHER_TILE_CANDIDATES) {
+    try {
+      await access(path);
+      return path;
+    } catch {
+      /* try next */
+    }
+  }
+  const master = await resolveMasterIcon();
+  const buf = await renderMaskableSquare(master, 512).png().toBuffer();
+  const fallback = join(ROOT, '.artifacts', 'launcher-tile-512.png');
+  await mkdir(join(ROOT, '.artifacts'), { recursive: true });
+  await writeFile(fallback, buf);
+  return fallback;
 }
 
 /**

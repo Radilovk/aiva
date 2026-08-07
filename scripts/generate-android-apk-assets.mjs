@@ -16,6 +16,7 @@ import {
   renderAdaptiveForeground,
   renderNotificationMask,
   resolveMasterIcon,
+  resolveLauncherTile,
 } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
@@ -26,7 +27,7 @@ const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res'
 const ANDROID_RES = join(ROOT, 'android-res');
 const SOURCE_DIR = join(ROOT, 'brand-assets', 'source');
 
-async function writeLauncherIcons(icon512Path) {
+async function writeLauncherIcons(artPath, launcherTilePath) {
   const legacyByDir = new Map(LEGACY_SIZES);
   const adaptiveByDir = new Map(ADAPTIVE_SIZES);
 
@@ -36,10 +37,10 @@ async function writeLauncherIcons(icon512Path) {
     const legacySize = legacyByDir.get(dir);
     const adaptiveSize = adaptiveByDir.get(dir);
 
-    const legacyBuf = await renderLegacyLauncher(icon512Path, legacySize)
+    const legacyBuf = await renderLegacyLauncher(launcherTilePath, legacySize)
       .png({ compressionLevel: 9 })
       .toBuffer();
-    const fgBuf = await renderAdaptiveForeground(icon512Path, adaptiveSize)
+    const fgBuf = await renderAdaptiveForeground(artPath, adaptiveSize)
       .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
     await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
@@ -143,13 +144,15 @@ async function mirrorToAndroidRes() {
 }
 
 async function main() {
-  const icon512Path = await resolveMasterIcon();
+  const artPath = await resolveMasterIcon();
+  const launcherTilePath = await resolveLauncherTile();
   console.log(`Android branding → ${OUT}`);
-  console.log(`  master: ${icon512Path}`);
-  await writeLauncherIcons(icon512Path);
+  console.log(`  art (adaptive fg): ${artPath}`);
+  console.log(`  legacy tile: ${launcherTilePath}`);
+  await writeLauncherIcons(artPath, launcherTilePath);
   await writeBrandColors();
   await writeAdaptiveIconXml();
-  await writeNotificationIcons(icon512Path);
+  await writeNotificationIcons(artPath);
   await removeCapacitorDefaultVectors();
   if (OUT.includes('android/app')) {
     await mirrorToAndroidRes();
