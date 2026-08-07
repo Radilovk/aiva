@@ -9,7 +9,6 @@ import { createRequire } from 'node:module';
 import { renderSquareIcon } from './lib/brand-icon-prep.mjs';
 import {
   renderLauncherSource,
-  renderLegacyLauncher,
   renderNotificationMask,
   resolveMasterIcon,
   APK_ICON_BG,
@@ -117,13 +116,14 @@ export async function processBrandAssets() {
   console.log(`  ✓ frontend/icons/icon-192.png (${m192.width}×${m192.height}, ${(icon192Buf.length / 1024).toFixed(1)} KB)`);
 
   const masterForApk = await resolveMasterIcon();
-  const appleTouchBuf = await renderLegacyLauncher(icon512Buf, 180)
+  const appleTouchBuf = await sharp(icon512Buf)
+    .resize(180, 180, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png({ compressionLevel: 9 })
     .toBuffer();
   await writeFile(join(OUT, 'apple-touch-icon.png'), appleTouchBuf);
   console.log(`  ✓ frontend/icons/apple-touch-icon.png (180×180, master ${masterForApk.replace(`${ROOT}/`, '')})`);
 
-  const notif = await renderNotificationMask(icon512Buf, 96)
+  const notif = await renderNotificationMask(icon512Src, 96)
     .then((b) => sharp(b).png({ compressionLevel: 9 }).toBuffer());
   await writeFile(join(OUT, 'ic-stat-notification.png'), notif);
   console.log('  ✓ frontend/icons/ic-stat-notification.png');

@@ -81,15 +81,30 @@ async function check(name, ok, detail = '') {
   return ok ? 0 : 1;
 }
 
+async function nearBlackRatio(buf) {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let black = 0;
+  let opaque = 0;
+  const n = info.width * info.height;
+  for (let i = 0; i < n; i += 1) {
+    const oi = i * 4;
+    if (data[oi + 3] < 20) continue;
+    opaque += 1;
+    if (data[oi] < 32 && data[oi + 1] < 32 && data[oi + 2] < 32) black += 1;
+  }
+  return opaque ? black / opaque : 0;
+}
+
 async function main() {
   await mkdir(OUT, { recursive: true });
   const fgBuf = await (await renderAdaptiveForeground(ICON, ADAPTIVE_CANVAS)).png().toBuffer();
-  const legacyBuf = await renderLegacyLauncher(ICON, LEGACY_SIZE).png().toBuffer();
+  const legacyBuf = await (await renderLegacyLauncher(ICON, LEGACY_SIZE)).png().toBuffer();
   const fgMeta = await sharp(fgBuf).metadata();
   const clipped = await clippedArtPixels(fgBuf, ADAPTIVE_CANVAS);
   const legacyCorners = await cornerAlpha(legacyBuf, LEGACY_SIZE);
   const fgCorners = await cornerAlpha(fgBuf, ADAPTIVE_CANVAS);
   const fgCenter = await hasOpaqueCenter(fgBuf, ADAPTIVE_CANVAS);
+  const fgBlackRatio = await nearBlackRatio(fgBuf);
 
   await writeFile(join(OUT, 'apk-adaptive-fg-432.png'), fgBuf);
   await writeFile(join(OUT, 'apk-legacy-192.png'), legacyBuf);
@@ -114,6 +129,11 @@ async function main() {
     fgCorners.join(','),
   );
   failed += await check('foreground has opaque center art', fgCenter);
+  failed += await check(
+    'foreground has no black card matte',
+    fgBlackRatio < 0.05,
+    `${(fgBlackRatio * 100).toFixed(1)}% near-black among opaque pixels`,
+  );
 
   const adaptiveXml = join(ANDROID_RES, 'mipmap-anydpi-v26', 'ic_launcher.xml');
   let xmlOk = false;
@@ -126,7 +146,7 @@ async function main() {
   failed += await check('adaptive icon XML in android-res', xmlOk, adaptiveXml);
 
   if (failed > 0) throw new Error(`${failed} verify check(s) failed`);
-  console.log(`\n${6 - failed}/6 checks passed`);
+  console.log(`\n${7 - failed}/7 checks passed`);
 }
 
 main().catch((e) => {

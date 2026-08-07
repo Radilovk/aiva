@@ -36,7 +36,7 @@ async function writeLauncherIcons(icon512Path) {
     const legacySize = legacyByDir.get(dir);
     const adaptiveSize = adaptiveByDir.get(dir);
 
-    const legacyBuf = await renderLegacyLauncher(icon512Path, legacySize)
+    const legacyBuf = await (await renderLegacyLauncher(icon512Path, legacySize))
       .png({ compressionLevel: 9 })
       .toBuffer();
     const fgBuf = await renderAdaptiveForeground(icon512Path, adaptiveSize)
