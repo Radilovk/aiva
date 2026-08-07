@@ -15,7 +15,7 @@ import {
   renderLegacyLauncher,
   renderAdaptiveForeground,
   renderNotificationMask,
-  resolveMasterIcon,
+  resolveLauncherTile,
 } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
@@ -36,7 +36,7 @@ async function writeLauncherIcons(icon512Path) {
     const legacySize = legacyByDir.get(dir);
     const adaptiveSize = adaptiveByDir.get(dir);
 
-    const legacyBuf = await (await renderLegacyLauncher(icon512Path, legacySize))
+    const legacyBuf = await renderLegacyLauncher(icon512Path, legacySize)
       .png({ compressionLevel: 9 })
       .toBuffer();
     const fgBuf = await renderAdaptiveForeground(icon512Path, adaptiveSize)
@@ -143,7 +143,7 @@ async function mirrorToAndroidRes() {
 }
 
 async function main() {
-  const icon512Path = await resolveMasterIcon();
+  const icon512Path = await resolveLauncherTile();
   console.log(`Android branding → ${OUT}`);
   console.log(`  master: ${icon512Path}`);
   await writeLauncherIcons(icon512Path);

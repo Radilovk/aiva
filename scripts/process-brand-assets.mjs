@@ -10,7 +10,6 @@ import { renderSquareIcon } from './lib/brand-icon-prep.mjs';
 import {
   renderLauncherSource,
   renderNotificationMask,
-  resolveMasterIcon,
   APK_ICON_BG,
 } from './lib/android-icon.mjs';
 
@@ -115,18 +114,19 @@ export async function processBrandAssets() {
   const m192 = await sharp(icon192Buf).metadata();
   console.log(`  ✓ frontend/icons/icon-192.png (${m192.width}×${m192.height}, ${(icon192Buf.length / 1024).toFixed(1)} KB)`);
 
-  const masterForApk = await resolveMasterIcon();
   const appleTouchBuf = await sharp(icon512Buf)
     .resize(180, 180, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png({ compressionLevel: 9 })
     .toBuffer();
   await writeFile(join(OUT, 'apple-touch-icon.png'), appleTouchBuf);
-  console.log(`  ✓ frontend/icons/apple-touch-icon.png (180×180, master ${masterForApk.replace(`${ROOT}/`, '')})`);
+  console.log('  ✓ frontend/icons/apple-touch-icon.png (180×180)');
 
-  const notif = await renderNotificationMask(icon512Src, 96)
+  const notif = await renderNotificationMask(icon512Buf, 96)
     .then((b) => sharp(b).png({ compressionLevel: 9 }).toBuffer());
   await writeFile(join(OUT, 'ic-stat-notification.png'), notif);
   console.log('  ✓ frontend/icons/ic-stat-notification.png');
+
+  console.log(`  APK input: frontend/icons/icon-512.png (NutriPlan icon-512x512.png equivalent)`);
 
   console.log('\nBrand (header logo):');
   await writeSquareWebp(brandSrc, join(OUT, 'brand.webp'), 512, { fill: 0.92 });
