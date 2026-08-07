@@ -1,43 +1,40 @@
-# KASY / AIVA — App Icon (NutriPlan / aidiet parity)
+# KASY / AIVA — App Icon (locked spec, NutriPlan / aidiet style)
 
-## Pipeline (same as aidiet `build-apk.yml`)
+## Master source
 
-```
-icon1.png (raw export)
-    → process-brand-assets.mjs
-    → frontend/icons/icon-512.png   ← NutriPlan icon-512x512.png equivalent
-    → generate-android-apk-assets.mjs
-    → mipmap-* + adaptive XML
-```
+| File | Role |
+|------|------|
+| `brand-assets/source/icon1.png` | **Preferred** master (robot PNG with alpha) |
+| `brand-assets/source/icon-512.png` | Processed transparent launcher tile (512×512) |
 
-**APK never reads `icon1.png` directly** — only the processed `icon-512.png` tile.
+Fallback: `PSX_20260805_210455.png`.
 
-## Raw export cleanup
+**Do not** use `frontend/icons/*` as generation input.
 
-`icon1.png` includes an opaque dark gray rounded card (~RGB 44,36,44).  
-`removeCardMatte()` flood-fills from edges to strip the card; robot + pink glow remain.
+## Strategy (same as NutriPlan / aidiet)
 
-## Adaptive icon
+- Master exports include an opaque black rounded card — `removeOpaqueMatte()` strips it before resize
+- **Transparent PNG** with robot + pink glow only (like NutriPlan apple on transparency)
+- **Legacy** `ic_launcher.png`: direct resize of source (transparent sides stay transparent)
+- **Adaptive foreground**: source scaled to **66.7%** safe zone on transparent 108dp canvas
+- **Adaptive background**: `@color/ic_launcher_background` → `#050508` (shows through transparent areas)
 
-| Layer | Content |
-|-------|---------|
-| Foreground | `icon-512.png` scaled to 66.7% safe zone, transparent canvas |
-| Background | `@color/ic_launcher_background` → `#050508` |
+PWA `icon-512.png` matches APK source — not an opaque maskable tile with tiny artwork.
 
-Legacy: direct resize of `icon-512.png` (transparent corners).
-
-## Commands
+## Scripts
 
 ```bash
 npm install --prefix workers
 node scripts/process-brand-assets.mjs
 node scripts/generate-android-apk-assets.mjs android-res
 node scripts/verify-apk-icon-preview.mjs
-node scripts/simulate-launcher-icon.mjs   # visual compare vs NutriPlan
 ```
 
 ## Do NOT
 
-- Point APK generation at `icon1.png` (bypasses card removal)
-- Composite onto opaque `#050508` tile for launcher
-- Use circular `renderApkCircle()` legacy-only icons
+- Composite artwork onto opaque `#050508` for launcher/APK (`renderMaskableSquare` for APK)
+- Shrink artwork to 66.7% on a full opaque tile (makes icon look small)
+- Use circular `renderApkCircle()` pre-shaped bitmaps
+- Delete `mipmap-anydpi-v26` adaptive XML
+
+See `docs/APK_ICON_GUIDE.md` and https://github.com/Radilovk/aidiet (`icon-512x512.png` + `build-apk.yml`).

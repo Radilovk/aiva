@@ -1,8 +1,9 @@
 /**
- * Android launcher icons — NutriPlan / aidiet pipeline (aidiet build-apk.yml).
+ * Android launcher icons — NutriPlan / aidiet pipeline.
  *
- * 1. process-brand-assets → frontend/icons/icon-512.png (transparent PNG, like icon-512x512.png)
- * 2. generate-android-apk-assets uses that tile ONLY (direct resize, no raw icon1)
+ * Source exports often include an opaque black rounded card; we strip it so only
+ * robot + pink glow remain on transparency (like NutriPlan apple on transparent PNG).
+ * Adaptive background #050508 comes from @color/ic_launcher_background.
  */
 import { createRequire } from 'node:module';
 import { access } from 'node:fs/promises';
@@ -17,7 +18,7 @@ const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 export const APP_WINDOW_BG = '#050508';
 export const APK_ICON_BG = '#050508';
 
-/** NutriPlan CI: SAFE = SIZE * 2/3 */
+/** 66.7% safe zone for adaptive foreground (Icon.md / NutriPlan). */
 export const SAFE_ZONE_RATIO = 2 / 3;
 
 export const LEGACY_SIZES = [
@@ -47,21 +48,13 @@ export const DENSITY_SCALES = [
   ['xxxhdpi', 4],
 ];
 
-const FRONTEND_ICONS = join(ROOT, 'frontend', 'icons');
-const SOURCE_DIR = join(ROOT, 'brand-assets', 'source');
-
-/** Processed launcher tile — same role as NutriPlan icon-512x512.png */
-export const LAUNCHER_TILE_CANDIDATES = [
-  join(FRONTEND_ICONS, 'icon-512.png'),
-  join(SOURCE_DIR, 'icon-512.png'),
-];
-
-/** Raw exports for first-time brand processing only */
-export const RAW_ICON_CANDIDATES = [
-  join(SOURCE_DIR, 'icon1.png'),
-  join(SOURCE_DIR, 'kasyico.png'),
+/** Raw masters only — never derived frontend/icons outputs. */
+export const MASTER_ICON_CANDIDATES = [
+  join(ROOT, 'brand-assets', 'source', 'icon1.png'),
+  join(ROOT, 'brand-assets', 'source', 'kasyico.png'),
+  join(ROOT, 'brand-assets', 'source', 'icon-512.png'),
   join(ROOT, 'PSX_20260805_210455.png'),
-  join(SOURCE_DIR, 'PSX_20260805_210455.png'),
+  join(ROOT, 'brand-assets', 'source', 'PSX_20260805_210455.png'),
 ];
 
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
@@ -75,133 +68,76 @@ function parseBg(hex) {
   };
 }
 
-function isPinkGlow(r, g, b) {
-  return r > 55 && r > g * 1.15 && r > b * 1.05;
-}
-
-/** True for export matte / card pixels (dark gray card, not robot visor). */
-function isMattePixel(r, g, b, a, { lumaMax = 58 } = {}) {
-  if (a < 12) return true;
-  const max = Math.max(r, g, b);
-  if (isPinkGlow(r, g, b)) return false;
-  return max < lumaMax;
-}
-
 /**
- * Flood from image edges through transparent + dark matte — removes black/gray card
- * while keeping robot visor (not connected to outer matte through low-luma flood).
+ * Remove baked-in opaque black card from robot exports (keeps pink neon glow).
+ * Without this, launchers show a small black rounded square inside the mask.
  */
-export async function removeCardMatte(buf, { lumaMax = 58 } = {}) {
+export async function removeOpaqueMatte(buf, { lumaMax = 32, alphaMin = 12 } = {}) {
   const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const w = info.width;
   const h = info.height;
   const out = Buffer.from(data);
-  const visited = new Uint8Array(w * h);
-  const queue = [];
-
-  const tryPush = (x, y) => {
-    if (x < 0 || y < 0 || x >= w || y >= h) return;
-    const idx = y * w + x;
-    if (visited[idx]) return;
-    const i = idx * 4;
-    const r = out[i];
-    const g = out[i + 1];
-    const b = out[i + 2];
-    const a = out[i + 3];
-    if (!isMattePixel(r, g, b, a, { lumaMax })) return;
-    visited[idx] = 1;
-    queue.push(idx);
-  };
-
-  for (let x = 0; x < w; x += 1) {
-    tryPush(x, 0);
-    tryPush(x, h - 1);
-  }
   for (let y = 0; y < h; y += 1) {
-    tryPush(0, y);
-    tryPush(w - 1, y);
+    for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      const r = out[i];
+      const g = out[i + 1];
+      const b = out[i + 2];
+      const a = out[i + 3];
+      if (a < alphaMin) continue;
+      const max = Math.max(r, g, b);
+      const isPinkGlow = r > 55 && r > g * 1.15 && r > b * 1.05;
+      if (max < lumaMax && !isPinkGlow) {
+        out[i + 3] = 0;
+      }
+    }
   }
-
-  while (queue.length > 0) {
-    const idx = queue.pop();
-    const x = idx % w;
-    const y = Math.floor(idx / w);
-    const i = idx * 4;
-    out[i + 3] = 0;
-    tryPush(x - 1, y);
-    tryPush(x + 1, y);
-    tryPush(x, y - 1);
-    tryPush(x, y + 1);
-  }
-
   return sharp(out, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
 }
 
-/** Trim export, strip card matte, trim alpha — robot + glow only. */
-export async function prepRawIconExport(input) {
+/** Trim matte, strip black card, trim alpha bounds — canonical launcher artwork. */
+export async function prepApkIconSource(input) {
   let buf = await sharp(input).ensureAlpha().png().toBuffer();
   try {
     buf = await sharp(buf).trim({ threshold: 32 }).png().toBuffer();
   } catch {
-    /* ok */
+    /* no matte */
   }
-  buf = await removeCardMatte(buf);
+  buf = await removeOpaqueMatte(buf);
   return trimAlphaArt(buf);
 }
 
-/**
- * Build canonical launcher tile (NutriPlan icon-512x512.png equivalent).
- * Transparent 512×512, artwork centered at natural size.
- */
-export async function buildLauncherTile(input, size = 512) {
-  const prepared = await prepRawIconExport(input);
+export async function resolveMasterIcon() {
+  for (const path of MASTER_ICON_CANDIDATES) {
+    try {
+      await access(path);
+      return path;
+    } catch {
+      /* try next */
+    }
+  }
+  throw new Error('No master icon found. Add brand-assets/source/icon1.png or icon-512.png.');
+}
+
+/** PWA / launcher tile — transparent PNG, artwork at natural size. */
+export async function renderLauncherSource(input, size) {
+  const prepared = await prepApkIconSource(input);
   return sharp(prepared).resize(size, size, { fit: 'contain', background: TRANSPARENT });
 }
 
-export async function resolveLauncherTile() {
-  for (const path of LAUNCHER_TILE_CANDIDATES) {
-    try {
-      await access(path);
-      return path;
-    } catch {
-      /* next */
-    }
-  }
-  throw new Error(
-    'Missing launcher tile. Run: node scripts/process-brand-assets.mjs',
-  );
-}
-
-export async function resolveRawIconExport() {
-  for (const path of RAW_ICON_CANDIDATES) {
-    try {
-      await access(path);
-      return path;
-    } catch {
-      /* next */
-    }
-  }
-  throw new Error('Missing raw icon export (icon1.png or kasyico.png).');
-}
-
-/** @deprecated Use resolveLauncherTile */
-export async function resolveMasterIcon() {
-  return resolveLauncherTile();
+/** Legacy launcher — prepared art resized (NutriPlan: convert -resize). */
+export async function renderLegacyLauncher(input, size) {
+  const prepared = await prepApkIconSource(input);
+  return sharp(prepared).resize(size, size, { fit: 'contain', background: TRANSPARENT });
 }
 
 /**
- * Legacy launcher — NutriPlan: convert ICON_SRC -resize SIZE (direct tile resize).
+ * Adaptive foreground — prepared art scaled to 66.7% safe zone on transparent canvas.
  */
-export function renderLegacyLauncher(tileInput, size) {
-  return sharp(tileInput).resize(size, size, { fit: 'inside', background: TRANSPARENT });
-}
-
-/**
- * Adaptive foreground — NutriPlan: xc:none + ICON_SRC resize SAFE + center composite.
- */
-export async function renderAdaptiveForeground(tileInput, canvasSize) {
+export async function renderAdaptiveForeground(input, canvasSize) {
+  const prepared = await prepApkIconSource(input);
   const safe = Math.floor(canvasSize * SAFE_ZONE_RATIO);
-  const scaled = await sharp(tileInput)
+  const scaled = await sharp(prepared)
     .resize(safe, safe, { fit: 'inside', background: TRANSPARENT })
     .png()
     .toBuffer();
@@ -215,19 +151,40 @@ export async function renderAdaptiveForeground(tileInput, canvasSize) {
   }).composite([{ input: scaled, gravity: 'center' }]);
 }
 
-/** Notification mask from launcher tile. */
-export async function renderNotificationMask(tileInput, size) {
-  const resized = await sharp(tileInput)
-    .resize(size, size, { fit: 'inside', background: TRANSPARENT })
+/** Monochrome notification mask — alpha extract from prepared art. */
+export async function renderNotificationMask(input, size) {
+  const prepared = await prepApkIconSource(input);
+  const resized = await sharp(prepared)
+    .resize(size, size, { fit: 'contain', background: TRANSPARENT })
     .ensureAlpha()
     .png()
     .toBuffer();
   return sharp(resized).extractChannel('alpha').png().toBuffer();
 }
 
-/** PWA tile generation alias */
-export async function renderLauncherSource(input, size = 512) {
-  return buildLauncherTile(input, size);
+/**
+ * @deprecated Opaque maskable tile — makes icon look small on launchers.
+ */
+export async function renderMaskableSquare(input, size = 512) {
+  const trimmed = await prepApkIconSource(input);
+  const safe = Math.floor(size * SAFE_ZONE_RATIO);
+  const logo = await sharp(trimmed)
+    .resize(safe, safe, { fit: 'inside', withoutEnlargement: false })
+    .png()
+    .toBuffer();
+  return sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: parseBg(APK_ICON_BG),
+    },
+  }).composite([{ input: logo, gravity: 'center' }]);
+}
+
+/** @deprecated Alias */
+export async function buildMaskableMaster(input, size = 512) {
+  return renderMaskableSquare(input, size);
 }
 
 export const APK_BG = APP_WINDOW_BG;
