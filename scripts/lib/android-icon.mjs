@@ -18,8 +18,8 @@ export const APP_WINDOW_BG = '#050508';
 /** Adaptive icon background — matches maskable master tile (NutriPlan uses #042F2E). */
 export const APK_ICON_BG = '#050508';
 
-/** 66.7% safe zone — avoids clipping by launcher masks (Icon.md). */
-export const SAFE_ZONE_RATIO = 2 / 3;
+/** 70% safe zone — slightly larger in square launchers; Android circle safe is ~61%. */
+export const SAFE_ZONE_RATIO = 0.7;
 
 export const LEGACY_SIZES = [
   ['mipmap-mdpi', 48],
