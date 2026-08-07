@@ -71,7 +71,7 @@ node scripts/generate-android-apk-assets.mjs android/app/src/main/res
 
 Adaptive foreground: transparent canvas, master scaled to safe zone, centered.
 
-Adaptive background: `@color/ic_launcher_background` → `#050508` in `values/colors.xml`.
+Adaptive background: `@color/ic_launcher_background` → `#050508` in `values/ic_launcher_background.xml`.
 
 Adaptive XML (`mipmap-anydpi-v26/ic_launcher.xml`):
 

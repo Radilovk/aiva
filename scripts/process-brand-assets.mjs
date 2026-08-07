@@ -7,11 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { renderSquareIcon } from './lib/brand-icon-prep.mjs';
-import {
-  renderMaskableSquare,
-  renderLegacyLauncher,
-  resolveMasterIcon,
-} from './lib/android-icon.mjs';
+import { buildMaskableMaster, renderLegacyLauncher } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,7 +23,6 @@ const ICON_192_CANDIDATES = [
 ];
 
 const ICON_512_CANDIDATES = [
-  join(SOURCE_DIR, 'icon1.png'),
   join(SOURCE_DIR, 'icon-512.png'),
   join(ROOT, 'PSX_20260805_210455.png'),
   join(SOURCE_DIR, 'PSX_20260805_210455.png'),
@@ -94,9 +89,9 @@ export async function processBrandAssets() {
   await mkdir(SOURCE_DIR, { recursive: true });
 
   console.log('\nMaskable master icons (66.7% safe zone, bg #050508):');
-  const icon512Buf = await renderMaskableSquare(icon512Src, 512)
+  const icon512Buf = await buildMaskableMaster(icon512Src, 512)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-  const icon192Buf = await renderMaskableSquare(icon192Src, 192)
+  const icon192Buf = await buildMaskableMaster(icon192Src, 192)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
   await writeFile(join(SOURCE_DIR, 'icon-512.png'), icon512Buf);
@@ -113,13 +108,6 @@ export async function processBrandAssets() {
 
   const m192 = await sharp(icon192Buf).metadata();
   console.log(`  ✓ frontend/icons/icon-192.png (${m192.width}×${m192.height}, ${(icon192Buf.length / 1024).toFixed(1)} KB)`);
-
-  const masterForApk = await resolveMasterIcon();
-  const appleTouchBuf = await renderLegacyLauncher(icon512Buf, 180)
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-  await writeFile(join(OUT, 'apple-touch-icon.png'), appleTouchBuf);
-  console.log(`  ✓ frontend/icons/apple-touch-icon.png (180×180, master ${masterForApk.replace(`${ROOT}/`, '')})`);
 
   const notif = await renderLegacyLauncher(icon512Buf, 96)
     .grayscale()

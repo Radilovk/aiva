@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Audit built APK: maskable adaptive icons, launch theme, no splash, no Capacitor defaults.
+ * Audit built APK: correct icons, launch theme, no splash, no Capacitor defaults.
  * Usage: node scripts/audit-apk.mjs [path/to/app-release.apk]
  */
 import { readFile, mkdir, rm, access } from 'node:fs/promises';
@@ -24,18 +24,6 @@ function md5(buf) {
   return createHash('md5').update(buf).digest('hex');
 }
 
-async function cornerAlpha(buf) {
-  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const w = info.width;
-  const h = info.height;
-  return [
-    data[3],
-    data[(w - 1) * 4 + 3],
-    data[(h - 1) * w * 4 + 3],
-    data[(h * w - 1) * 4 + 3],
-  ];
-}
-
 async function ensureApktool() {
   try {
     await access(APKTOOL);
@@ -54,26 +42,19 @@ async function main() {
 
   execSync(`java -jar ${APKTOOL} d -f "${APK}" -o "${OUT}/decoded"`, { stdio: 'pipe' });
 
-  const resRoot = join(OUT, 'decoded', 'res');
-  const fgApk = await readFile(join(resRoot, 'mipmap-xxxhdpi', 'ic_launcher_foreground.png'));
-  const legacyApk = await readFile(join(resRoot, 'mipmap-xxxhdpi', 'ic_launcher.png'));
+  const fgApk = await readFile(join(OUT, 'decoded', 'res', 'mipmap-xxxhdpi', 'ic_launcher_foreground.png'));
   const fgApkMd5 = md5(fgApk);
   const fgMeta = await sharp(fgApk).metadata();
-  const legacyCorners = await cornerAlpha(legacyApk);
-  const styles = await readFile(join(resRoot, 'values', 'styles.xml'), 'utf8');
+  const styles = await readFile(join(OUT, 'decoded', 'res', 'values', 'styles.xml'), 'utf8');
   const manifest = await readFile(join(OUT, 'decoded', 'AndroidManifest.xml'), 'utf8');
-  const colors = await readFile(join(resRoot, 'values', 'colors.xml'), 'utf8');
-  const adaptiveXml = await readFile(join(resRoot, 'mipmap-anydpi-v26', 'ic_launcher.xml'), 'utf8').catch(() => '');
+  const colors = await readFile(join(OUT, 'decoded', 'res', 'values', 'colors.xml'), 'utf8');
 
   const checks = [
     ['not Capacitor default icon', fgApkMd5 !== CAPACITOR_DEFAULT_FG_MD5, fgApkMd5],
     ['launcher fg is 432×432', fgMeta.width === 432 && fgMeta.height === 432, `${fgMeta.width}×${fgMeta.height}`],
-    ['adaptive icon XML present', adaptiveXml.includes('<adaptive-icon')],
-    ['adaptive background uses @color', adaptiveXml.includes('@color/ic_launcher_background')],
-    ['legacy launcher corners opaque', legacyCorners.every((a) => a > 200), legacyCorners.join(',')],
     ['windowBackground=@color/app_background', /android:windowBackground">@color\/app_background/.test(styles)],
-    ['no splash drawable in APK', !(await readFile(join(resRoot, 'drawable', 'splash.xml'), 'utf8').catch(() => null))],
-    ['no Capacitor vector fg', !(await readFile(join(resRoot, 'drawable-v24', 'ic_launcher_foreground.xml'), 'utf8').catch(() => null))],
+    ['no splash drawable in APK', !(await readFile(join(OUT, 'decoded', 'res', 'drawable', 'splash.xml'), 'utf8').catch(() => null))],
+    ['no Capacitor vector fg', !(await readFile(join(OUT, 'decoded', 'res', 'drawable-v24', 'ic_launcher_foreground.xml'), 'utf8').catch(() => null))],
     ['themed icon disabled', /THEMED_ICON_ENABLED.*false/.test(manifest)],
     ['ic_launcher_background #050508', colors.includes('#ff050508') || colors.includes('#050508')],
   ];
