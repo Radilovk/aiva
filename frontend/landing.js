@@ -109,11 +109,6 @@
   function initApkDownload() {
     const url = window.AIVA_CONFIG?.APK_DOWNLOAD_URL;
     if (!url) return;
-
-    if (/Android/i.test(navigator.userAgent)) {
-      document.documentElement.classList.add('show-apk-download');
-    }
-
     document.querySelectorAll('.apk-download-btn').forEach((el) => {
       el.href = url;
       el.setAttribute('rel', 'noopener noreferrer');
