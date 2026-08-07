@@ -6,12 +6,11 @@ This document is the single source of truth for how KASY launcher icons are buil
 
 | File | Size | Role |
 |------|------|------|
-| `brand-assets/source/icon-512.png` | **512×512** | **Maskable master** — robot artwork on `#050508` background |
-| `brand-assets/source/icon-192.png` | 192×192 | Smaller maskable master (notifications, shortcuts) |
-| `PSX_20260805_210455.png` | raw | Fallback robot source for 512 master |
-| `PSX_20260805_210411.png` | raw | Fallback robot source for 192 master |
+| `brand-assets/source/icon1.png` | Raw export (has dark gray card — stripped in pipeline) |
+| `frontend/icons/icon-512.png` | **Launcher tile** — NutriPlan `icon-512x512.png` equivalent |
+| `brand-assets/source/icon-512.png` | Copy of processed tile |
 
-Raw robot PNGs are trimmed and composited into maskable masters by `scripts/process-brand-assets.mjs`. The APK pipeline never reads raw PSX files directly — it uses the processed masters in `frontend/icons/` and `brand-assets/source/`.
+APK generation reads **only** `frontend/icons/icon-512.png` (never raw `icon1.png`).
 
 ## 2. Web / PWA registration
 
@@ -32,16 +31,14 @@ PWA and APK share one visual: **large robot on transparent PNG**; launcher backg
 
 ### Step A — Brand assets (`scripts/process-brand-assets.mjs`)
 
-1. Load raw robot PNG (`icon1.png` or PSX export).
-2. Trim transparent matte padding (`prepApkIconSource`).
-3. Build launcher tile via `renderLauncherSource()`:
-   - Canvas: 512×512 (or 192×192)
-   - **Transparent** background — artwork at natural size (like NutriPlan `icon-512x512.png`)
-4. Write to `frontend/icons/icon-{192,512}.png` and `brand-assets/source/`.
+1. Load raw export (`icon1.png`).
+2. `removeCardMatte()` — flood from edges removes dark gray rounded card (RGB ~44,36,44).
+3. `buildLauncherTile()` → transparent 512×512 PNG.
+4. Write `frontend/icons/icon-512.png` — **this file is APK input** (aidiet uses `icon-512x512.png` the same way).
 
 ### Step B — APK mipmaps (`scripts/generate-android-apk-assets.mjs`)
 
-Run after `npx cap add android` in CI, or locally:
+Uses `frontend/icons/icon-512.png` only — direct resize like aidiet `build-apk.yml`:
 
 ```bash
 node scripts/process-brand-assets.mjs
@@ -91,7 +88,7 @@ Monochrome alpha mask per density (`drawable-*/ic_stat_aiva.png`), extracted fro
 
 | Script | When | Checks |
 |--------|------|--------|
-| `scripts/verify-apk-icon-preview.mjs` | After generate, before APK build | 432px adaptive fg, 66.7% safe zone, no squircle clipping |
+| `scripts/simulate-launcher-icon.mjs` | Visual compare KASY vs NutriPlan under circle/squircle/teardrop masks |
 | `scripts/audit-apk.mjs` | After APK build | Correct fg dimensions, no Capacitor defaults, no splash |
 
 CI runs both in `.github/workflows/build-apk.yml`.

@@ -81,30 +81,33 @@ async function check(name, ok, detail = '') {
   return ok ? 0 : 1;
 }
 
-async function nearBlackRatio(buf) {
+async function outerRingDarkOpaque(buf, size, marginFrac = 0.14) {
   const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  let black = 0;
-  let opaque = 0;
-  const n = info.width * info.height;
-  for (let i = 0; i < n; i += 1) {
-    const oi = i * 4;
-    if (data[oi + 3] < 20) continue;
-    opaque += 1;
-    if (data[oi] < 32 && data[oi + 1] < 32 && data[oi + 2] < 32) black += 1;
+  const w = info.width;
+  const m = Math.max(1, Math.floor(w * marginFrac));
+  let count = 0;
+  for (let y = 0; y < w; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const inCenter = x >= m && x < w - m && y >= m && y < w - m;
+      if (inCenter) continue;
+      const i = (y * w + x) * 4;
+      const a = data[i + 3];
+      if (a > 180 && data[i] < 55 && data[i + 1] < 55 && data[i + 2] < 60) count += 1;
+    }
   }
-  return opaque ? black / opaque : 0;
+  return count;
 }
 
 async function main() {
   await mkdir(OUT, { recursive: true });
   const fgBuf = await (await renderAdaptiveForeground(ICON, ADAPTIVE_CANVAS)).png().toBuffer();
-  const legacyBuf = await (await renderLegacyLauncher(ICON, LEGACY_SIZE)).png().toBuffer();
+  const legacyBuf = await renderLegacyLauncher(ICON, LEGACY_SIZE).png().toBuffer();
   const fgMeta = await sharp(fgBuf).metadata();
   const clipped = await clippedArtPixels(fgBuf, ADAPTIVE_CANVAS);
   const legacyCorners = await cornerAlpha(legacyBuf, LEGACY_SIZE);
   const fgCorners = await cornerAlpha(fgBuf, ADAPTIVE_CANVAS);
   const fgCenter = await hasOpaqueCenter(fgBuf, ADAPTIVE_CANVAS);
-  const fgBlackRatio = await nearBlackRatio(fgBuf);
+  const outerDark = await outerRingDarkOpaque(fgBuf, ADAPTIVE_CANVAS);
 
   await writeFile(join(OUT, 'apk-adaptive-fg-432.png'), fgBuf);
   await writeFile(join(OUT, 'apk-legacy-192.png'), legacyBuf);
@@ -130,9 +133,9 @@ async function main() {
   );
   failed += await check('foreground has opaque center art', fgCenter);
   failed += await check(
-    'foreground has no black card matte',
-    fgBlackRatio < 0.05,
-    `${(fgBlackRatio * 100).toFixed(1)}% near-black among opaque pixels`,
+    'foreground outer ring has no card matte',
+    outerDark < 50,
+    `${outerDark} dark pixels in outer ring`,
   );
 
   const adaptiveXml = join(ANDROID_RES, 'mipmap-anydpi-v26', 'ic_launcher.xml');
