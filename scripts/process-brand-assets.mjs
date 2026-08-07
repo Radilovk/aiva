@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /**
- * Brand assets — maskable master PNG (Icon.md / NutriPlan pipeline).
+ * Brand assets — NutriPlan-style transparent launcher PNG (aidiet pipeline).
  */
-import { mkdir, writeFile, access, copyFile } from 'node:fs/promises';
+import { mkdir, writeFile, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { renderSquareIcon } from './lib/brand-icon-prep.mjs';
 import {
-  renderMaskableSquare,
+  renderLauncherSource,
   renderLegacyLauncher,
+  renderNotificationMask,
   resolveMasterIcon,
+  APK_ICON_BG,
 } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
@@ -84,7 +86,7 @@ export async function processBrandAssets() {
   const brandSrc = await resolveInDirs(BRAND_CANDIDATES);
   const buttonSrc = await resolveInDirs(BUTTON_CANDIDATES);
 
-  console.log('KASY brand assets (Icon.md maskable pipeline)');
+  console.log('KASY brand assets (NutriPlan transparent launcher pipeline)');
   console.log(`  robot-192: ${icon192Src}`);
   console.log(`  robot-512: ${icon512Src}`);
   console.log(`  brand:     ${brandSrc}`);
@@ -93,10 +95,10 @@ export async function processBrandAssets() {
   await mkdir(OUT, { recursive: true });
   await mkdir(SOURCE_DIR, { recursive: true });
 
-  console.log('\nMaskable master icons (66.7% safe zone, bg #050508):');
-  const icon512Buf = await renderMaskableSquare(icon512Src, 512)
+  console.log(`\nLauncher icons (transparent sides, bg ${APK_ICON_BG} via adaptive XML only):`);
+  const icon512Buf = await renderLauncherSource(icon512Src, 512)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
-  const icon192Buf = await renderMaskableSquare(icon192Src, 192)
+  const icon192Buf = await renderLauncherSource(icon192Src, 192)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
   await writeFile(join(SOURCE_DIR, 'icon-512.png'), icon512Buf);
@@ -121,11 +123,8 @@ export async function processBrandAssets() {
   await writeFile(join(OUT, 'apple-touch-icon.png'), appleTouchBuf);
   console.log(`  ✓ frontend/icons/apple-touch-icon.png (180×180, master ${masterForApk.replace(`${ROOT}/`, '')})`);
 
-  const notif = await renderLegacyLauncher(icon512Buf, 96)
-    .grayscale()
-    .normalize()
-    .png({ compressionLevel: 9 })
-    .toBuffer();
+  const notif = await renderNotificationMask(icon512Buf, 96)
+    .then((b) => sharp(b).png({ compressionLevel: 9 }).toBuffer());
   await writeFile(join(OUT, 'ic-stat-notification.png'), notif);
   console.log('  ✓ frontend/icons/ic-stat-notification.png');
 
