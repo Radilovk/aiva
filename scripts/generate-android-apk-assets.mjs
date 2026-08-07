@@ -15,6 +15,7 @@ import {
   renderLegacyLauncher,
   renderAdaptiveForeground,
   renderNotificationMask,
+  resolveMasterIcon,
 } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
@@ -24,28 +25,6 @@ const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res');
 const ANDROID_RES = join(ROOT, 'android-res');
 const SOURCE_DIR = join(ROOT, 'brand-assets', 'source');
-const FRONTEND_ICONS = join(ROOT, 'frontend', 'icons');
-
-async function exists(path) {
-  try {
-    await import('node:fs/promises').then((fs) => fs.access(path));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function resolveIcon512() {
-  const candidates = [
-    join(FRONTEND_ICONS, 'icon-512.png'),
-    join(SOURCE_DIR, 'icon-512.png'),
-    join(ROOT, 'PSX_20260805_210455.png'),
-  ];
-  for (const p of candidates) {
-    if (await exists(p)) return p;
-  }
-  throw new Error('Missing icon-512.png / PSX_20260805_210455.png');
-}
 
 async function writeLauncherIcons(icon512Path) {
   const legacyByDir = new Map(LEGACY_SIZES);
@@ -116,17 +95,17 @@ async function writeBrandColors() {
   const colorsXml = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="app_background">${APP_WINDOW_BG}</color>
-</resources>
-`;
-  const bgXml = `<?xml version="1.0" encoding="utf-8"?>
-<resources>
     <color name="ic_launcher_background">${APK_ICON_BG}</color>
 </resources>
 `;
   for (const valuesDir of [join(OUT, 'values'), join(ANDROID_RES, 'values')]) {
     await mkdir(valuesDir, { recursive: true });
     await writeFile(join(valuesDir, 'colors.xml'), colorsXml);
-    await writeFile(join(valuesDir, 'ic_launcher_background.xml'), bgXml);
+    try {
+      await unlink(join(valuesDir, 'ic_launcher_background.xml'));
+    } catch {
+      /* ok */
+    }
   }
 }
 
@@ -164,7 +143,7 @@ async function mirrorToAndroidRes() {
 }
 
 async function main() {
-  const icon512Path = await resolveIcon512();
+  const icon512Path = await resolveMasterIcon();
   console.log(`Android branding → ${OUT}`);
   console.log(`  master: ${icon512Path}`);
   await writeLauncherIcons(icon512Path);

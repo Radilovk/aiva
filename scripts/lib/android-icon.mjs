@@ -6,6 +6,7 @@
  *           background via @color/ic_launcher_background.
  */
 import { createRequire } from 'node:module';
+import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { trimAlphaArt } from './brand-icon-prep.mjs';
@@ -38,6 +39,25 @@ export const ADAPTIVE_SIZES = [
   ['mipmap-xxxhdpi', 432],
 ];
 
+export const ADAPTIVE_DP = 108;
+export const LEGACY_DP = 48;
+
+export const DENSITY_SCALES = [
+  ['mdpi', 1],
+  ['hdpi', 1.5],
+  ['xhdpi', 2],
+  ['xxhdpi', 3],
+  ['xxxhdpi', 4],
+];
+
+export const MASTER_ICON_CANDIDATES = [
+  join(ROOT, 'brand-assets', 'source', 'icon1.png'),
+  join(ROOT, 'brand-assets', 'source', 'icon-512.png'),
+  join(ROOT, 'PSX_20260805_210455.png'),
+  join(ROOT, 'brand-assets', 'source', 'PSX_20260805_210455.png'),
+  join(ROOT, 'frontend', 'icons', 'icon-512.png'),
+];
+
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 
 function parseBg(hex) {
@@ -60,11 +80,24 @@ export async function prepApkIconSource(input) {
   return trimAlphaArt(buf);
 }
 
+/** First existing master icon on the candidate chain. */
+export async function resolveMasterIcon() {
+  for (const path of MASTER_ICON_CANDIDATES) {
+    try {
+      await access(path);
+      return path;
+    } catch {
+      /* try next */
+    }
+  }
+  throw new Error('No master icon found. Add brand-assets/source/icon1.png or icon-512.png.');
+}
+
 /**
- * Maskable master PNG (512×512): brand bg + logo in 66.7% safe zone.
+ * Maskable master PNG: opaque brand bg + logo in 66.7% safe zone.
  * Used as single source for PWA + APK (Icon.md).
  */
-export async function buildMaskableMaster(input, size = 512) {
+export async function renderMaskableSquare(input, size = 512) {
   const trimmed = await prepApkIconSource(input);
   const safe = Math.floor(size * SAFE_ZONE_RATIO);
   const logo = await sharp(trimmed)
@@ -81,7 +114,12 @@ export async function buildMaskableMaster(input, size = 512) {
   }).composite([{ input: logo, gravity: 'center' }]);
 }
 
-/** Legacy launcher — direct resize, no extra overlay (Icon.md). */
+/** @deprecated Alias — use renderMaskableSquare */
+export async function buildMaskableMaster(input, size = 512) {
+  return renderMaskableSquare(input, size);
+}
+
+/** Legacy launcher — direct resize of maskable master (Icon.md). */
 export function renderLegacyLauncher(input, size) {
   return sharp(input).resize(size, size, { fit: 'contain', background: parseBg(APK_ICON_BG) });
 }
