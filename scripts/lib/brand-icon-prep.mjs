@@ -9,8 +9,8 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 
-/** Google adaptive / maskable safe zone (72dp of 108dp). */
-export const APP_ICON_FILL = 2 / 3;
+/** One fill ratio everywhere — matches the PWA icon the user approved. */
+export const APP_ICON_FILL = 0.88;
 
 function parseBg(hex) {
   return {

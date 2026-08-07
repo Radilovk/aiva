@@ -15,8 +15,6 @@ import {
   renderLegacyLauncher,
   renderAdaptiveForeground,
   renderNotificationMask,
-  resolveMasterIcon,
-  resolveLauncherTile,
 } from './lib/android-icon.mjs';
 
 const require = createRequire(import.meta.url);
@@ -26,8 +24,30 @@ const sharp = require(join(ROOT, 'workers/node_modules/sharp'));
 const OUT = process.argv[2] || join(ROOT, 'android', 'app', 'src', 'main', 'res');
 const ANDROID_RES = join(ROOT, 'android-res');
 const SOURCE_DIR = join(ROOT, 'brand-assets', 'source');
+const FRONTEND_ICONS = join(ROOT, 'frontend', 'icons');
 
-async function writeLauncherIcons(artPath, launcherTilePath) {
+async function exists(path) {
+  try {
+    await import('node:fs/promises').then((fs) => fs.access(path));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveIcon512() {
+  const candidates = [
+    join(FRONTEND_ICONS, 'icon-512.png'),
+    join(SOURCE_DIR, 'icon-512.png'),
+    join(ROOT, 'PSX_20260805_210455.png'),
+  ];
+  for (const p of candidates) {
+    if (await exists(p)) return p;
+  }
+  throw new Error('Missing icon-512.png / PSX_20260805_210455.png');
+}
+
+async function writeLauncherIcons(icon512Path) {
   const legacyByDir = new Map(LEGACY_SIZES);
   const adaptiveByDir = new Map(ADAPTIVE_SIZES);
 
@@ -37,10 +57,10 @@ async function writeLauncherIcons(artPath, launcherTilePath) {
     const legacySize = legacyByDir.get(dir);
     const adaptiveSize = adaptiveByDir.get(dir);
 
-    const legacyBuf = await renderLegacyLauncher(launcherTilePath, legacySize)
+    const legacyBuf = await renderLegacyLauncher(icon512Path, legacySize)
       .png({ compressionLevel: 9 })
       .toBuffer();
-    const fgBuf = await renderAdaptiveForeground(artPath, adaptiveSize)
+    const fgBuf = await renderAdaptiveForeground(icon512Path, adaptiveSize)
       .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
 
     await writeFile(join(folder, 'ic_launcher.png'), legacyBuf);
@@ -96,17 +116,17 @@ async function writeBrandColors() {
   const colorsXml = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="app_background">${APP_WINDOW_BG}</color>
+</resources>
+`;
+  const bgXml = `<?xml version="1.0" encoding="utf-8"?>
+<resources>
     <color name="ic_launcher_background">${APK_ICON_BG}</color>
 </resources>
 `;
   for (const valuesDir of [join(OUT, 'values'), join(ANDROID_RES, 'values')]) {
     await mkdir(valuesDir, { recursive: true });
     await writeFile(join(valuesDir, 'colors.xml'), colorsXml);
-    try {
-      await unlink(join(valuesDir, 'ic_launcher_background.xml'));
-    } catch {
-      /* ok */
-    }
+    await writeFile(join(valuesDir, 'ic_launcher_background.xml'), bgXml);
   }
 }
 
@@ -144,15 +164,13 @@ async function mirrorToAndroidRes() {
 }
 
 async function main() {
-  const artPath = await resolveMasterIcon();
-  const launcherTilePath = await resolveLauncherTile();
+  const icon512Path = await resolveIcon512();
   console.log(`Android branding → ${OUT}`);
-  console.log(`  art (adaptive fg): ${artPath}`);
-  console.log(`  legacy tile: ${launcherTilePath}`);
-  await writeLauncherIcons(artPath, launcherTilePath);
+  console.log(`  master: ${icon512Path}`);
+  await writeLauncherIcons(icon512Path);
   await writeBrandColors();
   await writeAdaptiveIconXml();
-  await writeNotificationIcons(artPath);
+  await writeNotificationIcons(icon512Path);
   await removeCapacitorDefaultVectors();
   if (OUT.includes('android/app')) {
     await mirrorToAndroidRes();
