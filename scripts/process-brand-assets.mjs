@@ -88,7 +88,7 @@ export async function processBrandAssets() {
   await mkdir(OUT, { recursive: true });
   await mkdir(SOURCE_DIR, { recursive: true });
 
-  console.log('\nMaskable master icons (80% safe zone, bg #050508):');
+  console.log('\nMaskable master icons (70% safe zone, bg #050508):');
   const icon512Buf = await buildMaskableMaster(icon512Src, 512)
     .then((p) => p.png({ compressionLevel: 9 }).toBuffer());
   const icon192Buf = await buildMaskableMaster(icon192Src, 192)
