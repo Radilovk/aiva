@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verify maskable adaptive icon pipeline: legacy opaque tile, adaptive fg safe zone.
+ * Verify NutriPlan-style launcher pipeline: transparent legacy + adaptive fg safe zone.
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -104,8 +104,8 @@ async function main() {
   );
   failed += await check('no squircle clipping', clipped === 0, `${clipped}px clipped`);
   failed += await check(
-    'legacy corners opaque (maskable tile)',
-    legacyCorners.every((a) => a > 200),
+    'legacy corners transparent (NutriPlan-style)',
+    legacyCorners.every((a) => a < 20),
     legacyCorners.join(','),
   );
   failed += await check(
