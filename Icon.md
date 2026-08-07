@@ -1,29 +1,26 @@
-# KASY / AIVA — App Icon (locked spec)
+# KASY / AIVA — App Icon (locked spec, NutriPlan / aidiet style)
 
 ## Master source
 
 | File | Role |
 |------|------|
-| `brand-assets/source/icon1.png` | **Preferred** master (1024×1024 robot PNG with alpha) |
-| `brand-assets/source/icon-512.png` | Processed maskable master (512×512) |
-| `brand-assets/source/icon-192.png` | Smaller master for notifications |
+| `brand-assets/source/icon1.png` | **Preferred** master (robot PNG with alpha) |
+| `brand-assets/source/icon-512.png` | Processed transparent launcher tile (512×512) |
 
-Fallback chain: `icon1.png` → `icon-512.png` → `PSX_20260805_210455.png`.
+Fallback: `PSX_20260805_210455.png`.
 
-**Do not** use `frontend/icons/*` as generation input — those are outputs.
+**Do not** use `frontend/icons/*` as generation input.
 
-## Strategy: maskable adaptive (NOT circular legacy)
+## Strategy (same as NutriPlan / aidiet)
 
-| Constant | Value |
-|----------|-------|
-| Background | `#050508` (opaque) |
-| Safe zone | **66.7%** (72 dp of 108 dp) |
-| Adaptive foreground canvas | 108 dp per density |
-| Legacy launcher | 48 dp per density |
+- **Transparent PNG** with large artwork — corners are transparent, not a filled dark square
+- **Legacy** `ic_launcher.png`: direct resize of source (transparent sides stay transparent)
+- **Adaptive foreground**: source scaled to **66.7%** safe zone on transparent 108dp canvas
+- **Adaptive background**: `@color/ic_launcher_background` → `#050508` (shows through transparent areas)
 
-PWA icon = APK icon. Same maskable tile on dark background.
+PWA `icon-512.png` matches APK source — not an opaque maskable tile with tiny artwork.
 
-## Scripts (run order)
+## Scripts
 
 ```bash
 npm install --prefix workers
@@ -32,22 +29,11 @@ node scripts/generate-android-apk-assets.mjs android-res
 node scripts/verify-apk-icon-preview.mjs
 ```
 
-CI runs the same pipeline into `android/app/src/main/res` after `npx cap add android`.
-
-## Generated outputs (commit with scripts)
-
-- `frontend/icons/icon-{192,512}.png`, `icon-512.webp`, `apple-touch-icon.png`
-- `android-res/mipmap-*/ic_launcher.png` (legacy, opaque corners)
-- `android-res/mipmap-*/ic_launcher_foreground.png` (adaptive, transparent corners)
-- `android-res/mipmap-anydpi-v26/ic_launcher.xml` (adaptive definition)
-- `android-res/values/colors.xml` (`app_background` + `ic_launcher_background`)
-
 ## Do NOT
 
-- Use `renderApkCircle()` or pre-shaped circular bitmaps
-- Delete `mipmap-anydpi-v26` or adaptive XML
-- Commit only PNG binaries without script changes
-- Use white `#FFFFFF` launcher background
-- Copy NutriPlan docs without matching scripts
+- Composite artwork onto opaque `#050508` for launcher/APK (`renderMaskableSquare` for APK)
+- Shrink artwork to 66.7% on a full opaque tile (makes icon look small)
+- Use circular `renderApkCircle()` pre-shaped bitmaps
+- Delete `mipmap-anydpi-v26` adaptive XML
 
-See `docs/APK_ICON_GUIDE.md` for troubleshooting.
+See `docs/APK_ICON_GUIDE.md` and https://github.com/Radilovk/aidiet (`icon-512x512.png` + `build-apk.yml`).

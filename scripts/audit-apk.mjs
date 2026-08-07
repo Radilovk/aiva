@@ -70,7 +70,7 @@ async function main() {
     ['launcher fg is 432×432', fgMeta.width === 432 && fgMeta.height === 432, `${fgMeta.width}×${fgMeta.height}`],
     ['adaptive icon XML present', adaptiveXml.includes('<adaptive-icon')],
     ['adaptive background uses @color', adaptiveXml.includes('@color/ic_launcher_background')],
-    ['legacy launcher corners opaque', legacyCorners.every((a) => a > 200), legacyCorners.join(',')],
+    ['legacy launcher corners transparent', legacyCorners.every((a) => a < 20), legacyCorners.join(',')],
     ['windowBackground=@color/app_background', /android:windowBackground">@color\/app_background/.test(styles)],
     ['no splash drawable in APK', !(await readFile(join(resRoot, 'drawable', 'splash.xml'), 'utf8').catch(() => null))],
     ['no Capacitor vector fg', !(await readFile(join(resRoot, 'drawable-v24', 'ic_launcher_foreground.xml'), 'utf8').catch(() => null))],
