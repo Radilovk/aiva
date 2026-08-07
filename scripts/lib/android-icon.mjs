@@ -2,7 +2,7 @@
  * Android launcher icons — NutriPlan / Icon.md pipeline.
  *
  * Legacy: direct resize of maskable master PNG.
- * Adaptive: foreground at 66.7% safe zone on 108dp canvas (per density),
+ * Adaptive: foreground at 80% safe zone on 108dp canvas (per density),
  *           background via @color/ic_launcher_background.
  */
 import { createRequire } from 'node:module';
@@ -18,8 +18,8 @@ export const APP_WINDOW_BG = '#050508';
 /** Adaptive icon background — matches maskable master tile (NutriPlan uses #042F2E). */
 export const APK_ICON_BG = '#050508';
 
-/** 70% safe zone — slightly larger in square launchers; Android circle safe is ~61%. */
-export const SAFE_ZONE_RATIO = 0.7;
+/** 80% safe zone — large square launcher fill; fg/bg both #050508 so circle clip is invisible. */
+export const SAFE_ZONE_RATIO = 0.8;
 
 export const LEGACY_SIZES = [
   ['mipmap-mdpi', 48],
