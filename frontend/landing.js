@@ -106,12 +106,23 @@
     });
   }
 
+  function initApkDownload() {
+    const url = window.AIVA_CONFIG?.APK_DOWNLOAD_URL;
+    if (!url) return;
+    document.querySelectorAll('.apk-download-btn').forEach((el) => {
+      el.href = url;
+      el.setAttribute('rel', 'noopener noreferrer');
+      el.setAttribute('target', '_blank');
+    });
+  }
+
   function init() {
     initTopBar();
     initFaq();
     initSnapDots();
     initDockHighlight();
     initLangSelect();
+    initApkDownload();
     applyLang(getLang());
   }
 

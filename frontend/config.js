@@ -38,11 +38,16 @@
     return location.origin;
   }
 
+  const GITHUB_REPO = 'Radilovk/aiva';
+
   window.AIVA_CONFIG = {
     API_BASE: resolveApiBase(),
     LIVE_MODEL: 'gemini-3.1-flash-live-preview',
     WORKER_ORIGIN,
     APP_BASE: resolveAppBasePath(),
     appUrl,
+    GITHUB_REPO,
+    APK_DOWNLOAD_URL: `https://github.com/${GITHUB_REPO}/releases/latest/download/KASY.apk`,
+    GITHUB_RELEASES_URL: `https://github.com/${GITHUB_REPO}/releases/latest`,
   };
 })();
