@@ -1430,11 +1430,42 @@
       display: flex;
     }
 
-    .important-toggle {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 0; cursor: pointer;
+    .form-grid label.important-toggle {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 0.84rem;
+      font-weight: 500;
     }
-    .important-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+    .form-grid .important-field {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .form-grid label.important-toggle input {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      margin: 0;
+      accent-color: var(--accent);
+    }
+
+    .form-grid label.important-toggle span {
+      line-height: 1.2;
+      white-space: nowrap;
+    }
 
     .modal-card {
       width: min(720px, 100%);
@@ -1915,10 +1946,12 @@
             <span data-i18n="time">Час</span>
             <input name="due_time" type="time">
           </label>
-          <label class="important-toggle">
-            <input name="important" type="checkbox">
-            <span data-i18n="priorityImportant">Важно!</span>
-          </label>
+          <div class="important-field">
+            <label class="important-toggle">
+              <input name="important" type="checkbox">
+              <span data-i18n="priorityImportant">Важно!</span>
+            </label>
+          </div>
           <label>
             <span data-i18n="emotionContext">Емоция / контекст</span>
             <select name="emotion">
