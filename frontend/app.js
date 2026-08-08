@@ -907,6 +907,7 @@ function renderUpcomingStrip() {
           <div class="upcoming-title">${escapeHtml(task.content)}</div>
           <div class="upcoming-countdown">${escapeHtml(countdown)}</div>
         </div>
+        <button class="upcoming-expand-btn" type="button" data-action="expand" aria-expanded="false" aria-label="Разгъни">▾</button>
         <div class="upcoming-actions">
           <button class="upcoming-action-btn" data-action="snooze" data-id="${task.id}" type="button" title="${escapeHtml(t('snooze10'))}">⏰</button>
           <button class="upcoming-action-btn" data-action="done" data-id="${task.id}" type="button" title="${escapeHtml(t('doneAction'))}">✓</button>
@@ -935,7 +936,7 @@ function renderTaskCard(task, mode = 'agenda') {
   const statusClass = overdue ? 'is-overdue' : (msUntil > 0 && msUntil <= 3600000 ? 'is-upcoming' : '');
   const important = window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority);
   const importantClass = important ? ' is-important' : '';
-  const priorityLabel = important ? (window.AIVA_TASK_PRIORITY?.label?.(task.priority, assistantSettings.profile?.language) || 'Важно!') : '';
+  const priorityLabel = important ? window.AIVA_TASK_PRIORITY.label(task.priority, assistantSettings.profile?.language) : '';
 
   return `
     <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')}${importantClass} ${statusClass}${task.isExternal ? ' external-event' : ''}" data-id="${task.id}"${task.isExternal ? ' data-external="true"' : ''} tabindex="0">
@@ -1267,7 +1268,7 @@ function buildTasksContextForAssistant() {
     const parts = [`ID ${task.id}: "${task.content}"`];
     if (task.due_date) parts.push(`дата ${task.due_date}`);
     if (task.due_time) parts.push(`час ${task.due_time}`);
-    if (window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority)) parts.push('важна');
+    if (window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority)) parts.push(' важна');
     if (task.notes) parts.push(`бележки: ${String(task.notes).slice(0, 120)}`);
     if (isTaskOverdue(task)) {
       overdueCount++;
@@ -1486,7 +1487,7 @@ async function handleVoiceReadTasks(args) {
     return { success: true, message: 'Няма задачи за този период.', tasks: [] };
   }
   const summary = result.map((t, i) =>
-    `${i + 1}. ${t.content}${window.AIVA_TASK_PRIORITY?.isImportant?.(t.priority) ? ' (важна)' : ''}${t.due_time ? ', ' + t.due_time : ''}${t.location ? ', ' + t.location : ''}`
+    `${i + 1}. ${t.content}${window.AIVA_TASK_PRIORITY?.isImportant?.(t.priority) ? ' ' : ''}${t.due_time ? ', ' + t.due_time : ''}${t.location ? ', ' + t.location : ''}`
   ).join('; ');
   return { success: true, count: result.length, summary, tasks: result.map((t) => ({ id: t.id, content: t.content, priority: t.priority, due_date: t.due_date, due_time: t.due_time })) };
 }
@@ -1862,17 +1863,21 @@ function fillTaskForm(task) {
 }
 
 function openTaskModal(task = null) {
+  if (!taskModal || !taskForm) return;
   modalTitle.textContent = task ? t('taskDetails') : t('newTask');
-  deleteTaskBtn.hidden = !task;
-  duplicateTaskBtn.hidden = !task;
-  discussTaskBtn.hidden = !task;
+  if (deleteTaskBtn) deleteTaskBtn.hidden = !task;
+  if (duplicateTaskBtn) duplicateTaskBtn.hidden = !task;
+  if (discussTaskBtn) discussTaskBtn.hidden = !task;
   fillTaskForm(task);
+  taskModal.hidden = false;
   taskModal.classList.add('visible');
   taskModal.setAttribute('aria-hidden', 'false');
-  taskForm.elements.content.focus();
+  taskForm.elements.content?.focus?.();
 }
 
 function closeTaskModal() {
+  if (!taskModal) return;
+  taskModal.hidden = true;
   taskModal.classList.remove('visible');
   taskModal.setAttribute('aria-hidden', 'true');
 }
@@ -2243,7 +2248,7 @@ async function disconnectSession(options = {}) {
 }
 
 // --- Events ---
-recordBtn.addEventListener('click', () => {
+recordBtn?.addEventListener('click', () => {
   if (isSessionActive || isConnecting) {
     void disconnectSession({ immediate: true });
   } else {
@@ -2262,17 +2267,17 @@ viewButtons.forEach((button) => {
   });
 });
 
-prevRangeBtn.addEventListener('click', () => moveCalendar(-1));
-nextRangeBtn.addEventListener('click', () => moveCalendar(1));
-todayBtn.addEventListener('click', () => {
+prevRangeBtn?.addEventListener('click', () => moveCalendar(-1));
+nextRangeBtn?.addEventListener('click', () => moveCalendar(1));
+todayBtn?.addEventListener('click', () => {
   currentDate = new Date();
   weekFocusDate = new Date();
   renderCalendar();
   refreshExternalEvents();
 });
-addTaskBtn.addEventListener('click', () => openTaskModal());
+addTaskBtn?.addEventListener('click', () => openTaskModal());
 
-tasksContainer.addEventListener('click', (e) => {
+tasksContainer?.addEventListener('click', (e) => {
   const check = e.target.closest('.task-check');
   if (check) {
     e.stopPropagation();
@@ -2306,7 +2311,7 @@ tasksContainer.addEventListener('click', (e) => {
   }
 });
 
-tasksContainer.addEventListener('keydown', (e) => {
+tasksContainer?.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const card = e.target.closest('.task-card');
   if (!card || card.dataset.external) return;
@@ -2314,11 +2319,11 @@ tasksContainer.addEventListener('keydown', (e) => {
   openTaskModal(getTaskById(card.dataset.id));
 });
 
-tasksContainer.addEventListener('touchstart', (e) => {
+tasksContainer?.addEventListener('touchstart', (e) => {
   touchStartX = e.changedTouches[0].clientX;
 }, { passive: true });
 
-tasksContainer.addEventListener('touchend', (e) => {
+tasksContainer?.addEventListener('touchend', (e) => {
   if (touchStartX === null) return;
   const delta = e.changedTouches[0].clientX - touchStartX;
   touchStartX = null;
@@ -2326,7 +2331,7 @@ tasksContainer.addEventListener('touchend', (e) => {
   moveCalendar(delta < 0 ? 1 : -1);
 }, { passive: true });
 
-taskForm.addEventListener('submit', async (e) => {
+taskForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
     await saveTaskFromForm();
@@ -2336,7 +2341,7 @@ taskForm.addEventListener('submit', async (e) => {
   }
 });
 
-deleteTaskBtn.addEventListener('click', async () => {
+deleteTaskBtn?.addEventListener('click', async () => {
   const id = taskIdField.value;
   if (!id) return;
   if (assistantSettings.safety.askBeforeDelete && !confirm(t('confirmDelete'))) return;
@@ -2348,7 +2353,7 @@ deleteTaskBtn.addEventListener('click', async () => {
   }
 });
 
-duplicateTaskBtn.addEventListener('click', async () => {
+duplicateTaskBtn?.addEventListener('click', async () => {
   const id = taskIdField.value;
   if (!id) return;
   try {
@@ -2358,7 +2363,7 @@ duplicateTaskBtn.addEventListener('click', async () => {
   }
 });
 
-discussTaskBtn.addEventListener('click', () => {
+discussTaskBtn?.addEventListener('click', () => {
   const task = getTaskById(taskIdField.value);
   if (!task) return;
   voiceFocusTask = task;
@@ -2368,7 +2373,7 @@ discussTaskBtn.addEventListener('click', () => {
   }
 });
 
-addToCalendarBtn.addEventListener('click', async () => {
+addToCalendarBtn?.addEventListener('click', async () => {
   const task = {
     id: taskIdField.value || `new-${Date.now()}`,
     content: taskForm.elements.content.value,
@@ -2401,12 +2406,12 @@ addToCalendarBtn.addEventListener('click', async () => {
   }
 });
 
-closeTaskModalBtn.addEventListener('click', closeTaskModal);
-taskModal.addEventListener('click', (e) => {
+closeTaskModalBtn?.addEventListener('click', closeTaskModal);
+taskModal?.addEventListener('click', (e) => {
   if (e.target === taskModal) closeTaskModal();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && taskModal.classList.contains('visible')) closeTaskModal();
+  if (e.key === 'Escape' && taskModal && !taskModal.hidden) closeTaskModal();
 });
 
 window.addEventListener('aiva:settings-updated', () => {
@@ -2435,6 +2440,17 @@ window.addEventListener('aiva:notification-fired', () => {
 
 if (upcomingList) {
   upcomingList.addEventListener('click', async (e) => {
+    const expandBtn = e.target.closest('[data-action="expand"]');
+    if (expandBtn) {
+      e.stopPropagation();
+      const item = expandBtn.closest('.upcoming-item');
+      if (!item) return;
+      const expanded = item.classList.toggle('is-expanded');
+      expandBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      expandBtn.setAttribute('aria-label', expanded ? 'Сгъни' : 'Разгъни');
+      return;
+    }
+
     const btn = e.target.closest('[data-action]');
     if (btn) {
       e.stopPropagation();
