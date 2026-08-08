@@ -3,7 +3,7 @@ CREATE TABLE tasks (
   user_id TEXT NOT NULL,
   content TEXT NOT NULL,
   emotion TEXT,
-  priority INTEGER DEFAULT 3,
+  priority INTEGER DEFAULT 0,
   due_date TEXT,
   due_time TEXT,
   estimated_minutes INTEGER,

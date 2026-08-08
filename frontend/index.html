@@ -1071,14 +1071,26 @@
       min-width: 0;
     }
 
-    .priority-pill {
-      flex: 0 0 auto;
-      font-size: 0.62rem;
-      color: white;
-      background: rgba(255, 59, 92, 0.22);
-      border: 1px solid rgba(255, 59, 92, 0.28);
-      border-radius: 999px;
-      padding: 2px 7px;
+    .task-item.task-neutral {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .task-item.is-important {
+      background: rgba(255, 59, 92, 0.08);
+      border-color: rgba(255, 59, 92, 0.35);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .task-item.is-important.task-neutral {
+      background: rgba(255, 59, 92, 0.1);
+    }
+
+    .priority-pill.important {
+      color: #fff;
+      background: rgba(255, 59, 92, 0.85);
+      border-color: rgba(255, 59, 92, 0.5);
+      font-weight: 600;
+      font-size: 0.64rem;
     }
 
     .task-info {
@@ -1352,11 +1364,7 @@
       opacity: 0.9;
     }
 
-    .priority-1 { background: #ff3b5c; }
-    .priority-2 { background: #ff8f3b; }
-    .priority-3 { background: #f5d66b; }
-    .priority-4 { background: #62d9b7; }
-    .priority-5 { background: #78a8ff; }
+    .priority-important { background: #ff3b5c; }
 
     .month-agenda {
       margin-top: 12px;
@@ -1375,9 +1383,11 @@
       -webkit-backdrop-filter: blur(10px);
     }
 
-    .task-modal.visible {
-      display: flex;
+    .important-toggle {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; cursor: pointer;
     }
+    .important-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
 
     .modal-card {
       width: min(720px, 100%);
@@ -1858,15 +1868,9 @@
             <span data-i18n="time">Час</span>
             <input name="due_time" type="time">
           </label>
-          <label>
-            <span data-i18n="priority">Приоритет</span>
-            <select name="priority">
-              <option value="1" data-i18n="priorityP1">П1 - висок</option>
-              <option value="2" data-i18n="priorityP2">П2</option>
-              <option value="3" data-i18n="priorityP3">П3</option>
-              <option value="4" data-i18n="priorityP4">П4</option>
-              <option value="5" data-i18n="priorityP5">П5 - нисък</option>
-            </select>
+          <label class="important-toggle">
+            <input name="important" type="checkbox">
+            <span data-i18n="priorityImportant">❗ Важно!</span>
           </label>
           <label>
             <span data-i18n="emotionContext">Емоция / контекст</span>
@@ -2016,7 +2020,9 @@
   <script src="lib/haptics.js"></script>
   <script src="lib/mediaUtils.js"></script>
   <script src="lib/shortcutBridge.js"></script>
+  <script src="lib/taskPriority.js"></script>
   <script src="lib/deviceProfile.js"></script>
+  <script src="lib/deviceIntelligence.js"></script>
   <script src="lib/deviceContext.js"></script>
   <script src="lib/assistantMemory.js"></script>
   <script src="lib/deviceActions.js"></script>

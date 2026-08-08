@@ -198,7 +198,7 @@ class SaveTaskTool extends FunctionCallDefinition {
             description: 'Засечена емоция от тона',
             enum: ['stress', 'tired', 'urgent', 'neutral'],
           },
-          priority: { type: 'integer', description: 'Приоритет 1 (висок) до 5 (нисък)' },
+          important: { type: 'boolean', description: 'true = важна задача (❗), false/липсва = нормална без маркировка' },
           due_date: { type: 'string', description: 'Дата YYYY-MM-DD или празно' },
           due_time: { type: 'string', description: 'Час HH:MM или празно' },
           estimated_minutes: { type: 'integer', description: 'Прогнозни минути' },
@@ -208,7 +208,7 @@ class SaveTaskTool extends FunctionCallDefinition {
           tags: { type: 'string', description: 'Тагове, разделени със запетая' },
         },
       },
-      ['task', 'emotion', 'priority']
+      ['task', 'emotion']
     );
   }
 
@@ -257,7 +257,7 @@ class EditTaskTool extends FunctionCallDefinition {
           content: { type: 'string', description: 'Нов текст на задачата' },
           due_date: { type: 'string', description: 'Нова дата YYYY-MM-DD' },
           due_time: { type: 'string', description: 'Нов час HH:MM' },
-          priority: { type: 'integer', description: 'Нов приоритет 1-5' },
+          important: { type: 'boolean', description: 'true = маркирай като важна (❗), false = премахни маркировката' },
           notes: { type: 'string', description: 'Нови бележки' },
           location: { type: 'string', description: 'Нова локация' },
           tags: { type: 'string', description: 'Нови тагове' },
@@ -508,6 +508,15 @@ function getWeekdayHeaders() {
   return headers;
 }
 
+function resolveTaskPriority(args) {
+  if (args?.important === true || args?.important === 'true') return 1;
+  if (args?.important === false || args?.important === 'false') return 0;
+  if (args?.priority !== undefined && args?.priority !== null) {
+    return window.AIVA_TASK_PRIORITY?.normalize?.(args.priority) ?? 0;
+  }
+  return 0;
+}
+
 function sortedTasks(items) {
   return [...items].sort((a, b) => {
     const dateA = a.due_date || '9999-12-31';
@@ -516,7 +525,7 @@ function sortedTasks(items) {
     const timeA = a.due_time || '99:99';
     const timeB = b.due_time || '99:99';
     if (timeA !== timeB) return timeA.localeCompare(timeB);
-    return (a.priority || 3) - (b.priority || 3);
+    return window.AIVA_TASK_PRIORITY?.sortCompare?.(a, b) ?? ((b.priority || 0) - (a.priority || 0));
   });
 }
 
@@ -822,16 +831,19 @@ window.showCalendarSyncToast = function showCalendarSyncToast(task) {
   showToast({
     content: task?.content ? tf('toastCalendarArrow', { content: task.content }) : t('toastAddedCalendar'),
     emotion: 'neutral',
-    priority: 3,
+    priority: 0,
   });
 };
 
 function showToast(task) {
   toastContent.textContent = task.content;
   const emotionMap = { stress: '😰', tired: '😴', urgent: '⚡', neutral: '😊' };
+  const importantLabel = window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority)
+    ? window.AIVA_TASK_PRIORITY.label(task.priority, assistantSettings.profile?.language)
+    : '';
   toastMeta.innerHTML = `
     <span>${emotionMap[task.emotion] || '😊'} ${escapeHtml(task.emotion || 'neutral')}</span>
-    <span>⚡ ${escapeHtml(`P${task.priority}`)}</span>
+    ${importantLabel ? `<span>${escapeHtml(importantLabel)}</span>` : ''}
     ${task.due_date ? `<span>📅 ${escapeHtml(task.due_date)}</span>` : ''}
     ${task.due_time ? `<span>🕘 ${escapeHtml(task.due_time)}</span>` : ''}
   `;
@@ -921,16 +933,19 @@ function renderTaskCard(task, mode = 'agenda') {
   const msUntil = taskDt ? taskDt.getTime() - Date.now() : Infinity;
   const synced = window.AIVA_NATIVE_CALENDAR?.isTaskSynced?.(task.id);
   const statusClass = overdue ? 'is-overdue' : (msUntil > 0 && msUntil <= 3600000 ? 'is-upcoming' : '');
+  const important = window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority);
+  const importantClass = important ? ' is-important' : '';
+  const priorityLabel = important ? window.AIVA_TASK_PRIORITY.label(task.priority, assistantSettings.profile?.language) : '';
 
   return `
-    <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')} ${statusClass}${task.isExternal ? ' external-event' : ''}" data-id="${task.id}"${task.isExternal ? ' data-external="true"' : ''} tabindex="0">
+    <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')}${importantClass} ${statusClass}${task.isExternal ? ' external-event' : ''}" data-id="${task.id}"${task.isExternal ? ' data-external="true"' : ''} tabindex="0">
       <button class="task-check" data-id="${task.id}" aria-label="${escapeHtml(t('markComplete'))}" type="button">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
       <div class="task-body">
         <div class="task-row">
           <div class="task-text">${escapeHtml(task.content)}</div>
-          <span class="priority-pill">P${escapeHtml(task.priority || 3)}</span>
+          ${priorityLabel ? `<span class="priority-pill important">${escapeHtml(priorityLabel)}</span>` : ''}
           ${synced ? '<span class="calendar-badge">📅</span>' : ''}
         </div>
         <div class="task-info">
@@ -1116,7 +1131,9 @@ function renderMonthView(renderOpts = {}) {
               >
                 <span class="month-date">${date.getDate()}</span>
                 <span class="month-dots">
-                  ${dayTasks.slice(0, 4).map((task) => `<i class="dot priority-${escapeHtml(task.priority || 3)}"></i>`).join('')}
+                  ${dayTasks.slice(0, 4).map((task) => window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority)
+                    ? '<i class="dot priority-important"></i>'
+                    : '<i class="dot"></i>').join('')}
                 </span>
                 ${dayTasks.length ? `<span class="month-count">${dayTasks.length}</span>` : ''}
               </button>
@@ -1250,7 +1267,7 @@ function buildTasksContextForAssistant() {
     const parts = [`ID ${task.id}: "${task.content}"`];
     if (task.due_date) parts.push(`дата ${task.due_date}`);
     if (task.due_time) parts.push(`час ${task.due_time}`);
-    if (task.priority) parts.push(`приоритет ${task.priority}`);
+    if (window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority)) parts.push('❗ важна');
     if (task.notes) parts.push(`бележки: ${String(task.notes).slice(0, 120)}`);
     if (isTaskOverdue(task)) {
       overdueCount++;
@@ -1469,7 +1486,7 @@ async function handleVoiceReadTasks(args) {
     return { success: true, message: 'Няма задачи за този период.', tasks: [] };
   }
   const summary = result.map((t, i) =>
-    `${i + 1}. ${t.content} (приоритет ${t.priority}${t.due_time ? ', ' + t.due_time : ''}${t.location ? ', ' + t.location : ''})`
+    `${i + 1}. ${t.content}${window.AIVA_TASK_PRIORITY?.isImportant?.(t.priority) ? ' ❗' : ''}${t.due_time ? ', ' + t.due_time : ''}${t.location ? ', ' + t.location : ''}`
   ).join('; ');
   return { success: true, count: result.length, summary, tasks: result.map((t) => ({ id: t.id, content: t.content, priority: t.priority, due_date: t.due_date, due_time: t.due_time })) };
 }
@@ -1482,7 +1499,9 @@ async function handleVoiceEditTask(args) {
   if (args.content) updates.content = args.content;
   if (args.due_date) updates.due_date = args.due_date;
   if (args.due_time) updates.due_time = args.due_time;
-  if (args.priority) updates.priority = args.priority;
+  if (args.important === true || args.important === 'true') updates.priority = 1;
+  else if (args.important === false || args.important === 'false') updates.priority = 0;
+  else if (args.priority !== undefined) updates.priority = resolveTaskPriority(args);
   if (args.notes) updates.notes = args.notes;
   if (args.location) updates.location = args.location;
   if (args.tags) updates.tags = args.tags;
@@ -1540,7 +1559,7 @@ function showUndoToast(deletedTask) {
         repeat_rule: deletedTask.repeat_rule,
         tags: deletedTask.tags,
       });
-      showToast({ content: t('undoRestored'), emotion: 'neutral', priority: 3 });
+      showToast({ content: t('undoRestored'), emotion: 'neutral', priority: 0 });
     } catch (e) {
       showError(e.message || t('errSave'));
     }
@@ -1700,7 +1719,7 @@ async function persistTask(args) {
       user_id: userId,
       task: args.task,
       emotion: args.emotion || defaults.emotion,
-      priority: args.priority || defaults.priority,
+      priority: resolveTaskPriority(args),
       due_date: args.due_date,
       due_time: args.due_time,
       estimated_minutes: args.estimated_minutes || defaults.estimatedMinutes,
@@ -1730,7 +1749,7 @@ async function saveTaskFromForm() {
     user_id: userId,
     content: String(formData.get('content') || '').trim(),
     emotion: formData.get('emotion') || 'neutral',
-    priority: Number(formData.get('priority')) || assistantSettings.defaults.priority,
+    priority: formData.get('important') === 'on' ? 1 : 0,
     due_date: formData.get('due_date') || null,
     due_time: formData.get('due_time') || null,
     estimated_minutes: formData.get('estimated_minutes') ? Number(formData.get('estimated_minutes')) : null,
@@ -1819,7 +1838,7 @@ async function duplicateTaskToRows(taskId) {
 
   await loadTasks();
   duplicateRowsField.value = '';
-  showToast({ content: tf('toastCopies', { count: rows.length }), emotion: 'neutral', priority: 3 });
+  showToast({ content: tf('toastCopies', { count: rows.length }), emotion: 'neutral', priority: 0 });
 }
 
 // --- Task modal ---
@@ -1828,7 +1847,7 @@ function fillTaskForm(task) {
   taskIdField.value = task?.id || '';
   taskForm.elements.content.value = task?.content || '';
   taskForm.elements.emotion.value = task?.emotion || defaults.emotion;
-  taskForm.elements.priority.value = task?.priority || defaults.priority;
+  taskForm.elements.important.checked = window.AIVA_TASK_PRIORITY?.isImportant?.(task?.priority);
   taskForm.elements.due_date.value = task?.due_date || toISODate(currentDate);
   taskForm.elements.due_time.value = task?.due_time || defaults.dueTime || '';
   taskForm.elements.estimated_minutes.value = task?.estimated_minutes || defaults.estimatedMinutes || '';
@@ -2372,7 +2391,7 @@ addToCalendarBtn.addEventListener('click', async () => {
         : await window.AIVA_CALENDAR.addToDevice(task);
     }
     if (result?.method !== 'aborted' && result !== 'aborted') {
-      showToast({ content: t('toastCalendarAdd'), emotion: 'neutral', priority: 3 });
+      showToast({ content: t('toastCalendarAdd'), emotion: 'neutral', priority: 0 });
     }
   } catch (error) {
     showError(error.message || t('errCalendar'));
@@ -2400,7 +2419,7 @@ window.addEventListener('aiva:profile-updated', () => {
 });
 
 window.addEventListener('aiva:calendar-connected', () => {
-  showToast({ content: t('toastCalendarSync'), emotion: 'neutral', priority: 3 });
+  showToast({ content: t('toastCalendarSync'), emotion: 'neutral', priority: 0 });
 });
 
 window.addEventListener('aiva:task-done-from-notif', () => {
@@ -2423,7 +2442,7 @@ if (upcomingList) {
         await markDone(taskId);
       } else if (action === 'snooze' && task && window.AIVA_NOTIFIER) {
         await window.AIVA_NOTIFIER.snoozeTask(taskId, task.content, 10);
-        showToast({ content: t('toastSnooze10'), emotion: 'neutral', priority: 3 });
+        showToast({ content: t('toastSnooze10'), emotion: 'neutral', priority: 0 });
       }
       return;
     }
@@ -2513,6 +2532,12 @@ loadTasks();
 refreshExternalEvents();
 loadDailyBrief();
 initDeviceBanner();
+if (window.AIVA_DEVICE_INTEL?.bootstrapQuiet) {
+  window.AIVA_DEVICE_INTEL.bootstrapQuiet().catch(() => {});
+}
+if (window.AIVA_DEVICE_CONTEXT?.ensureMemorySeed) {
+  window.AIVA_DEVICE_CONTEXT.ensureMemorySeed().catch(() => {});
+}
 initPaywallUi();
 
 function initPaywallUi() {
@@ -2580,7 +2605,7 @@ if ('serviceWorker' in navigator) {
       const task = getTaskById(event.data.taskId);
       if (task) {
         await window.AIVA_NOTIFIER.snoozeTask(event.data.taskId, task.content, event.data.minutes || 10);
-        showToast({ content: t('toastSnooze'), emotion: 'neutral', priority: 3 });
+        showToast({ content: t('toastSnooze'), emotion: 'neutral', priority: 0 });
       }
     }
   });

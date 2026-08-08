@@ -77,8 +77,11 @@ function normalizeOptionalText(value: string | null | undefined): string | null 
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function normalizePriority(value: number | undefined): number {
-  return Math.min(5, Math.max(1, parseInt(String(value ?? 3), 10) || 3));
+function normalizePriority(value: number | undefined | null): number {
+  if (value === undefined || value === null) return 0;
+  const n = parseInt(String(value), 10);
+  if (Number.isNaN(n)) return 0;
+  return n === 1 ? 1 : 0;
 }
 
 export async function createTask(db: D1Database, input: TaskInput): Promise<Task> {
@@ -120,7 +123,7 @@ export async function getIncompleteTasks(db: D1Database, userId: string): Promis
        WHERE user_id = ? AND done = 0
        ORDER BY COALESCE(due_date, '9999-12-31') ASC,
                 COALESCE(due_time, '99:99') ASC,
-                priority ASC,
+                priority DESC,
                 created_at DESC`
     )
     .bind(userId)
@@ -149,7 +152,7 @@ export async function getAllIncompleteTasks(db: D1Database): Promise<Task[]> {
        WHERE done = 0
        ORDER BY COALESCE(due_date, '9999-12-31') ASC,
                 COALESCE(due_time, '99:99') ASC,
-                priority ASC,
+                priority DESC,
                 created_at DESC`
     )
     .all<Task>();
