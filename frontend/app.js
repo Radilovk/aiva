@@ -935,7 +935,7 @@ function renderTaskCard(task, mode = 'agenda') {
   const statusClass = overdue ? 'is-overdue' : (msUntil > 0 && msUntil <= 3600000 ? 'is-upcoming' : '');
   const important = window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority);
   const importantClass = important ? ' is-important' : '';
-  const priorityLabel = important ? window.AIVA_TASK_PRIORITY.label(task.priority, assistantSettings.profile?.language) : '';
+  const priorityLabel = important ? (window.AIVA_TASK_PRIORITY?.label?.(task.priority, assistantSettings.profile?.language) || 'Важно!') : '';
 
   return `
     <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')}${importantClass} ${statusClass}${task.isExternal ? ' external-event' : ''}" data-id="${task.id}"${task.isExternal ? ' data-external="true"' : ''} tabindex="0">
@@ -1267,7 +1267,7 @@ function buildTasksContextForAssistant() {
     const parts = [`ID ${task.id}: "${task.content}"`];
     if (task.due_date) parts.push(`дата ${task.due_date}`);
     if (task.due_time) parts.push(`час ${task.due_time}`);
-    if (window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority)) parts.push('❗ важна');
+    if (window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority)) parts.push('важна');
     if (task.notes) parts.push(`бележки: ${String(task.notes).slice(0, 120)}`);
     if (isTaskOverdue(task)) {
       overdueCount++;
@@ -1486,7 +1486,7 @@ async function handleVoiceReadTasks(args) {
     return { success: true, message: 'Няма задачи за този период.', tasks: [] };
   }
   const summary = result.map((t, i) =>
-    `${i + 1}. ${t.content}${window.AIVA_TASK_PRIORITY?.isImportant?.(t.priority) ? ' ❗' : ''}${t.due_time ? ', ' + t.due_time : ''}${t.location ? ', ' + t.location : ''}`
+    `${i + 1}. ${t.content}${window.AIVA_TASK_PRIORITY?.isImportant?.(t.priority) ? ' (важна)' : ''}${t.due_time ? ', ' + t.due_time : ''}${t.location ? ', ' + t.location : ''}`
   ).join('; ');
   return { success: true, count: result.length, summary, tasks: result.map((t) => ({ id: t.id, content: t.content, priority: t.priority, due_date: t.due_date, due_time: t.due_time })) };
 }
@@ -1847,7 +1847,10 @@ function fillTaskForm(task) {
   taskIdField.value = task?.id || '';
   taskForm.elements.content.value = task?.content || '';
   taskForm.elements.emotion.value = task?.emotion || defaults.emotion;
-  taskForm.elements.important.checked = window.AIVA_TASK_PRIORITY?.isImportant?.(task?.priority);
+  const importantEl = taskForm.querySelector('[name="important"]');
+  if (importantEl) {
+    importantEl.checked = window.AIVA_TASK_PRIORITY?.isImportant?.(task?.priority) ?? false;
+  }
   taskForm.elements.due_date.value = task?.due_date || toISODate(currentDate);
   taskForm.elements.due_time.value = task?.due_time || defaults.dueTime || '';
   taskForm.elements.estimated_minutes.value = task?.estimated_minutes || defaults.estimatedMinutes || '';
