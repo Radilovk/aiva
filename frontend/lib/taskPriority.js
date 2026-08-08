@@ -20,7 +20,7 @@
   function label(value, lang) {
     if (!isImportant(value)) return '';
     const isBg = !lang || lang === 'bg';
-    return isBg ? '❗ Важно!' : '❗ Important!';
+    return isBg ? 'Важно!' : 'Important!';
   }
 
   function sortCompare(a, b) {

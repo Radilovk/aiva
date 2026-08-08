@@ -62,7 +62,7 @@ function formatTaskLine(task: Task, lang: string): string {
   const due = task.due_date
     ? `${labels.due}: ${task.due_date}${task.due_time ? ' ' + task.due_time : ''}`
     : labels.none;
-  return task.priority === 1 ? `- [❗ ${task.content}] (${due})` : `- ${task.content} (${due})`;
+  return task.priority === 1 ? `- [Важно! ${task.content}] (${due})` : `- ${task.content} (${due})`;
 }
 
 export async function handleCron(env: CronEnv): Promise<void> {

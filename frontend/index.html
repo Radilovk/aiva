@@ -1383,6 +1383,10 @@
       -webkit-backdrop-filter: blur(10px);
     }
 
+    .task-modal.visible {
+      display: flex;
+    }
+
     .important-toggle {
       display: flex; align-items: center; gap: 10px;
       padding: 10px 0; cursor: pointer;
@@ -1870,7 +1874,7 @@
           </label>
           <label class="important-toggle">
             <input name="important" type="checkbox">
-            <span data-i18n="priorityImportant">❗ Важно!</span>
+            <span data-i18n="priorityImportant">Важно!</span>
           </label>
           <label>
             <span data-i18n="emotionContext">Емоция / контекст</span>
