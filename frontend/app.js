@@ -2498,7 +2498,7 @@ async function initDeviceBanner() {
   banner.hidden = false;
   document.getElementById('deviceBannerOpen')?.addEventListener('click', () => {
     localStorage.setItem('aiva_device_banner_done', '1');
-    location.href = `${window.AIVA_CONFIG.appUrl('settings.html')}#deviceSetupSection`;
+    location.href = `${window.AIVA_CONFIG.appUrl('settings.html')}#deviceAccessSection`;
   });
   document.getElementById('deviceBannerDismiss')?.addEventListener('click', () => {
     localStorage.setItem('aiva_device_banner_done', '1');

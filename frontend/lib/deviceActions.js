@@ -243,6 +243,29 @@
     return { ok: true, method: 'web_maps_search' };
   }
 
+  async function hasContactsPermission() {
+    const plugin = getPlugin();
+    if (!plugin?.checkPermissions) return false;
+    try {
+      const state = await plugin.checkPermissions();
+      return state?.contacts === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
+  async function requestContactsPermission() {
+    if (await hasContactsPermission()) return true;
+    const plugin = getPlugin();
+    if (!plugin?.requestPermissions) return false;
+    try {
+      const res = await plugin.requestPermissions();
+      return res?.contacts === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
   async function findContacts(query, limit = 5) {
     const q = String(query || '').trim();
     if (!q) return { ok: false, error: 'query required' };
@@ -498,6 +521,8 @@
     openSettings,
     searchMaps,
     findContacts,
+    hasContactsPermission,
+    requestContactsPermission,
     scheduleReminder,
     runDiagnostics,
     listAvailableApps,
