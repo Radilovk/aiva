@@ -201,6 +201,8 @@
       border-radius: 16px;
       border: 1px solid rgba(45, 212, 168, 0.2);
       background: rgba(45, 212, 168, 0.06);
+      max-width: 100%;
+      overflow: hidden;
     }
 
     .upcoming-strip[hidden] { display: none !important; }
@@ -220,11 +222,12 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      max-width: 100%;
     }
 
     .upcoming-item {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 10px;
       padding: 10px 12px;
       border-radius: 12px;
@@ -232,6 +235,8 @@
       border: 1px solid var(--border);
       cursor: pointer;
       transition: background 0.2s;
+      max-width: 100%;
+      overflow: hidden;
     }
 
     .upcoming-item:hover { background: var(--surface-hover); }
@@ -247,13 +252,44 @@
 
     .upcoming-item.is-overdue .upcoming-time { color: var(--accent); }
 
-    .upcoming-body { flex: 1; min-width: 0; }
-    .upcoming-title { font-size: 0.84rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .upcoming-body { flex: 1; min-width: 0; overflow: hidden; }
+    .upcoming-title {
+      font-size: 0.84rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .upcoming-item.is-expanded .upcoming-title {
+      white-space: normal;
+      word-break: break-word;
+      overflow: visible;
+      text-overflow: unset;
+    }
     .upcoming-countdown { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; }
+
+    .upcoming-expand-btn {
+      flex: 0 0 auto;
+      align-self: center;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 8px;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      font-size: 0.85rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s, color 0.2s;
+    }
+    .upcoming-expand-btn:hover { background: var(--surface-hover); color: var(--text); }
+    .upcoming-item.is-expanded .upcoming-expand-btn { transform: rotate(180deg); }
 
     .upcoming-actions {
       display: flex;
       gap: 4px;
+      flex: 0 0 auto;
     }
 
     .upcoming-action-btn {
@@ -831,6 +867,8 @@
       width: 100%;
       margin-top: auto;
       padding-top: 1rem;
+      position: relative;
+      z-index: 2;
     }
 
     .tasks-header {
@@ -1383,6 +1421,11 @@
       -webkit-backdrop-filter: blur(10px);
     }
 
+    .task-modal[hidden] {
+      display: none !important;
+    }
+
+    .task-modal:not([hidden]),
     .task-modal.visible {
       display: flex;
     }
@@ -1849,7 +1892,7 @@
   </div>
 
   <!-- Task details modal -->
-  <div class="task-modal" id="taskModal" aria-hidden="true">
+  <div class="task-modal" id="taskModal" hidden aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <div class="modal-title" id="modalTitle" data-i18n="taskDetails" data-i18n-dynamic>Детайли за задачата</div>
