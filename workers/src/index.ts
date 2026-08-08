@@ -454,7 +454,7 @@ app.post('/api/tasks', async (c) => {
       user_id: body.user_id,
       content: body.task || body.content || '',
       emotion: body.emotion || 'neutral',
-      priority: Math.min(5, Math.max(1, parseInt(String(body.priority)) || 3)),
+      priority: body.priority === 1 || body.priority === '1' ? 1 : 0,
       due_date: body.due_date || null,
       due_time: body.due_time || null,
       estimated_minutes: body.estimated_minutes ? parseInt(String(body.estimated_minutes)) : null,
@@ -733,7 +733,7 @@ app.get('/api/calendar.ics', async (c) => {
       lines.push(`SUMMARY:${escapeICS(task.content)}`);
       if (task.notes) lines.push(`DESCRIPTION:${escapeICS(task.notes)}`);
       if (task.location) lines.push(`LOCATION:${escapeICS(task.location)}`);
-      lines.push(`PRIORITY:${Math.min(9, task.priority * 2)}`);
+      lines.push(`PRIORITY:${task.priority === 1 ? 1 : 5}`);
       if (task.tags) lines.push(`CATEGORIES:${escapeICS(task.tags)}`);
       if (reminderMinutes > 0) {
         lines.push('BEGIN:VALARM');

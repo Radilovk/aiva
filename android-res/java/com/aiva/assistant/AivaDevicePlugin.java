@@ -9,6 +9,12 @@ import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
 
+import android.content.pm.PackageManager;
+import android.Manifest;
+
+import androidx.core.content.ContextCompat;
+
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -94,6 +100,125 @@ public class AivaDevicePlugin extends Plugin {
             result.put("appVersion", ctx.getPackageManager()
                 .getPackageInfo(ctx.getPackageName(), 0).versionName);
         } catch (Exception ignored) { /* optional */ }
+        call.resolve(result);
+    }
+
+    private boolean hasRuntimePermission(String permission) {
+        return ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean isPackageInstalled(String packageName) {
+        try {
+            getContext().getPackageManager().getPackageInfo(packageName, 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    private JSArray buildAiControlHints(String profile) {
+        JSArray hints = new JSArray();
+        switch (profile) {
+            case "xiaomi":
+                hints.put("MIUI/HyperOS: maps via geo: or Petal; SMS via smsto:; open Security → Autostart + Unrestricted battery for KASY");
+                hints.put("Volume shortcut needs accessibility service when screen locked");
+                break;
+            case "huawei":
+                hints.put("Huawei/Honor: prefer Petal Maps (com.huawei.maps.app); enable App launch management → Manage manually for KASY");
+                hints.put("Battery → App launch → allow all toggles for KASY");
+                break;
+            case "samsung":
+                hints.put("Samsung One UI: Device care → Battery → Never sleeping apps; allow notifications");
+                hints.put("Google Maps preferred when installed");
+                break;
+            case "oppo":
+            case "vivo":
+            case "oneplus":
+                hints.put("ColorOS/Funtouch/Oxygen: allow autostart and disable battery auto-optimize for KASY");
+                break;
+            default:
+                hints.put("Stock Android: standard intents for maps, tel:, sms:, share; battery exemption via system dialog");
+                break;
+        }
+        hints.put("Contacts search requires READ_CONTACTS at runtime");
+        hints.put("Viber/WhatsApp: open app with pre-filled text — user confirms send");
+        return hints;
+    }
+
+    /** Extended probe for quiet AI device recognition — model, OS, permissions, control hints. */
+    @PluginMethod
+    public void getDeviceCapabilities(PluginCall call) {
+        String profile = detectProfile();
+        Context ctx = getContext();
+        JSObject result = new JSObject();
+
+        result.put("manufacturer", Build.MANUFACTURER);
+        result.put("brand", Build.BRAND);
+        result.put("model", Build.MODEL);
+        result.put("device", Build.DEVICE);
+        result.put("product", Build.PRODUCT);
+        result.put("hardware", Build.HARDWARE);
+        result.put("board", Build.BOARD);
+        result.put("androidVersion", Build.VERSION.RELEASE);
+        result.put("sdkInt", Build.VERSION.SDK_INT);
+        result.put("profile", profile);
+        result.put("needsAutostart", needsAutostart(profile));
+        result.put("batteryOptimizationIgnored", isIgnoringBatteryOptimizations());
+        result.put("timezone", TimeZone.getDefault().getID());
+        result.put("locale", Locale.getDefault().toLanguageTag());
+        result.put("language", Locale.getDefault().getLanguage());
+        result.put("country", Locale.getDefault().getCountry());
+        result.put("dontKillMyAppUrl", "https://dontkillmyapp.com/" + profile);
+
+        JSObject permissions = new JSObject();
+        permissions.put("microphone", hasRuntimePermission(Manifest.permission.RECORD_AUDIO));
+        permissions.put("calendarRead", hasRuntimePermission(Manifest.permission.READ_CALENDAR));
+        permissions.put("calendarWrite", hasRuntimePermission(Manifest.permission.WRITE_CALENDAR));
+        permissions.put("contacts", hasRuntimePermission(Manifest.permission.READ_CONTACTS));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.put("notifications", hasRuntimePermission(Manifest.permission.POST_NOTIFICATIONS));
+        } else {
+            permissions.put("notifications", true);
+        }
+        result.put("permissions", permissions);
+
+        JSObject apps = new JSObject();
+        apps.put("googleMaps", isPackageInstalled("com.google.android.apps.maps"));
+        apps.put("petalMaps", isPackageInstalled("com.huawei.maps.app"));
+        apps.put("waze", isPackageInstalled("com.waze"));
+        apps.put("viber", isPackageInstalled("com.viber.voip"));
+        apps.put("whatsapp", isPackageInstalled("com.whatsapp"));
+        apps.put("telegram", isPackageInstalled("org.telegram.messenger"));
+        result.put("installedApps", apps);
+
+        result.put("aiControlHints", buildAiControlHints(profile));
+
+        try {
+            android.util.DisplayMetrics dm = ctx.getResources().getDisplayMetrics();
+            result.put("screenWidthPx", dm.widthPixels);
+            result.put("screenHeightPx", dm.heightPixels);
+            result.put("densityDpi", dm.densityDpi);
+        } catch (Exception ignored) { /* optional */ }
+        try {
+            result.put("appVersion", ctx.getPackageManager()
+                .getPackageInfo(ctx.getPackageName(), 0).versionName);
+        } catch (Exception ignored) { /* optional */ }
+
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void openAppInfoSettings(PluginCall call) {
+        JSObject result = new JSObject();
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            result.put("opened", true);
+        } catch (Exception e) {
+            result.put("opened", false);
+        }
         call.resolve(result);
     }
 

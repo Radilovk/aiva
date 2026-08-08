@@ -28,6 +28,9 @@
   }
 
   async function fetchNativeProfile() {
+    const intel = await window.AIVA_DEVICE_INTEL?.probe?.(false);
+    if (intel) return { ...intel, platform: 'android', collectedAt: intel.probedAt || new Date().toISOString() };
+
     const plugin = getPlugin();
     if (!plugin?.getDeviceProfile) return null;
     try {
@@ -70,6 +73,7 @@
 
   function formatForPrompt(ctx) {
     if (!ctx) return '';
+    const intelBlock = window.AIVA_DEVICE_INTEL?.formatForPrompt?.(window.AIVA_DEVICE_INTEL.readCache?.());
     const lines = [
       'УСТРОЙСТВО (постоянен контекст — използвай за device actions и OEM поведение):',
       `- Платформа: ${ctx.platform || 'unknown'}`,
@@ -77,15 +81,12 @@
       `- Модел: ${ctx.model || '?'}`,
     ];
     if (ctx.device) lines.push(`- Код устройство: ${ctx.device}`);
-    if (ctx.product) lines.push(`- Продукт: ${ctx.product}`);
     if (ctx.androidVersion) lines.push(`- Android: ${ctx.androidVersion} (SDK ${ctx.sdkInt || '?'})`);
     if (ctx.profile) lines.push(`- OEM профил: ${ctx.profile}`);
     if (ctx.timezone) lines.push(`- Часова зона: ${ctx.timezone}`);
-    if (ctx.locale) lines.push(`- Локал: ${ctx.locale}`);
     if (ctx.needsAutostart) lines.push('- Нужен autostart/battery exemption за фонови напомняния');
     if (ctx.batteryOptimizationIgnored === false) lines.push('- Battery optimization НЕ е изключена');
-    if (ctx.appVersion) lines.push(`- Версия на app: ${ctx.appVersion}`);
-    if (ctx.collectedAt) lines.push(`- Събрано: ${ctx.collectedAt}`);
+    if (intelBlock) lines.push('', intelBlock);
     return lines.join('\n');
   }
 

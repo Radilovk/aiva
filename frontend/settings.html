@@ -639,16 +639,6 @@
       <div class="section-title" data-i18n="defaultsTitle" data-i18n-prefix="📋 ">Стойности по подразбиране</div>
       <div class="row-grid">
         <div class="field">
-          <span class="field-label" data-i18n="defPriority">Приоритет</span>
-          <select id="defaultPriority">
-            <option value="1" data-i18n="priorityP1">П1 — висок</option>
-            <option value="2" data-i18n="priorityP2">П2</option>
-            <option value="3" data-i18n="priorityP3">П3</option>
-            <option value="4" data-i18n="priorityP4">П4</option>
-            <option value="5" data-i18n="priorityP5">П5 — нисък</option>
-          </select>
-        </div>
-        <div class="field">
           <span class="field-label" data-i18n="defDuration">Продължителност (мин)</span>
           <input type="number" id="defaultMinutes" min="0" max="480">
         </div>
@@ -774,6 +764,7 @@
   <script src="lib/deviceProfile.js"></script>
   <script src="lib/nativePermissions.js"></script>
   <script src="lib/deviceActions.js"></script>
+  <script src="lib/deviceIntelligence.js"></script>
   <script src="lib/deviceAccessFlow.js"></script>
   <script src="lib/icsUtils.js"></script>
   <script src="local-scheduler.js"></script>
@@ -911,7 +902,6 @@
       setToggle('toggleShowUnscheduled', settings.calendar.showUnscheduled);
 
       // Defaults
-      document.getElementById('defaultPriority').value = settings.defaults.priority;
       document.getElementById('defaultMinutes').value = settings.defaults.estimatedMinutes;
       document.getElementById('defaultDueTime').value = settings.defaults.dueTime;
       document.getElementById('defaultEmotion').value = settings.defaults.emotion;
@@ -1290,7 +1280,7 @@
           showUnscheduled: getToggle('toggleShowUnscheduled'),
         },
         defaults: {
-          priority: parseInt(document.getElementById('defaultPriority').value, 10),
+          priority: 0,
           estimatedMinutes: parseInt(document.getElementById('defaultMinutes').value, 10) || 30,
           dueTime: document.getElementById('defaultDueTime').value,
           emotion: document.getElementById('defaultEmotion').value,

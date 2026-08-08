@@ -23,6 +23,7 @@
 
 ФУНКЦИИ ЗА ЗАДАЧИ:
 - Когато разбереш задачата → ИЗВИКАЙ save_task
+- Маркирай important=true САМО ако потребителят казва че задачата е важна/спешна/приоритетна; иначе без маркировка
 - Когато потребителят поиска да чуе задачите си → ИЗВИКАЙ read_tasks
 - Когато потребителят иска да редактира задача → ИЗВИКАЙ edit_task (опиши коя задача и какво да се промени)
 - Когато потребителят иска да изтрие задача → ПЪРВО потвърди с "Сигурен ли си?", после ИЗВИКАЙ delete_task
@@ -85,7 +86,7 @@
       showUnscheduled: true,
     },
     defaults: {
-      priority: 3,
+      priority: 0,
       estimatedMinutes: 30,
       dueTime: '09:00',
       emotion: 'neutral',
@@ -177,7 +178,7 @@
     }
     merged.deviceActions.enabled = merged.deviceActions.enabled !== false;
     merged.temperature = Math.min(2, Math.max(0, Number(merged.temperature) || 0));
-    merged.defaults.priority = Math.min(5, Math.max(1, parseInt(String(merged.defaults.priority), 10) || 3));
+    merged.defaults.priority = merged.defaults.priority === 1 ? 1 : 0;
     merged.defaults.estimatedMinutes = Math.max(0, parseInt(String(merged.defaults.estimatedMinutes), 10) || 0);
     merged.safety.maxDuplicateDays = Math.min(365, Math.max(1, parseInt(String(merged.safety.maxDuplicateDays), 10) || 30));
     if (merged.calendarSync.provider === 'ics') merged.calendarSync.provider = 'subscribe';
