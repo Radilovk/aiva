@@ -107,6 +107,7 @@ let greetingMicTimer = null;
 let reconnectAttempts = 0;
 let resumingSession = false;
 let disconnectInProgress = false;
+let voiceSessionNativeActive = false;
 const MAX_RECONNECT_ATTEMPTS = 2;
 
 function setMicUplinkMuted(muted) {
@@ -620,6 +621,10 @@ function clearGreetingMicTimer() {
 async function ensureMicStreaming() {
   if (!client || audioStreamer?.isStreaming) return;
   if (!audioStreamer) audioStreamer = new AudioStreamer(client);
+  if (!voiceSessionNativeActive) {
+    await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(true);
+    voiceSessionNativeActive = true;
+  }
   await audioStreamer.start();
 }
 
@@ -2189,7 +2194,6 @@ async function connectSession() {
     if (audioPlayer?.audioContext?.state === 'suspended') {
       await audioPlayer.audioContext.resume().catch(() => {});
     }
-    await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(true);
 
     client.connect();
   } catch (e) {
@@ -2221,7 +2225,10 @@ async function disconnectSession(options = {}) {
       await waitForFarewellPlaybackIdle(2500);
     }
     audioPlayer?.interrupt?.();
-    await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(false);
+    if (voiceSessionNativeActive) {
+      await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(false);
+      voiceSessionNativeActive = false;
+    }
     if (audioStreamer) {
       audioStreamer.stop();
       audioStreamer = null;

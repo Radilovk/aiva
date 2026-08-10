@@ -2,6 +2,7 @@ package com.aiva.assistant;
 
 import android.Manifest;
 import android.app.KeyguardManager;
+import android.media.AudioManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -35,6 +36,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AivaDevicePlugin.class);
         registerPlugin(AivaActionsPlugin.class);
         super.onCreate(savedInstanceState);
+        // WebView Web Audio uses STREAM_MUSIC — bind hardware volume keys to media volume.
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
         applyDarkSystemBars();
         requestEssentialPermissions();
         AivaVolumeKeyHandler.getInstance().setListener(AivaShortcutLauncher::launchListening);
