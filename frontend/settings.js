@@ -61,6 +61,7 @@
 - memory_save — запис/редакция по key; memory_list — преглед; memory_delete — изтриване
 - Не записвай временни неща („сега отивам да пазарувам") — само ако потребителят иска да го запомниш`,
     instructionsCustomized: false,
+    userGuidance: '',
     model: 'gemini-3.1-flash-live-preview',
     voiceName: 'Kore',
     temperature: 1.0,
@@ -152,6 +153,9 @@
     if (merged.profile.onboardingComplete === undefined) {
       merged.profile.onboardingComplete = false;
     }
+    if (typeof merged.userGuidance !== 'string') {
+      merged.userGuidance = '';
+    }
     if (merged.textOutputEnabled === undefined) {
       merged.textOutputEnabled = merged.inputAudioTranscription !== false;
     }
@@ -221,13 +225,17 @@
     return settings;
   }
 
-  function buildSessionInstructions(baseInstructions, profile, extraContext) {
+  function buildSessionInstructions(baseInstructions, profile, extraContext, userGuidance) {
     const lang = profile?.language || 'bg';
     const userName = (profile?.userName || '').trim();
     const langInstruction = window.AIVA_I18N?.getLanguageInstruction?.(lang)
       || 'Respond in the user\'s selected language.';
 
     let instructions = (baseInstructions || '').trim();
+    const guidance = String(userGuidance || '').trim();
+    if (guidance) {
+      instructions += `\n\nПОТРЕБИТЕЛСКИ НАСОКИ (СВЕЩЕН ТЕКСТ — НИКОГА не променяй, не презаписвай и не изтривай; само следвай):\n${guidance}`;
+    }
     instructions += `\n\n${window.AIVA_I18N?.t?.('langSectionTitle') || 'LANGUAGE:'}\n- ${langInstruction}`;
     if (userName) {
       const addr = window.AIVA_I18N?.tf?.('addressUserAs', { name: userName })

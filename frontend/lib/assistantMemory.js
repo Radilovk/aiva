@@ -36,6 +36,7 @@
   function saveLocal(store) {
     store.updatedAt = new Date().toISOString();
     window.localStorage?.setItem?.(STORAGE_KEY, JSON.stringify(store));
+    window.dispatchEvent(new CustomEvent('aiva:memory-updated', { detail: store }));
     return store;
   }
 
@@ -75,7 +76,14 @@
     if (!local.updatedAt || (remote.updatedAt && remote.updatedAt > local.updatedAt)) {
       return saveLocal(remote);
     }
+    if (local.updatedAt && (!remote.updatedAt || local.updatedAt > remote.updatedAt)) {
+      syncToCloud(local);
+    }
     return local;
+  }
+
+  function syncInBackground() {
+    hydrate().catch(() => {});
   }
 
   function findEntry(store, key) {
@@ -84,7 +92,7 @@
   }
 
   async function listEntries(category) {
-    const store = await hydrate();
+    const store = loadLocal();
     let entries = store.entries;
     if (category) {
       const cat = String(category).trim().toLowerCase();
@@ -102,7 +110,7 @@
       return { ok: false, error: `content max ${MAX_CONTENT_LEN} chars` };
     }
 
-    const store = await hydrate();
+    const store = loadLocal();
     const now = new Date().toISOString();
     const existing = findEntry(store, k);
     if (existing) {
@@ -130,7 +138,7 @@
   }
 
   async function deleteEntry({ key, id }) {
-    const store = await hydrate();
+    const store = loadLocal();
     const before = store.entries.length;
     if (id) {
       store.entries = store.entries.filter((e) => e.id !== id);
@@ -148,6 +156,41 @@
     return { ok: true, deleted: before - store.entries.length };
   }
 
+  function formatForSettings(store) {
+    if (!store?.entries?.length) return '';
+    return store.entries
+      .slice()
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+      .map((e) => `- [${e.key}] (${e.category || 'general'}): ${e.content}`)
+      .join('\n');
+  }
+
+  function parseSettingsText(text) {
+    const entries = [];
+    for (const line of String(text || '').split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const match = trimmed.match(/^-\s*\[([^\]]+)\]\s*\(([^)]+)\):\s*(.+)$/);
+      if (!match) continue;
+      entries.push({
+        id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        key: normalizeKey(match[1]),
+        category: match[2].trim().slice(0, 40) || 'general',
+        content: match[3].trim().slice(0, MAX_CONTENT_LEN),
+        source: 'assistant',
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    return entries.slice(0, MAX_ENTRIES);
+  }
+
+  async function importFromSettingsText(text) {
+    const entries = parseSettingsText(text);
+    const store = saveLocal({ entries, updatedAt: null });
+    syncToCloud(store);
+    return { ok: true, count: entries.length };
+  }
+
   function formatForPrompt(store) {
     if (!store?.entries?.length) {
       return 'ПОСТОЯННА ПАМЕТ (празна): можеш да записваш факти с memory_save.';
@@ -160,9 +203,12 @@
     return `ПОСТОЯННА ПАМЕТ (редактирай с memory_save / memory_delete):\n${lines.join('\n')}`;
   }
 
+  function buildPromptSectionSync() {
+    return formatForPrompt(loadLocal());
+  }
+
   async function buildPromptSection() {
-    const store = await hydrate();
-    return formatForPrompt(store);
+    return buildPromptSectionSync();
   }
 
   function createTool(name, description, properties, required = []) {
@@ -187,7 +233,7 @@
       ),
       createTool(
         'memory_save',
-        'Записва или обновява факт в постоянната памет (по key). Използвай за важни предпочитания, работни факти, контекст.',
+        'Записва или обновява факт в постоянната памет (по key). НЕ променя потребителските насоки от настройките — само факти за потребителя.',
         {
           key: { type: 'string', description: 'Кратък идентификатор, напр. preferred_call_time' },
           content: { type: 'string', description: 'Текст за запомняне' },
@@ -231,10 +277,15 @@
 
   window.AIVA_MEMORY = {
     hydrate,
+    syncInBackground,
+    loadLocal,
     listEntries,
     upsertEntry,
     deleteEntry,
+    importFromSettingsText,
+    formatForSettings,
     buildPromptSection,
+    buildPromptSectionSync,
     formatForPrompt,
     getGeminiTools,
     handleTool,

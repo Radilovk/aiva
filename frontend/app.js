@@ -2124,12 +2124,14 @@ async function connectSession() {
       extraContext += `\n\n${window.AIVA_DEVICE_CONTEXT.formatForPrompt(deviceCtx)}`;
     }
     await window.AIVA_DEVICE_CONTEXT?.ensureMemorySeed?.();
-    const memorySection = await window.AIVA_MEMORY?.buildPromptSection?.();
+    const memorySection = window.AIVA_MEMORY?.buildPromptSectionSync?.()
+      || await window.AIVA_MEMORY?.buildPromptSection?.();
     if (memorySection) extraContext += `\n\n${memorySection}`;
     const instructions = buildSessionInstructions(
       assistantSettings.systemInstructions,
       assistantSettings.profile,
-      extraContext
+      extraContext,
+      assistantSettings.userGuidance
     );
     client.systemInstructions = instructions;
     // Транскрипцията е винаги включена: нужна за UI и надеждно затваряне при сбогуване.
@@ -2658,4 +2660,4 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.AIVA_DEVICE_CONTEXT?.collect?.().catch(() => {});
-window.AIVA_MEMORY?.hydrate?.().catch(() => {});
+window.AIVA_MEMORY?.syncInBackground?.();
