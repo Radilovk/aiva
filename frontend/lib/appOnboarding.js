@@ -134,7 +134,14 @@
     if (currentStep === STEP_INTRO) {
       saveProfile({ onboardingComplete: true, language: selectedLang });
       hide();
+      window.dispatchEvent(new CustomEvent('aiva:onboarding-complete'));
     }
+  }
+
+  function skipOnboarding() {
+    saveProfile({ onboardingComplete: true, language: selectedLang });
+    hide();
+    window.dispatchEvent(new CustomEvent('aiva:onboarding-complete'));
   }
 
   function bindUI() {
@@ -143,10 +150,7 @@
     overlay._bound = true;
 
     document.getElementById('onboardNext')?.addEventListener('click', goNext);
-    document.getElementById('onboardSkip')?.addEventListener('click', () => {
-      saveProfile({ onboardingComplete: true, language: selectedLang });
-      hide();
-    });
+    document.getElementById('onboardSkip')?.addEventListener('click', skipOnboarding);
   }
 
   function checkOnLoad() {

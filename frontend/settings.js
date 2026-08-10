@@ -119,11 +119,10 @@
       subscribedAt: null,
     },
     hardwareShortcut: {
-      // Тригерът е фиксиран: двата бутона за звук (+ и −) едновременно
-      enabled: true,
+      enabled: false,
     },
     deviceActions: {
-      enabled: true,
+      enabled: false,
     },
   };
 
@@ -176,7 +175,7 @@
     if (!merged.deviceActions || typeof merged.deviceActions !== 'object') {
       merged.deviceActions = { ...DEFAULT_ASSISTANT_SETTINGS.deviceActions };
     }
-    merged.deviceActions.enabled = merged.deviceActions.enabled !== false;
+    merged.deviceActions.enabled = merged.deviceActions.enabled === true;
     merged.temperature = Math.min(2, Math.max(0, Number(merged.temperature) || 0));
     merged.defaults.priority = merged.defaults.priority === 1 ? 1 : 0;
     merged.defaults.estimatedMinutes = Math.max(0, parseInt(String(merged.defaults.estimatedMinutes), 10) || 0);
