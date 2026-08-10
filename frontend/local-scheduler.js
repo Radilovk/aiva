@@ -420,6 +420,21 @@
     armPreciseTimer();
   }
 
+  async function checkPermissions() {
+    if (!window.Capacitor?.isNativePlatform?.()) {
+      if (!('Notification' in window)) return false;
+      return Notification.permission === 'granted';
+    }
+    try {
+      const LN = LocalNotifications || window.Capacitor?.Plugins?.LocalNotifications;
+      if (!LN?.checkPermissions) return false;
+      const perm = await LN.checkPermissions();
+      return perm?.display === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
   async function requestPermission() {
     if (window.Capacitor?.isNativePlatform?.()) {
       return ensureNativeReady();
@@ -527,6 +542,7 @@
     init,
     ensureNativeReady,
     requestPermission,
+    checkPermissions,
     scheduleForTask,
     scheduleAt,
     cancelForTask,

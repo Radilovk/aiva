@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v45';
+const CACHE_NAME = 'aiva-v46';
 const ASSETS = [
   'index.html',
   'landing.html',
@@ -36,6 +36,8 @@ const ASSETS = [
   'lib/shortcutBridge.js',
   'lib/deviceProfile.js',
   'lib/deviceIntelligence.js',
+  'lib/deviceAccessFlow.js',
+  'lib/deviceIntelBrief.js',
   'lib/deviceContext.js',
   'lib/deviceActions.js',
   'lib/nativePermissions.js',

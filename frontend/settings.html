@@ -163,6 +163,23 @@
       margin-top: 10px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45;
     }
 
+    .cal-advanced, .cal-cloud-panel {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .cal-advanced summary, .cal-cloud-panel summary {
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .cal-advanced[open] summary, .cal-cloud-panel[open] summary {
+      margin-bottom: 8px;
+    }
+
     .saved-toast {
       position: fixed; bottom: calc(var(--safe-bottom) + var(--settings-bar-height) + 16px);
       left: 50%; transform: translateX(-50%) translateY(60px);
@@ -429,106 +446,102 @@
         <span class="toggle-label" data-i18n="showUpcomingBar">Показвай лента „Предстоящи"</span>
         <div class="toggle" id="toggleUpcomingStrip"></div>
       </div>
-      <p class="sync-note" data-i18n="notifPlatformNote">На Android APK напомнянията работят дори когато приложението е затворено. На iOS и уеб — включете календарния абонамент за напомняния от системния календар.</p>
+      <p class="sync-note" data-i18n="notifPlatformNote">На Android APK напомнянията работят локално. На уеб/iOS — включете <a href="#calendar-sync" class="footer-link">календарен абонамент</a> за системни напомняния.</p>
     </div>
 
     <!-- Calendar Sync -->
     <div class="section" id="calendar-sync">
-      <div class="section-title" data-i18n="calSyncTitle" data-i18n-prefix="📅 ">Календар</div>
-      <div class="field" data-calendar-platform="web">
-        <span class="field-label" data-i18n="connectCloud">Свържи облачен календар (основен режим)</span>
-        <div class="subscribe-actions">
-          <button class="btn primary" type="button" id="connectGoogleBtn" data-i18n="connectGoogle">Свържи Google</button>
-          <button class="btn primary" type="button" id="connectMicrosoftBtn" data-i18n="connectOutlook">Свържи Outlook</button>
-        </div>
-        <p class="sync-note" id="cloudStatusText" data-i18n="cloudDisconnected" data-i18n-dynamic>Не е свързан облачен календар.</p>
-      </div>
-      <div class="field" data-calendar-platform="web">
-        <span class="field-label" data-i18n="pickCalAfterConnect">Избери календар след свързване</span>
-        <div class="row-grid">
-          <select id="cloudProviderSelect">
-            <option value="google">Google</option>
-            <option value="microsoft">Outlook</option>
-            <option value="apple">Apple (iCloud)</option>
-          </select>
-          <select id="cloudCalendarSelect">
-            <option value="" data-i18n="noCalendarsLoaded">Няма заредени календари</option>
-          </select>
-        </div>
-        <div class="subscribe-actions" style="margin-top:10px">
-          <button class="btn" type="button" id="refreshCloudCalendarsBtn" data-i18n="refreshCals">Обнови календари</button>
-          <button class="btn" type="button" id="saveCloudCalendarBtn" data-i18n="savePick">Запази избор</button>
-          <button class="btn danger" type="button" id="disconnectCloudBtn" data-i18n="disconnectProv">Разкачи провайдъра</button>
-        </div>
-      </div>
-      <div class="field" data-calendar-platform="web">
-        <span class="field-label" data-i18n="appleIcloudFull">Apple / iCloud (Пълен достъп)</span>
-        <div id="appleConnectForm" style="display:none; margin-top:10px; border:1px solid var(--border); padding:15px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.02);">
-          <div class="field">
-            <span class="field-label" data-i18n="appleIdLabel">Apple ID (email)</span>
-            <input type="text" id="appleId" placeholder="user@icloud.com">
-          </div>
-          <div class="field">
-            <span class="field-label" data-i18n="appPassword">App-Specific Password</span>
-            <input type="text" id="applePassword" placeholder="xxxx-xxxx-xxxx-xxxx">
-            <p class="field-hint" data-i18n="appPasswordHint">Генерирайте парола на appleid.apple.com</p>
-          </div>
-          <button class="btn primary" type="button" id="submitAppleBtn" data-i18n="connectIcloudBtn">Свържи iCloud</button>
-        </div>
-        <button class="btn" type="button" id="showAppleFormBtn" data-i18n="showAppleCal">Свържи Apple Календар</button>
-        <p class="sync-note" data-i18n="appleCalDAVDesc">Използва се CalDAV за двупосочна синхронизация (четене и запис).</p>
-      </div>
+      <div class="section-title" data-i18n="calSyncTitle" data-i18n-prefix="📅 ">Синхронизация с календар</div>
+
       <div class="field" id="androidLocalCalendarSection" data-calendar-platform="android" style="display:none">
-        <span class="field-label" data-i18n="connectLocal">Свържи локален календар</span>
-        <button class="btn primary" type="button" id="connectLocalCalendarBtn" data-i18n="connectLocal">Свържи локален календар</button>
+        <p class="sync-note" id="localCalendarStatusText" data-i18n="localCalNotSelected" data-i18n-dynamic>Не е избран календар на телефона.</p>
+        <button class="btn primary" type="button" id="connectLocalCalendarBtn" data-i18n="connectLocal">Избери календар на телефона</button>
         <div class="row-grid" id="localCalendarPicker" style="margin-top:10px;display:none">
           <select id="localCalendarSelect">
             <option value="" data-i18n="noLocalCalsFound">Няма намерени локални календари</option>
           </select>
           <button class="btn" type="button" id="saveLocalCalendarBtn" data-i18n="save">Запази</button>
         </div>
-        <p class="sync-note" id="localCalendarStatusText" data-i18n="localCalNotSelected" data-i18n-dynamic>Не е избран локален календар.</p>
+        <p class="field-hint" data-i18n="androidCalHint">Задачите с дата се записват в избрания календар с напомняния.</p>
       </div>
-      <hr id="calendarFallbackDivider" style="border:none;border-top:1px solid var(--border);margin:14px 0">
-      <div id="calendarFallbackBlock">
-      <div class="field">
-        <span class="field-label" data-i18n="fallbackTitle">Fallback синхронизация (резервен режим)</span>
-        <select id="calendarProvider">
-          <option value="none" data-i18n="provNone">Изключено</option>
-          <option value="subscribe" data-i18n="provSubscribe">Автоматично — абонамент (препоръчано за iOS/уеб)</option>
-          <option value="native" data-i18n="provNative">Директно в календара на телефона (Android APK)</option>
-          <option value="manual" data-i18n="provManual">При всяка нова задача</option>
-        </select>
-        <div class="field-hint" data-i18n="fallbackHint">Абонаментът синхронизира всички задачи в Google / Apple / Samsung / Outlook календар. На Android APK директният режим записва събития в системния календар с напомняния.</div>
-      </div>
-      <div class="field" id="subscribeSection" style="display:none">
-        <span class="field-label" data-i18n="subPickCal">Абонирай се (избери календар)</span>
-        <div class="subscribe-actions">
-          <button class="btn primary" type="button" id="subscribeGoogleBtn">Google Calendar</button>
-          <button class="btn" type="button" id="subscribeAppleBtn">Apple Calendar</button>
-          <button class="btn" type="button" id="subscribeSamsungBtn">Samsung Calendar</button>
-          <button class="btn" type="button" id="subscribeOutlookBtn">Outlook</button>
+
+      <div data-calendar-platform="web">
+        <div class="field">
+          <span class="field-label" data-i18n="calSyncModeLabel">Как да синхронизирате задачите</span>
+          <select id="calendarProvider">
+            <option value="none" data-i18n="provNone">Изключено</option>
+            <option value="subscribe" data-i18n="provSubscribeSimple">Абонамент в календар (препоръчано)</option>
+            <option value="manual" data-i18n="provManual">Ръчно при всяка нова задача</option>
+          </select>
+          <p class="field-hint" data-i18n="calSyncModeHint">Абонаментът добавя задачите в Google или Apple календар и ги обновява автоматично.</p>
         </div>
-        <div class="ics-url" style="margin-top:12px">
-          <input type="text" id="icsUrl" readonly>
-          <button class="btn" type="button" id="copyIcsBtn" data-i18n="copyBtn">Копирай</button>
+
+        <div class="field" id="subscribeSection" style="display:none">
+          <button class="btn primary" type="button" id="subscribePrimaryBtn" data-i18n="subscribePrimaryBtn">Отвори в календар</button>
+          <details class="cal-advanced">
+            <summary data-i18n="calAdvancedOptions">Други опции</summary>
+            <div class="subscribe-actions">
+              <button class="btn" type="button" id="subscribeGoogleBtn">Google</button>
+              <button class="btn" type="button" id="subscribeAppleBtn">Apple</button>
+              <button class="btn" type="button" id="subscribeOutlookBtn">Outlook</button>
+            </div>
+            <div class="ics-url" style="margin-top:12px">
+              <input type="text" id="icsUrl" readonly>
+              <button class="btn" type="button" id="copyIcsBtn" data-i18n="copyBtn">Копирай</button>
+            </div>
+            <button class="btn" type="button" id="exportAllIcsBtn" data-i18n="importAllIcs" style="margin-top:10px">Еднократен импорт (.ics)</button>
+          </details>
         </div>
-        <div class="subscribe-actions">
-          <button class="btn" type="button" id="exportAllIcsBtn" data-i18n="importAllIcs">Импортирай всички задачи (.ics)</button>
+
+        <div class="field" id="manualSection" style="display:none">
+          <div class="toggle-row">
+            <span class="toggle-label" data-i18n="offerCalOnNew">Предлагай календар при нова задача</span>
+            <div class="toggle" id="toggleAutoExport"></div>
+          </div>
         </div>
-        <p class="sync-note" data-i18n="subscribeHint">След абониране календарът обновява задачите автоматично (обикновено на 15–60 мин). При промяна в KASY събитието се актуализира в календара.</p>
-      </div>
-      <div class="field" id="manualSection" style="display:none">
-        <div class="toggle-row">
-          <span class="toggle-label" data-i18n="offerCalOnNew">Предлагай календар при нова задача</span>
-          <div class="toggle" id="toggleAutoExport"></div>
-        </div>
-        <p class="sync-note" data-i18n="manualHint">При всяка нова задача с дата ще се отвори споделяне към календарното приложение на устройството — изберете кой календар да ползвате.</p>
-      </div>
-      <div class="field" id="nativeSection" style="display:none" hidden>
-        <p class="field-hint" data-i18n="nativeHint" hidden>Директен режим за Android APK — задачите се записват в системния календар с напомняния. Изисква разрешение за календар при първо ползване.</p>
-        <button class="btn primary" type="button" id="requestCalendarPermBtn" data-i18n="grantCalPerm" hidden>Разреши достъп до календара</button>
-      </div>
+
+        <details class="cal-cloud-panel" id="cloudPlusPanel">
+          <summary data-i18n="calCloudPlusTitle">Облачен календар — KASY Plus (двупосочен)</summary>
+          <div class="field" style="margin-top:12px">
+            <div class="subscribe-actions">
+              <button class="btn primary" type="button" id="connectGoogleBtn" data-i18n="connectGoogle">Свържи Google</button>
+              <button class="btn primary" type="button" id="connectMicrosoftBtn" data-i18n="connectOutlook">Свържи Outlook</button>
+            </div>
+            <p class="sync-note" id="cloudStatusText" data-i18n="cloudDisconnected" data-i18n-dynamic>Не е свързан облачен календар.</p>
+          </div>
+          <div class="field">
+            <div class="row-grid">
+              <select id="cloudProviderSelect">
+                <option value="google">Google</option>
+                <option value="microsoft">Outlook</option>
+                <option value="apple">Apple (iCloud)</option>
+              </select>
+              <select id="cloudCalendarSelect">
+                <option value="" data-i18n="noCalendarsLoaded">Няма заредени календари</option>
+              </select>
+            </div>
+            <div class="subscribe-actions" style="margin-top:10px">
+              <button class="btn" type="button" id="refreshCloudCalendarsBtn" data-i18n="refreshCals">Обнови</button>
+              <button class="btn" type="button" id="saveCloudCalendarBtn" data-i18n="savePick">Запази</button>
+              <button class="btn danger" type="button" id="disconnectCloudBtn" data-i18n="disconnectProv">Разкачи</button>
+            </div>
+          </div>
+          <div class="field">
+            <button class="btn" type="button" id="showAppleFormBtn" data-i18n="showAppleCal">Свържи Apple iCloud (CalDAV)</button>
+            <div id="appleConnectForm" style="display:none; margin-top:10px; border:1px solid var(--border); padding:15px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.02);">
+              <div class="field">
+                <span class="field-label" data-i18n="appleIdLabel">Apple ID (email)</span>
+                <input type="text" id="appleId" placeholder="user@icloud.com">
+              </div>
+              <div class="field">
+                <span class="field-label" data-i18n="appPassword">App-Specific Password</span>
+                <input type="text" id="applePassword" placeholder="xxxx-xxxx-xxxx-xxxx">
+                <p class="field-hint" data-i18n="appPasswordHint">Генерирайте парола на appleid.apple.com</p>
+              </div>
+              <button class="btn primary" type="button" id="submitAppleBtn" data-i18n="connectIcloudBtn">Свържи iCloud</button>
+            </div>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -591,17 +604,19 @@
       <div class="section-title" data-i18n="deviceAccessTitle">Функции и приложения</div>
       <div class="toggle-row">
         <div class="toggle-label-with-info">
-          <span class="toggle-label" data-i18n="deviceAccessLabel">Достъп до функции и други приложения</span>
+          <span class="toggle-label" data-i18n="deviceAccessLabel">Гласови команди за телефона</span>
           <button type="button" class="info-icon-btn" id="deviceAccessInfoBtn" aria-label="Информация">i</button>
         </div>
         <div class="toggle" id="toggleDeviceAccess"></div>
       </div>
       <p class="device-access-status" id="deviceAccessStatus" hidden></p>
+      <button class="btn primary" type="button" id="deviceAccessSetupBtn" hidden data-i18n="deviceAccessSetupBtn">Настрой разрешения</button>
+      <p class="field-hint" data-i18n="deviceAccessHint">Включете функцията, после натиснете „Настрой разрешения“ и потвърдете системните диалози.</p>
     </div>
 
     <!-- Calendar View -->
     <div class="section">
-      <div class="section-title" data-i18n="calViewTitle" data-i18n-prefix="📆 ">Календар</div>
+      <div class="section-title" data-i18n="calViewTitle" data-i18n-prefix="📆 ">Изглед на календара</div>
       <div class="row-grid">
         <div class="field">
           <span class="field-label" data-i18n="defaultViewLabel">Изглед по подразбиране</span>
@@ -812,28 +827,49 @@
 
     function refreshDeviceAccessStatus() {
       const statusEl = document.getElementById('deviceAccessStatus');
-      if (!statusEl || !isAndroidPlatform || !getToggle('toggleDeviceAccess')) {
-        if (statusEl) statusEl.hidden = true;
+      const setupBtn = document.getElementById('deviceAccessSetupBtn');
+      if (!statusEl || !isAndroidPlatform) return;
+
+      const enabled = getToggle('toggleDeviceAccess');
+      if (!enabled) {
+        statusEl.textContent = t('deviceAccessDisabled');
+        statusEl.classList.remove('warn');
+        statusEl.hidden = false;
+        if (setupBtn) setupBtn.hidden = true;
         return;
       }
+
       window.AIVA_DEVICE_ACCESS?.getAccessSummary?.().then(({ summary }) => {
         if (!summary) {
-          statusEl.hidden = true;
+          statusEl.textContent = t('deviceAccessPartial');
+          statusEl.classList.add('warn');
+          statusEl.hidden = false;
+          if (setupBtn) setupBtn.hidden = false;
           return;
         }
-        const pending = ['notifications', 'calendar', 'contacts', 'battery']
-          .filter((k) => summary[k] === false);
+        const pending = [
+          summary.notifications === false ? t('permNotifications') : null,
+          summary.calendar === false ? t('permCalendar') : null,
+          summary.contacts === false ? t('permContacts') : null,
+          summary.battery === false ? t('permBattery') : null,
+        ].filter(Boolean);
+
         if (!pending.length) {
           statusEl.textContent = t('deviceAccessReady');
           statusEl.classList.remove('warn');
           statusEl.hidden = false;
+          if (setupBtn) setupBtn.hidden = true;
         } else {
-          statusEl.textContent = t('deviceAccessPartial');
+          statusEl.textContent = tf('deviceAccessMissing', { list: pending.join(', ') });
           statusEl.classList.add('warn');
           statusEl.hidden = false;
+          if (setupBtn) setupBtn.hidden = false;
         }
       }).catch(() => {
-        statusEl.hidden = true;
+        statusEl.textContent = t('deviceAccessPartial');
+        statusEl.classList.add('warn');
+        statusEl.hidden = false;
+        if (setupBtn) setupBtn.hidden = false;
       });
     }
 
@@ -889,10 +925,10 @@
       setToggle('toggleGrounding', settings.googleGrounding);
       setToggle('toggleTextOutput', settings.textOutputEnabled);
       setToggle('toggleBargeIn', settings.bargeInEnabled);
-      setToggle('toggleDeviceAccess', settings.deviceActions?.enabled !== false);
+      setToggle('toggleDeviceAccess', settings.deviceActions?.enabled === true);
 
       // Hardware shortcut (fixed +−+− pattern)
-      setToggle('toggleShortcutEnabled', settings.hardwareShortcut?.enabled);
+      setToggle('toggleShortcutEnabled', settings.hardwareShortcut?.enabled === true);
 
       // Calendar
       document.getElementById('defaultView').value = settings.calendar.defaultView;
@@ -939,9 +975,6 @@
       document.querySelectorAll('[data-calendar-platform="android"]').forEach((el) => {
         el.style.display = isAndroidPlatform ? '' : 'none';
       });
-      if (isAndroidPlatform) {
-        document.getElementById('calendarProvider').value = 'native';
-      }
       const webNote = document.getElementById('hardwareShortcutWebNote');
       const androidControls = document.getElementById('hardwareShortcutAndroidControls');
       if (webNote) webNote.classList.toggle('visible', !isAndroidPlatform);
@@ -1224,34 +1257,24 @@
     }
 
     function updateCalendarSyncUI() {
-      const fallbackBlock = document.getElementById('calendarFallbackBlock');
-      const fallbackDivider = document.getElementById('calendarFallbackDivider');
-      if (isAndroidPlatform) {
-        if (fallbackBlock) fallbackBlock.style.display = 'none';
-        if (fallbackDivider) fallbackDivider.style.display = 'none';
-      } else {
-        if (fallbackBlock) fallbackBlock.style.display = '';
-        if (fallbackDivider) fallbackDivider.style.display = '';
-      }
-      let provider = document.getElementById('calendarProvider').value;
-      if (isAndroidPlatform) {
-        provider = 'native';
-        document.getElementById('calendarProvider').value = 'native';
-      }
+      if (isAndroidPlatform) return;
+      const provider = document.getElementById('calendarProvider').value;
       const subscribeSection = document.getElementById('subscribeSection');
       const manualSection = document.getElementById('manualSection');
 
       subscribeSection.style.display = provider === 'subscribe' ? '' : 'none';
       manualSection.style.display = provider === 'manual' ? '' : 'none';
-      const nativeSection = document.getElementById('nativeSection');
-      if (nativeSection) {
-        nativeSection.style.display = isAndroidPlatform || provider !== 'native' ? 'none' : '';
-      }
 
       if (provider === 'subscribe') {
         const userId = getUserId() || 'unknown';
         document.getElementById('icsUrl').value = calendarSync.getFeedUrl(userId) || `${getApiBase()}/api/calendar.ics?user_id=${encodeURIComponent(userId)}`;
       }
+    }
+
+    function getPreferredSubscribeProvider() {
+      return settings.calendarSync?.preferredProvider
+        || window.AIVA_CALENDAR_ONBOARD?.detectPreferredProvider?.()
+        || 'google';
     }
 
     // --- Collect settings from UI ---
@@ -1330,12 +1353,36 @@
             const res = await fetch(`${API_BASE || WORKER_ORIGIN}/api/tasks/${encodeURIComponent(userId)}`);
             const data = await res.json();
             await window.AIVA_NOTIFIER.scheduleAll(data.tasks || [], settings.notifications.reminderMinutes);
+          } else {
+            setToggle('toggleNotifications', false);
+            settings = saveAssistantSettings({
+              ...settings,
+              notifications: { ...settings.notifications, enabled: false },
+            });
           }
         }
         enablePushNotifications();
+      } else if (window.AIVA_NOTIFIER?.cancelAll) {
+        await window.AIVA_NOTIFIER.cancelAll();
       }
       showSavedToast();
       return settings;
+    }
+
+    async function syncPermissionTogglesOnLoad() {
+      if (window.AIVA_NOTIFIER?.checkPermissions) {
+        const granted = await window.AIVA_NOTIFIER.checkPermissions();
+        if (!granted && getToggle('toggleNotifications')) {
+          setToggle('toggleNotifications', false);
+          settings = saveAssistantSettings({
+            ...settings,
+            notifications: { ...settings.notifications, enabled: false },
+          });
+        }
+      }
+      if (isAndroidPlatform) {
+        await refreshDeviceAccessStatus();
+      }
     }
 
     function showSavedToast() {
@@ -1415,6 +1462,14 @@
     });
     document.getElementById('saveLocalCalendarBtn')?.addEventListener('click', saveSelectedLocalCalendar);
 
+    document.getElementById('subscribePrimaryBtn')?.addEventListener('click', () => {
+      try {
+        calendarSync.openSubscribe(getPreferredSubscribeProvider());
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+
     document.getElementById('copyIcsBtn').addEventListener('click', () => {
       const input = document.getElementById('icsUrl');
       const text = calendarSync.getWebcalUrl() || input.value;
@@ -1430,9 +1485,6 @@
     document.getElementById('subscribeAppleBtn').addEventListener('click', () => {
       try { calendarSync.openSubscribe('apple'); } catch (e) { alert(e.message); }
     });
-    document.getElementById('subscribeSamsungBtn')?.addEventListener('click', () => {
-      try { calendarSync.openSubscribe('samsung'); } catch (e) { alert(e.message); }
-    });
     document.getElementById('subscribeOutlookBtn').addEventListener('click', () => {
       try { calendarSync.openSubscribe('outlook'); } catch (e) { alert(e.message); }
     });
@@ -1445,15 +1497,6 @@
       } catch (e) {
         alert(e.message || t('errExport'));
       }
-    });
-
-    document.getElementById('requestCalendarPermBtn')?.addEventListener('click', async () => {
-      if (!calendarCrud?.isAndroid?.()) {
-        alert(t('errNativeAndroid'));
-        return;
-      }
-      const result = await calendarCrud.requestPermissions();
-      alert(result.granted ? t('calPermGranted') : t('calPermDenied'));
     });
 
     document.getElementById('profileLanguage').addEventListener('change', (e) => {
@@ -1507,19 +1550,26 @@
           ...settings,
           deviceActions: { enabled },
         });
-        const statusEl = document.getElementById('deviceAccessStatus');
-        if (enabled && window.AIVA_DEVICE_ACCESS) {
-          if (statusEl) {
-            statusEl.hidden = false;
-            statusEl.textContent = t('deviceAccessGranting');
-            statusEl.classList.add('warn');
-          }
-          await window.AIVA_DEVICE_ACCESS.grantAll();
-          await refreshDeviceAccessStatus();
-        } else if (statusEl) {
-          statusEl.hidden = true;
-        }
+        await refreshDeviceAccessStatus();
       }, 0);
+    });
+
+    document.getElementById('deviceAccessSetupBtn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('deviceAccessSetupBtn');
+      const prevText = btn?.textContent;
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = t('deviceAccessGranting');
+      }
+      try {
+        await window.AIVA_DEVICE_ACCESS?.grantAll?.();
+        await refreshDeviceAccessStatus();
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = prevText || t('deviceAccessSetupBtn');
+        }
+      }
     });
 
     document.getElementById('toggleShortcutEnabled')?.addEventListener('click', async () => {
@@ -1530,10 +1580,6 @@
           hardwareShortcut: { enabled },
         });
         await applyHardwareShortcutConfig({ enabled });
-        if (enabled) {
-          const a11y = await window.AIVA_SHORTCUT?.isAccessibilityEnabled?.().catch(() => false);
-          if (!a11y) await window.AIVA_SHORTCUT?.openAccessibilitySettings?.();
-        }
         await refreshShortcutStatus();
       }, 0);
     });
@@ -1561,6 +1607,17 @@
 
       deviceProfile = await window.AIVA_DEVICE_ACCESS.getProfile();
       section.style.display = '';
+
+      const { summary } = await window.AIVA_DEVICE_ACCESS.getAccessSummary?.().catch(() => ({}));
+      const hasAnyPerm = summary && ['notifications', 'calendar', 'contacts', 'battery'].some((k) => summary[k] === true);
+      if (settings.deviceActions?.enabled === true && !hasAnyPerm) {
+        setToggle('toggleDeviceAccess', false);
+        settings = saveAssistantSettings({
+          ...settings,
+          deviceActions: { enabled: false },
+        });
+      }
+
       await refreshDeviceAccessStatus();
 
       document.addEventListener('visibilitychange', async () => {
@@ -1677,6 +1734,7 @@
         await handleCloudOauthCallback();
       }
       populateUI();
+      await syncPermissionTogglesOnLoad();
       await initBilling();
       document.getElementById('paywallDismissBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.hidePaywall?.());
       document.getElementById('paywallMonthlyBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.openCheckout?.('plus_monthly'));
@@ -1687,7 +1745,7 @@
         await initDeviceAccess();
         await refreshShortcutStatus();
         const hash = location.hash.replace('#', '');
-        if (hash === 'deviceAccessSection' || hash === 'deviceSetupSection') {
+        if (hash === 'deviceAccessSection') {
           document.getElementById('deviceAccessSection')?.scrollIntoView({ behavior: 'smooth' });
         }
       } else {

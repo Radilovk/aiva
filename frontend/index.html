@@ -369,6 +369,20 @@
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
     }
 
+    .device-intel-brief-body {
+      max-height: 45vh;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      margin: 16px 0 20px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+    }
+
     .onboard-dots {
       display: flex;
       gap: 8px;
@@ -2051,6 +2065,16 @@
     </div>
   </div>
 
+  <!-- Device intelligence briefing (first APK launch) -->
+  <div class="app-onboard" id="deviceIntelBrief" hidden aria-hidden="true">
+    <div class="app-onboard-card" role="dialog" aria-modal="true" aria-labelledby="deviceIntelBriefTitle">
+      <h2 id="deviceIntelBriefTitle" data-i18n="deviceBriefTitle">Вашият телефон</h2>
+      <p class="onboard-subtitle" data-i18n="deviceBriefSubtitle">KASY анализира устройството ви, за да се интегрира правилно с Android, системните правила и приложенията.</p>
+      <div class="device-intel-brief-body" id="deviceIntelBriefBody"></div>
+      <button class="onboard-primary" id="deviceIntelBriefOk" type="button" data-i18n="deviceBriefOk">Разбрах</button>
+    </div>
+  </div>
+
   <!-- Subscription paywall -->
   <div class="paywall-modal" id="paywallModal" aria-hidden="true">
     <div class="paywall-card" role="dialog" aria-modal="true">
@@ -2103,6 +2127,8 @@
   <script src="lib/taskPriority.js"></script>
   <script src="lib/deviceProfile.js"></script>
   <script src="lib/deviceIntelligence.js"></script>
+  <script src="lib/deviceAccessFlow.js"></script>
+  <script src="lib/deviceIntelBrief.js"></script>
   <script src="lib/deviceContext.js"></script>
   <script src="lib/assistantMemory.js"></script>
   <script src="lib/deviceActions.js"></script>

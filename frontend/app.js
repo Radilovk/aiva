@@ -2551,6 +2551,23 @@ loadTasks();
 refreshExternalEvents();
 loadDailyBrief();
 initDeviceBanner();
+
+function tryShowDeviceBrief() {
+  if (!window.AIVA_DEVICE_BRIEF?.shouldShow?.()) return;
+  setTimeout(() => {
+    window.AIVA_DEVICE_BRIEF.showIfNeeded().catch(() => {});
+  }, 700);
+}
+
+window.addEventListener('aiva:onboarding-complete', tryShowDeviceBrief);
+if (window.AIVA_APP_ONBOARD?.isComplete?.()) {
+  tryShowDeviceBrief();
+}
+
+document.getElementById('deviceIntelBriefOk')?.addEventListener('click', () => {
+  window.AIVA_DEVICE_BRIEF?.hide?.();
+});
+
 if (window.AIVA_DEVICE_INTEL?.bootstrapQuiet) {
   window.AIVA_DEVICE_INTEL.bootstrapQuiet().catch(() => {});
 }
