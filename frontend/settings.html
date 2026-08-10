@@ -583,6 +583,23 @@
       <div class="field-hint" data-i18n="bargeInHint">Можеш да прекъсваш асистента, докато говори. Изключи при проблеми с ехо.</div>
     </div>
 
+    <!-- Memory & user guidance -->
+    <div class="section" id="memoryGuidanceSection">
+      <div class="section-title" data-i18n="memorySectionTitle" data-i18n-prefix="🧠 ">Памет и насоки</div>
+
+      <div class="field">
+        <span class="field-label" data-i18n="assistantMemoryLabel">Какво помни за мен</span>
+        <textarea id="assistantMemoryField" rows="8" spellcheck="false" data-i18n-placeholder="assistantMemoryPlaceholder" placeholder="- [ключ] (категория): факт"></textarea>
+        <p class="field-hint" data-i18n="assistantMemoryHint">AI управлява тази памет по време на разговор. Можете да редактирате тук — формат: - [ключ] (категория): текст</p>
+      </div>
+
+      <div class="field">
+        <span class="field-label" data-i18n="userGuidanceLabel">Мои насоки към асистента</span>
+        <textarea id="userGuidanceField" rows="6" spellcheck="false" data-i18n-placeholder="userGuidancePlaceholder" placeholder="Напр. винаги ми говори на „ти“, не предлагай срещи преди 9:00…"></textarea>
+        <p class="field-hint" data-i18n="userGuidanceHint">Само вие редактирате този текст. AI не го променя — винаги го следва при всеки отговор.</p>
+      </div>
+    </div>
+
     <!-- Hardware Shortcut -->
     <div class="section" id="hardwareShortcutSection">
       <div class="section-title" data-i18n="hardwareShortcutTitle" data-i18n-prefix="📱 ">Хардуерен бутон</div>
@@ -781,6 +798,7 @@
   <script src="lib/deviceActions.js"></script>
   <script src="lib/deviceIntelligence.js"></script>
   <script src="lib/deviceAccessFlow.js"></script>
+  <script src="lib/assistantMemory.js"></script>
   <script src="lib/icsUtils.js"></script>
   <script src="local-scheduler.js"></script>
   <script src="lib/deviceCalendar.js"></script>
@@ -927,6 +945,9 @@
       setToggle('toggleBargeIn', settings.bargeInEnabled);
       setToggle('toggleDeviceAccess', settings.deviceActions?.enabled === true);
 
+      document.getElementById('userGuidanceField').value = settings.userGuidance || '';
+      populateMemoryField();
+
       // Hardware shortcut (fixed +−+− pattern)
       setToggle('toggleShortcutEnabled', settings.hardwareShortcut?.enabled === true);
 
@@ -949,6 +970,19 @@
 
       // Appearance
       setToggle('toggleCompactCalendar', settings.appearance.compactCalendar);
+    }
+
+    function populateMemoryField() {
+      const field = document.getElementById('assistantMemoryField');
+      if (!field || !window.AIVA_MEMORY?.formatForSettings) return;
+      field.value = window.AIVA_MEMORY.formatForSettings(window.AIVA_MEMORY.loadLocal());
+    }
+
+    async function refreshMemoryFieldFromCloud() {
+      if (window.AIVA_MEMORY?.hydrate) {
+        await window.AIVA_MEMORY.hydrate();
+      }
+      populateMemoryField();
     }
 
     function setToggle(id, value) {
@@ -1290,6 +1324,7 @@
         deviceActions: {
           enabled: getToggle('toggleDeviceAccess'),
         },
+        userGuidance: document.getElementById('userGuidanceField').value.trim(),
         profile: {
           ...settings.profile,
           language: document.getElementById('profileLanguage').value,
@@ -1342,6 +1377,11 @@
     }
 
     async function saveAllSettings() {
+      if (window.AIVA_MEMORY?.importFromSettingsText) {
+        await window.AIVA_MEMORY.importFromSettingsText(
+          document.getElementById('assistantMemoryField')?.value || ''
+        );
+      }
       settings = saveAssistantSettings(collectSettings());
       applySettingsLanguage(settings.profile?.language || 'bg');
       await applyHardwareShortcutConfig(settings.hardwareShortcut);
@@ -1728,12 +1768,18 @@
       }
     }
 
+    window.addEventListener('aiva:memory-updated', populateMemoryField);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') populateMemoryField();
+    });
+
     (async () => {
       applyCalendarPlatformUI();
       if (!isAndroidPlatform) {
         await handleCloudOauthCallback();
       }
       populateUI();
+      await refreshMemoryFieldFromCloud();
       await syncPermissionTogglesOnLoad();
       await initBilling();
       document.getElementById('paywallDismissBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.hidePaywall?.());
