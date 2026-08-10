@@ -3,6 +3,8 @@ package com.aiva.assistant;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
@@ -33,6 +35,8 @@ import java.util.TimeZone;
  */
 @CapacitorPlugin(name = "AivaDevice")
 public class AivaDevicePlugin extends Plugin {
+
+    private AudioFocusRequest mediaAudioFocusRequest;
 
     private String detectProfile() {
         String m = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase();
@@ -222,6 +226,36 @@ public class AivaDevicePlugin extends Plugin {
         call.resolve(result);
     }
 
+    private void requestMediaAudioFocus(AudioManager am) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioAttributes attrs = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build();
+            mediaAudioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(attrs)
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener(focusChange -> { })
+                .build();
+            am.requestAudioFocus(mediaAudioFocusRequest);
+        } else {
+            am.requestAudioFocus(
+                focusChange -> { },
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            );
+        }
+    }
+
+    private void abandonMediaAudioFocus(AudioManager am) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && mediaAudioFocusRequest != null) {
+            am.abandonAudioFocusRequest(mediaAudioFocusRequest);
+            mediaAudioFocusRequest = null;
+        } else {
+            am.abandonAudioFocus(focusChange -> { });
+        }
+    }
+
     @PluginMethod
     public void setVoiceSessionActive(PluginCall call) {
         boolean active = call.getBoolean("active", false);
@@ -234,9 +268,14 @@ public class AivaDevicePlugin extends Plugin {
         }
         try {
             if (active) {
-                am.setMode(AudioManager.MODE_IN_COMMUNICATION);
-                am.setSpeakerphoneOn(true);
+                // Web Audio playback + getUserMedia echo cancellation — not telephony.
+                // MODE_IN_COMMUNICATION + speakerphone forced greeting to the loudspeaker
+                // and retargeted hardware volume keys to the call stream.
+                am.setMode(AudioManager.MODE_NORMAL);
+                am.setSpeakerphoneOn(false);
+                requestMediaAudioFocus(am);
             } else {
+                abandonMediaAudioFocus(am);
                 am.setSpeakerphoneOn(false);
                 am.setMode(AudioManager.MODE_NORMAL);
             }
