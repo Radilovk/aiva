@@ -59,9 +59,6 @@ const addToCalendarBtn = document.getElementById('addToCalendarBtn');
 const discussTaskBtn = document.getElementById('discussTaskBtn');
 const duplicateRowsField = document.getElementById('duplicateRows');
 const taskIdField = document.getElementById('taskId');
-const upcomingStrip = document.getElementById('upcomingStrip');
-const upcomingList = document.getElementById('upcomingList');
-const upcomingCount = document.getElementById('upcomingCount');
 
 // --- State ---
 let client = null;
@@ -885,54 +882,7 @@ function getTaskCountdown(task) {
   return window.AIVA_NOTIFIER.formatCountdown(dt.getTime() - Date.now());
 }
 
-function renderUpcomingStrip() {
-  if (!upcomingStrip || !upcomingList) return;
-  const show = assistantSettings.notifications?.showUpcomingStrip !== false;
-  if (!show || !window.AIVA_NOTIFIER?.getUpcomingTasks) {
-    upcomingStrip.hidden = true;
-    return;
-  }
-
-  const upcoming = window.AIVA_NOTIFIER.getUpcomingTasks(tasks, 24).slice(0, 5);
-  if (!upcoming.length) {
-    upcomingStrip.hidden = true;
-    return;
-  }
-
-  upcomingStrip.hidden = false;
-  upcomingCount.textContent = String(upcoming.length);
-
-  upcomingList.innerHTML = upcoming.map(({ task, msUntil }) => {
-    const overdue = msUntil < 0;
-    const countdown = window.AIVA_NOTIFIER.formatCountdown(msUntil);
-    return `
-      <div class="upcoming-item ${overdue ? 'is-overdue' : ''}" data-id="${task.id}" tabindex="0">
-        <div class="upcoming-time">${escapeHtml(task.due_time || '—')}</div>
-        <div class="upcoming-body">
-          <div class="upcoming-title">${escapeHtml(task.content)}</div>
-          <div class="upcoming-countdown">${escapeHtml(countdown)}</div>
-        </div>
-        <button class="upcoming-expand-btn" type="button" data-action="expand" aria-expanded="false" aria-label="Разгъни">▾</button>
-        <div class="upcoming-actions">
-          <button class="upcoming-action-btn" data-action="snooze" data-id="${task.id}" type="button" title="${escapeHtml(t('snooze10'))}">⏰</button>
-          <button class="upcoming-action-btn" data-action="done" data-id="${task.id}" type="button" title="${escapeHtml(t('doneAction'))}">✓</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function taskMeta(task) {
-  const meta = [];
-  if (task.due_time) meta.push(task.due_time);
-  if (task.estimated_minutes) meta.push(`${task.estimated_minutes} ${t('minsShort')}`);
-  if (task.location) meta.push(task.location);
-  if (task.tags) meta.push(task.tags);
-  return meta;
-}
-
 function renderTaskCard(task, mode = 'agenda') {
-  const meta = taskMeta(task);
   const overdue = isTaskOverdue(task);
   const countdown = getTaskCountdown(task);
   const taskDt = getTaskDateTime(task);
@@ -942,26 +892,21 @@ function renderTaskCard(task, mode = 'agenda') {
   const important = window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority);
   const importantClass = important ? ' is-important' : '';
   const priorityLabel = important ? window.AIVA_TASK_PRIORITY.label(task.priority, assistantSettings.profile?.language) : '';
+  const isExternal = task.isExternal;
 
   return `
-    <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')}${importantClass} ${statusClass}${task.isExternal ? ' external-event' : ''}" data-id="${task.id}"${task.isExternal ? ' data-external="true"' : ''} tabindex="0">
-      <button class="task-check" data-id="${task.id}" aria-label="${escapeHtml(t('markComplete'))}" type="button">
-        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-      </button>
+    <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')}${importantClass} ${statusClass}${isExternal ? ' external-event' : ''}" data-id="${task.id}"${isExternal ? ' data-external="true"' : ''} tabindex="0" aria-expanded="false">
+      <div class="task-time">${escapeHtml(task.due_time || '—')}</div>
       <div class="task-body">
         <div class="task-row">
-          <div class="task-text">${escapeHtml(task.content)}</div>
+          <div class="task-title">${escapeHtml(task.content)}</div>
           ${priorityLabel ? `<span class="priority-pill important">${escapeHtml(priorityLabel)}</span>` : ''}
           ${synced ? '<span class="calendar-badge">📅</span>' : ''}
         </div>
-        <div class="task-info">
-          ${task.due_date && mode !== 'month' ? `<span>${escapeHtml(task.due_date)}</span>` : ''}
-          ${meta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}
-          ${countdown ? `<span class="task-countdown">${escapeHtml(countdown)}</span>` : ''}
-          ${task.repeat_rule ? `<span>↻ ${escapeHtml(task.repeat_rule)}</span>` : ''}
-        </div>
+        ${countdown ? `<div class="task-countdown">${escapeHtml(countdown)}</div>` : ''}
         ${task.notes ? `<div class="task-note">${escapeHtml(task.notes)}</div>` : ''}
       </div>
+      ${!isExternal ? `<button class="task-modal-btn" type="button" data-action="open-modal" aria-label="${escapeHtml(t('notifOpen'))}">⋯</button>` : ''}
     </article>
   `;
 }
@@ -1170,7 +1115,6 @@ function renderMonthView(renderOpts = {}) {
 function renderCalendar(renderOpts = {}) {
   setActiveViewButton();
   tasksCount.textContent = tasks.length;
-  renderUpcomingStrip();
 
   if (calendarView === 'day') {
     renderAgendaView([currentDate], renderOpts);
@@ -2287,16 +2231,13 @@ todayBtn?.addEventListener('click', () => {
 addTaskBtn?.addEventListener('click', () => openTaskModal());
 
 tasksContainer?.addEventListener('click', (e) => {
-  const check = e.target.closest('.task-check');
-  if (check) {
+  const modalBtn = e.target.closest('[data-action="open-modal"]');
+  if (modalBtn) {
     e.stopPropagation();
-    const item = check.closest('.task-item');
-    if (item) {
-      item.style.opacity = '0';
-      item.style.transform = 'translateX(20px)';
-      item.style.transition = 'all 0.3s ease';
+    const item = modalBtn.closest('.task-item');
+    if (item && !item.dataset.external) {
+      openTaskModal(getTaskById(item.dataset.id));
     }
-    setTimeout(() => markDone(check.dataset.id), 300);
     return;
   }
 
@@ -2315,17 +2256,20 @@ tasksContainer?.addEventListener('click', (e) => {
   }
 
   const card = e.target.closest('.task-card');
-  if (card && !card.dataset.external) {
-    openTaskModal(getTaskById(card.dataset.id));
+  if (card) {
+    const expanded = card.classList.toggle('is-expanded');
+    card.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   }
 });
 
 tasksContainer?.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.target.closest('.task-modal-btn')) return;
   const card = e.target.closest('.task-card');
-  if (!card || card.dataset.external) return;
+  if (!card) return;
   e.preventDefault();
-  openTaskModal(getTaskById(card.dataset.id));
+  const expanded = card.classList.toggle('is-expanded');
+  card.setAttribute('aria-expanded', expanded ? 'true' : 'false');
 });
 
 tasksContainer?.addEventListener('touchstart', (e) => {
@@ -2444,40 +2388,8 @@ window.addEventListener('aiva:task-done-from-notif', () => {
 });
 
 window.addEventListener('aiva:notification-fired', () => {
-  renderUpcomingStrip();
+  updateCountdownsInPlace();
 });
-
-if (upcomingList) {
-  upcomingList.addEventListener('click', async (e) => {
-    const expandBtn = e.target.closest('[data-action="expand"]');
-    if (expandBtn) {
-      e.stopPropagation();
-      const item = expandBtn.closest('.upcoming-item');
-      if (!item) return;
-      const expanded = item.classList.toggle('is-expanded');
-      expandBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-      expandBtn.setAttribute('aria-label', expanded ? 'Сгъни' : 'Разгъни');
-      return;
-    }
-
-    const btn = e.target.closest('[data-action]');
-    if (btn) {
-      e.stopPropagation();
-      const taskId = btn.dataset.id;
-      const action = btn.dataset.action;
-      const task = getTaskById(taskId);
-      if (action === 'done') {
-        await markDone(taskId);
-      } else if (action === 'snooze' && task && window.AIVA_NOTIFIER) {
-        await window.AIVA_NOTIFIER.snoozeTask(taskId, task.content, 10);
-        showToast({ content: t('toastSnooze10'), emotion: 'neutral', priority: 0 });
-      }
-      return;
-    }
-    const item = e.target.closest('.upcoming-item');
-    if (item) openTaskModal(getTaskById(item.dataset.id));
-  });
-}
 
 // Refresh countdowns every minute — update text in place instead of
 // rebuilding the whole calendar DOM.
@@ -2493,7 +2405,6 @@ function updateCountdownsInPlace() {
 
 setInterval(() => {
   if (tasks.length) {
-    renderUpcomingStrip();
     updateCountdownsInPlace();
   }
 }, 60000);
