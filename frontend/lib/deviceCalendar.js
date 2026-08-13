@@ -24,7 +24,7 @@
     return ics.buildICS(task, { ...getReminderOptions(), ...options });
   }
 
-  async function shareOrDownloadICS(task, ics, fileName) {
+  async function shareOrDownloadICS(task, ics, fileName, options = {}) {
     const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
 
     try {
@@ -35,6 +35,15 @@
       }
     } catch (e) {
       if (e && e.name === 'AbortError') return 'aborted';
+    }
+
+    if (options.allowDownload === false) {
+      const url = window.AIVA_ICS?.getGoogleCalendarUrl?.(task);
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return 'google';
+      }
+      throw new Error('Споделянето не е налично в този браузър');
     }
 
     const url = URL.createObjectURL(blob);
@@ -55,7 +64,8 @@
     }
 
     const fileName = `aiva-${task.id || 'task'}.ics`;
-    return shareOrDownloadICS(task, ics, fileName);
+    const allowDownload = options.allowDownload === true;
+    return shareOrDownloadICS(task, ics, fileName, { allowDownload });
   }
 
   window.AIVA_CALENDAR = { addToDevice, buildICS, shareOrDownloadICS };

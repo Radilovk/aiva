@@ -4,7 +4,7 @@
  * Strategy:
  *   Android APK  → AivaCalendar Capacitor plugin (CalendarContract) when available
  *   iOS / mobile → ICS share sheet + webcal subscribe
- *   Web          → Google Calendar deep link + ICS download
+ *   Web          → webcal subscribe / Google Calendar deep link / Web Share (no auto-download)
  */
 (function () {
   const SYNC_MAP_KEY = 'aiva_native_calendar_map';
@@ -28,6 +28,20 @@
     if (isIOS()) return 'ios-web';
     if (isAndroid()) return 'android-web';
     return 'web';
+  }
+
+  function isDesktopWeb() {
+    return getPlatform() === 'web';
+  }
+
+  function canShareICS() {
+    try {
+      const blob = new Blob([''], { type: 'text/calendar' });
+      const file = new File([blob], 'test.ics', { type: 'text/calendar' });
+      return !!navigator.canShare?.({ files: [file] });
+    } catch {
+      return false;
+    }
   }
 
   function getReminderOptions() {
@@ -141,11 +155,11 @@
     }
   }
 
-  async function shareICS(task) {
+  async function shareICS(task, options = {}) {
     if (!window.AIVA_CALENDAR?.addToDevice) {
       throw new Error('ICS модулът не е зареден');
     }
-    return window.AIVA_CALENDAR.addToDevice(task);
+    return window.AIVA_CALENDAR.addToDevice(task, options);
   }
 
   async function openGoogleCalendar(task) {
@@ -156,7 +170,8 @@
   }
 
   /**
-   * Smart add: tries native plugin on Android APK, then ICS share, then Google link.
+   * Smart add: native plugin on Android APK, Web Share on mobile, deep links on desktop web.
+   * Never triggers a file download unless options.allowDownload === true (explicit export).
    */
   async function addToDeviceCalendar(task, options = {}) {
     if (!task?.due_date) {
@@ -165,6 +180,7 @@
 
     const platform = getPlatform();
     const preferNative = options.preferNative !== false;
+    const allowDownload = options.allowDownload === true;
 
     // Android APK: try native CalendarContract first
     if (preferNative && platform === 'android-native') {
@@ -179,29 +195,28 @@
       }
     }
 
-    // iOS / all platforms: ICS share sheet (opens Apple Calendar, Google Calendar, etc.)
-    if (platform.startsWith('ios') || options.preferShare) {
-      const result = await shareICS(task);
-      return { method: 'ics-share', platform, result };
-    }
-
-    // Android web/APK fallback: try share first
-    if (navigator.canShare) {
+    // Mobile browsers: OS share sheet → calendar picker (not a filesystem download)
+    if ((platform.startsWith('ios') || platform === 'android-web') && canShareICS()) {
       try {
-        const result = await shareICS(task);
+        const result = await shareICS(task, { allowDownload: false });
         if (result !== 'aborted') return { method: 'ics-share', platform, result };
       } catch (e) {
         if (e?.name === 'AbortError') return { method: 'aborted', platform };
       }
     }
 
-    // Web fallback: Google Calendar deep link
-    if (options.allowGoogle !== false) {
+    // Desktop / mobile web: Google Calendar deep link (no file download)
+    if (!allowDownload && options.allowGoogle !== false) {
       return { method: 'google', platform, result: await openGoogleCalendar(task) };
     }
 
-    const result = await shareICS(task);
-    return { method: 'ics-download', platform, result };
+    // Explicit export only (settings → export all)
+    if (allowDownload) {
+      const result = await shareICS(task, { allowDownload: true });
+      return { method: 'ics-download', platform, result };
+    }
+
+    return { method: 'google', platform, result: await openGoogleCalendar(task) };
   }
 
   async function syncTaskToDevice(task) {
@@ -254,6 +269,8 @@
     isNative,
     isIOS,
     isAndroid,
+    isDesktopWeb,
+    canShareICS,
     getPlatform,
     getPlatformLabel,
     requestNativePermissions,

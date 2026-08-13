@@ -76,13 +76,17 @@
     return window.AIVA_ICS?.buildMultiICS(tasks, opts) || null;
   }
 
-  async function shareICS(ics, fileName, title) {
+  async function shareICS(ics, fileName, title, options = {}) {
     const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
     const file = new File([blob], fileName, { type: 'text/calendar' });
 
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: title || 'KASY задачи' });
       return 'shared';
+    }
+
+    if (options.allowDownload === false) {
+      throw new Error('Споделянето не е налично в този браузър');
     }
 
     const url = URL.createObjectURL(blob);
@@ -99,7 +103,7 @@
   async function exportAllToDevice(tasks) {
     const ics = buildMultiEventICS(tasks);
     if (!ics) throw new Error('Няма задачи с дата за експорт');
-    return shareICS(ics, 'aiva-tasks.ics', 'KASY — всички задачи');
+    return shareICS(ics, 'aiva-tasks.ics', 'KASY — всички задачи', { allowDownload: true });
   }
 
   function getSyncSettings() {
@@ -151,11 +155,15 @@
     }
 
     if (isManualMode() && getSyncSettings().autoExportOnSave && window.AIVA_NATIVE_CALENDAR) {
-      try {
-        const result = await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
-        if (result?.method !== 'aborted') return { action: 'shared', ...result };
-      } catch (e) {
-        if (e?.name !== 'AbortError') console.warn('Manual calendar export:', e);
+      const platform = window.AIVA_NATIVE_CALENDAR.getPlatform?.();
+      // Only Android APK silently writes on save; web never auto-downloads
+      if (platform === 'android-native') {
+        try {
+          const result = await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
+          if (result?.method !== 'aborted') return { action: 'shared', ...result };
+        } catch (e) {
+          if (e?.name !== 'AbortError') console.warn('Manual calendar export:', e);
+        }
       }
     }
 

@@ -210,17 +210,30 @@
 
   async function enableDevicePerTask(task) {
     clearDismiss();
+    const platform = window.AIVA_NATIVE_CALENDAR?.getPlatform?.() || 'web';
+    const isWeb = platform === 'web' || platform === 'android-web' || platform === 'ios-web';
+
     saveCalendarSettings({
-      provider: 'manual',
+      provider: isWeb ? 'subscribe' : 'manual',
       setupComplete: true,
-      autoExportOnSave: true,
+      autoExportOnSave: false,
     });
 
     await enableNotifications();
 
     if (task?.due_date && window.AIVA_NATIVE_CALENDAR) {
       try {
-        await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
+        if (isWeb && platform !== 'android-native') {
+          if (window.AIVA_NATIVE_CALENDAR.canShareICS?.()) {
+            await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
+          } else if (window.AIVA_CALENDAR_SYNC) {
+            window.AIVA_CALENDAR_SYNC.openSubscribe(detectPreferredProvider());
+          } else {
+            await window.AIVA_NATIVE_CALENDAR.openGoogleCalendar(task);
+          }
+        } else {
+          await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
+        }
       } catch (e) {
         if (e?.name !== 'AbortError') console.warn('Device calendar export:', e);
       }
