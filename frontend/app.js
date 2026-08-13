@@ -1644,9 +1644,7 @@ async function loadTasks() {
       window.AIVA_CALENDAR_ONBOARD.checkAfterLoad(tasks);
     }
     // Re-schedule notifications when tasks are refreshed
-    if (window.AIVA_NOTIFIER && assistantSettings.notifications?.enabled) {
-      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
-    }
+    rescheduleNotifications();
   } catch (e) {
     console.error('loadTasks:', e);
   }
