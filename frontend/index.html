@@ -194,124 +194,17 @@
     .calendar-banner[hidden],
     .calendar-sync-chip[hidden] { display: none !important; }
 
-    /* Upcoming events strip */
-    .upcoming-strip {
-      margin: 0 0 14px;
-      padding: 12px 14px;
-      border-radius: 16px;
-      border: 1px solid rgba(45, 212, 168, 0.2);
-      background: rgba(45, 212, 168, 0.06);
-      max-width: 100%;
-      overflow: hidden;
-    }
-
-    .upcoming-strip[hidden] { display: none !important; }
-
-    .upcoming-strip-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: #9ef0d3;
-      letter-spacing: 0.3px;
-    }
-
-    .upcoming-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-width: 100%;
-    }
-
-    .upcoming-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border);
-      cursor: pointer;
-      transition: background 0.2s;
-      max-width: 100%;
-      overflow: hidden;
-    }
-
-    .upcoming-item:hover { background: var(--surface-hover); }
-    .upcoming-item.is-overdue { border-color: rgba(255, 59, 92, 0.35); background: rgba(255, 59, 92, 0.06); }
-
-    .upcoming-time {
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-      min-width: 48px;
-      text-align: center;
-    }
-
-    .upcoming-item.is-overdue .upcoming-time { color: var(--accent); }
-
-    .upcoming-body { flex: 1; min-width: 0; overflow: hidden; }
-    .upcoming-title {
-      font-size: 0.84rem;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .upcoming-item.is-expanded .upcoming-title {
-      white-space: normal;
-      word-break: break-word;
-      overflow: visible;
-      text-overflow: unset;
-    }
-    .upcoming-countdown { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; }
-
-    .upcoming-expand-btn {
-      flex: 0 0 auto;
-      align-self: center;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-secondary);
-      border-radius: 8px;
-      width: 28px;
-      height: 28px;
-      padding: 0;
-      font-size: 0.85rem;
-      line-height: 1;
-      cursor: pointer;
-      transition: transform 0.2s, background 0.2s, color 0.2s;
-    }
-    .upcoming-expand-btn:hover { background: var(--surface-hover); color: var(--text); }
-    .upcoming-item.is-expanded .upcoming-expand-btn { transform: rotate(180deg); }
-
-    .upcoming-actions {
-      display: flex;
-      gap: 4px;
-      flex: 0 0 auto;
-    }
-
-    .upcoming-action-btn {
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-secondary);
-      border-radius: 8px;
-      padding: 4px 8px;
-      font-size: 0.68rem;
-      cursor: pointer;
-    }
-
-    .task-item.is-overdue { border-left: 3px solid var(--accent); }
-    .task-item.is-upcoming { border-left: 3px solid #2dd4a8; }
+    .task-item.is-overdue { border-color: rgba(255, 59, 92, 0.35); background: rgba(255, 59, 92, 0.06); }
+    .task-item.is-upcoming { border-color: rgba(45, 212, 168, 0.35); }
 
     .task-countdown {
       font-size: 0.72rem;
-      color: #2dd4a8;
-      font-weight: 500;
+      color: var(--text-secondary);
+      margin-top: 2px;
     }
 
     .task-item.is-overdue .task-countdown { color: var(--accent); }
+    .task-item.is-upcoming .task-countdown { color: #2dd4a8; font-weight: 500; }
 
     .calendar-badge {
       font-size: 0.65rem;
@@ -1045,14 +938,16 @@
     }
 
     .task-item {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
-      margin-bottom: 8px;
       display: flex;
-      align-items: center;
-      gap: 12px;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      max-width: 100%;
+      overflow: hidden;
       transition: background 0.2s, transform 0.2s;
       cursor: pointer;
     }
@@ -1067,53 +962,38 @@
       }
     }
 
-    .task-check {
-      width: 22px;
-      height: 22px;
-      min-width: 22px;
-      border-radius: 50%;
-      border: 1.5px solid rgba(255, 255, 255, 0.15);
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      background: transparent;
+    .task-time {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      min-width: 48px;
+      text-align: center;
+      padding-top: 2px;
     }
 
-    .task-check:hover {
-      border-color: var(--success);
-      background: var(--success-glow);
-    }
-
-    .task-check svg {
-      width: 12px;
-      height: 12px;
-      fill: none;
-      stroke: var(--success);
-      stroke-width: 2.5;
-      opacity: 0;
-      transition: opacity 0.15s;
-    }
-
-    .task-check:hover svg {
-      opacity: 1;
-    }
+    .task-item.is-overdue .task-time { color: var(--accent); }
 
     .task-body {
       flex: 1;
       min-width: 0;
+      overflow: hidden;
     }
 
-    .task-text {
-      font-size: 0.88rem;
-      font-weight: 400;
+    .task-title {
+      font-size: 0.84rem;
+      font-weight: 500;
       line-height: 1.35;
       color: var(--text);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .task-item.is-expanded .task-title {
+      white-space: normal;
+      word-break: break-word;
+      overflow: visible;
+      text-overflow: unset;
     }
 
     .task-row {
@@ -1130,11 +1010,31 @@
     .task-item.is-important {
       background: rgba(255, 59, 92, 0.08);
       border-color: rgba(255, 59, 92, 0.35);
-      box-shadow: inset 3px 0 0 var(--accent);
     }
 
     .task-item.is-important.task-neutral {
       background: rgba(255, 59, 92, 0.1);
+    }
+
+    .task-modal-btn {
+      flex: 0 0 auto;
+      align-self: center;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 8px;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .task-modal-btn:hover {
+      background: var(--surface-hover);
+      color: var(--text);
     }
 
     .priority-pill.important {
@@ -1145,24 +1045,16 @@
       font-size: 0.64rem;
     }
 
-    .task-info {
-      font-size: 0.68rem;
-      color: var(--text-secondary);
-      margin-top: 3px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
     .task-note {
-      margin-top: 7px;
+      margin-top: 6px;
       color: rgba(255, 255, 255, 0.62);
       font-size: 0.72rem;
       line-height: 1.35;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      display: none;
+    }
+
+    .task-item.is-expanded .task-note {
+      display: block;
     }
 
     .empty-state {
@@ -1315,6 +1207,10 @@
       margin-bottom: 10px;
       color: var(--text);
       text-transform: capitalize;
+    }
+
+    .calendar-day.is-today .day-header {
+      display: none;
     }
 
     .day-name {
@@ -1871,14 +1767,6 @@
         <button class="brief-dismiss" id="briefDismiss" type="button" data-i18n-aria="briefDismiss" aria-label="Скрий">✕</button>
       </div>
       <p class="brief-card-text" id="briefText"></p>
-    </section>
-
-    <section class="upcoming-strip" id="upcomingStrip" hidden>
-      <div class="upcoming-strip-header">
-        <span>⏰ <span data-i18n="upcoming">Предстоящи</span></span>
-        <span id="upcomingCount">0</span>
-      </div>
-      <div class="upcoming-list" id="upcomingList"></div>
     </section>
 
     <section class="voice-hero">
