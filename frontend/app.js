@@ -2554,12 +2554,33 @@ async function initDeviceBanner() {
   });
 }
 
+function initAccountBanner() {
+  const banner = document.getElementById('accountBanner');
+  if (!banner || !window.AIVA_ACCOUNT) return;
+
+  const update = () => {
+    const show = window.AIVA_ACCOUNT.shouldShowAccountBanner(tasks.some((task) => task.due_date || task.content));
+    banner.hidden = !show;
+  };
+
+  update();
+
+  document.getElementById('accountBannerAction')?.addEventListener('click', () => {
+    location.href = window.AIVA_ACCOUNT.getSettingsUrl('#accountSection');
+  });
+  document.getElementById('accountBannerDismiss')?.addEventListener('click', () => {
+    window.AIVA_ACCOUNT.dismissAccountBanner();
+    banner.hidden = true;
+  });
+}
+
 (async function boot() {
   await window.AIVA_ACCOUNT?.init?.();
   applyPreferences();
   syncProfileToServer();
   renderCalendar();
-  loadTasks();
+  await loadTasks();
+  initAccountBanner();
   refreshExternalEvents();
   loadDailyBrief();
   initDeviceBanner();

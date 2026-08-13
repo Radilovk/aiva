@@ -4,6 +4,8 @@
 (function () {
   const SESSION_KEY = 'aiva_session_token';
   const EMAIL_KEY = 'aiva_account_email';
+  const DISMISS_KEY = 'aiva_account_banner_dismissed_until';
+  const DISMISS_DAYS = 14;
 
   function t(key, vars) {
     return window.AIVA_I18N?.tf?.(key, vars) ?? window.AIVA_I18N?.t?.(key) ?? key;
@@ -34,8 +36,44 @@
     return localStorage.getItem(EMAIL_KEY) || '';
   }
 
+  function parseJwtPayload(token) {
+    try {
+      const part = token.split('.')[1];
+      if (!part) return null;
+      const padded = part.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
+      return JSON.parse(atob(padded + pad));
+    } catch {
+      return null;
+    }
+  }
+
+  function isTokenValidLocally(token) {
+    const payload = parseJwtPayload(token);
+    if (!payload?.user_id || !payload?.email) return false;
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return false;
+    return true;
+  }
+
   function isLoggedIn() {
-    return !!getSessionToken() && !!getAccountEmail();
+    return isTokenValidLocally(getSessionToken());
+  }
+
+  function shouldShowAccountBanner(hasTasks = false) {
+    if (isLoggedIn() || !hasTasks) return false;
+    const until = localStorage.getItem(DISMISS_KEY);
+    if (until && Date.now() < Number(until)) return false;
+    return true;
+  }
+
+  function dismissAccountBanner() {
+    localStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_DAYS * 86400000));
+  }
+
+  function applySessionPayload(payload) {
+    if (!payload?.user_id) return;
+    localStorage.setItem('aiva_user_id', payload.user_id);
+    if (payload.email) localStorage.setItem(EMAIL_KEY, payload.email);
   }
 
   async function persistAuth(data) {
@@ -43,6 +81,7 @@
     localStorage.setItem(EMAIL_KEY, data.email);
     localStorage.setItem('aiva_user_id', data.user_id);
     localStorage.removeItem('aiva_tasks_etag');
+    dismissAccountBanner();
 
     const prefs = window.Capacitor?.Plugins?.Preferences;
     if (prefs) {
@@ -157,13 +196,23 @@
 
   async function init() {
     await restoreFromPreferences();
-    const me = await fetchMe();
-    if (me?.user_id && me.user_id !== getUserId()) {
-      localStorage.setItem('aiva_user_id', me.user_id);
-      localStorage.removeItem('aiva_tasks_etag');
+
+    const token = getSessionToken();
+    if (token && isTokenValidLocally(token)) {
+      applySessionPayload(parseJwtPayload(token));
+      return parseJwtPayload(token);
     }
-    if (me?.email) localStorage.setItem(EMAIL_KEY, me.email);
-    return me;
+
+    if (token) {
+      await clearAuth();
+    }
+
+    return null;
+  }
+
+  function getSettingsUrl(hash = '') {
+    const base = window.AIVA_CONFIG?.appUrl?.('settings.html') || 'settings.html';
+    return hash ? `${base}${hash}` : base;
   }
 
   window.AIVA_ACCOUNT = {
@@ -180,5 +229,8 @@
     getSessionToken,
     getAccountEmail,
     isLoggedIn,
+    shouldShowAccountBanner,
+    dismissAccountBanner,
+    getSettingsUrl,
   };
 })();

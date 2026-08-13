@@ -46,6 +46,7 @@ import {
   restoreSubscriptionByEmail,
   verifyJwt,
   verifyLoginCode,
+  getAccountEmailByUserId,
 } from './auth';
 
 interface Env extends StripeEnv {
@@ -884,7 +885,15 @@ app.post('/api/stripe/checkout', async (c) => {
   }
   try {
     const origin = requestOrigin(new URL(c.req.url));
-    const { url } = await createCheckoutSession(c.env, body.user_id, priceId, origin, body.plan);
+    const customerEmail = await getAccountEmailByUserId(c.env.DB, body.user_id);
+    const { url } = await createCheckoutSession(
+      c.env,
+      body.user_id,
+      priceId,
+      origin,
+      body.plan,
+      customerEmail
+    );
     return c.json({ url });
   } catch (e) {
     console.error('Stripe checkout error:', e);

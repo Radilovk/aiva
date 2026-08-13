@@ -733,7 +733,6 @@
       <div id="accountLoggedIn" hidden>
         <p class="billing-usage" id="accountLoggedInText"></p>
         <div class="btn-group" style="margin-top:8px">
-          <button class="btn" type="button" id="accountRestoreBtn" data-i18n="accountRestoreBilling">Възстанови абонамент</button>
           <button class="btn danger" type="button" id="accountLogoutBtn" data-i18n="accountLogout">Изход</button>
         </div>
       </div>
@@ -1760,7 +1759,7 @@
         }
       });
 
-      document.getElementById('accountVerifyBtn')?.addEventListener('click', async () => {
+      async function submitVerify() {
         const email = emailInput?.value?.trim();
         const code = codeInput?.value?.trim();
         if (!email || !code) {
@@ -1769,34 +1768,30 @@
         }
         showStatus('');
         try {
-          await window.AIVA_ACCOUNT.verifyCode(email, code);
-          showStatus(t('accountLoginSuccess'));
-          setTimeout(() => location.reload(), 600);
+          const result = await window.AIVA_ACCOUNT.verifyCode(email, code);
+          if (result.subscription_restored) {
+            showStatus(tf('accountLoginSuccessWithSub', { tier: result.subscription_tier || 'Plus' }));
+          } else {
+            showStatus(t('accountLoginSuccess'));
+          }
+          setTimeout(() => location.reload(), 700);
         } catch (e) {
           showStatus(e.message || t('accountErrGeneric'), true);
         }
+      }
+
+      document.getElementById('accountVerifyBtn')?.addEventListener('click', submitVerify);
+      codeInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitVerify();
+      });
+      emailInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('accountSendCodeBtn')?.click();
       });
 
       document.getElementById('accountLogoutBtn')?.addEventListener('click', async () => {
         await window.AIVA_ACCOUNT.clearAuth();
         showStatus(t('accountLogoutDone'));
         renderAccountState();
-      });
-
-      document.getElementById('accountRestoreBtn')?.addEventListener('click', async () => {
-        showStatus('');
-        try {
-          const result = await window.AIVA_ACCOUNT.restoreSubscription();
-          if (result.restored) {
-            showStatus(t('accountRestoreSuccess'));
-            await window.AIVA_SUBSCRIPTION?.fetchSubscription?.(true);
-            await initBilling();
-          } else {
-            showStatus(t('accountRestoreNone'), true);
-          }
-        } catch (e) {
-          showStatus(e.message || t('accountErrGeneric'), true);
-        }
       });
     }
 
@@ -1894,6 +1889,17 @@
         if (noteEl) noteEl.textContent = t('billingSuccess');
         history.replaceState({}, '', location.pathname);
         await window.AIVA_SUBSCRIPTION.fetchSubscription(true);
+        if (!window.AIVA_ACCOUNT?.isLoggedIn?.()) {
+          const accountSection = document.getElementById('accountSection');
+          const statusEl = document.getElementById('accountStatus');
+          if (accountSection) {
+            accountSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          if (statusEl) {
+            statusEl.hidden = false;
+            statusEl.textContent = t('accountBillingHint');
+          }
+        }
       } else if (params.get('billing') === 'cancel') {
         if (noteEl) noteEl.textContent = t('billingCancel');
         history.replaceState({}, '', location.pathname);

@@ -169,6 +169,15 @@ export async function getAccountByEmail(db: D1Database, email: string): Promise<
   return row ?? null;
 }
 
+export async function getAccountEmailByUserId(db: D1Database, userId: string): Promise<string | null> {
+  await ensureAccountsSchema(db);
+  const row = await db
+    .prepare('SELECT email FROM accounts WHERE primary_user_id = ?')
+    .bind(userId)
+    .first<{ email: string }>();
+  return row?.email ?? null;
+}
+
 export async function getAccountById(db: D1Database, accountId: string): Promise<AccountRecord | null> {
   await ensureAccountsSchema(db);
   const row = await db
@@ -274,7 +283,14 @@ export async function verifyLoginCode(
   email: string,
   code: string,
   deviceUserId: string
-): Promise<{ token: string; user_id: string; email: string; account_id: string }> {
+): Promise<{
+  token: string;
+  user_id: string;
+  email: string;
+  account_id: string;
+  subscription_restored?: boolean;
+  subscription_tier?: string;
+}> {
   const normalized = normalizeEmail(email);
   const trimmedCode = String(code || '').trim();
   if (!isValidEmail(normalized) || !/^\d{6}$/.test(trimmedCode)) {
@@ -326,11 +342,14 @@ export async function verifyLoginCode(
     email: account.email,
   });
 
+  const restore = await restoreSubscriptionByEmail(env, account.email, account.primary_user_id);
+
   return {
     token,
     user_id: account.primary_user_id,
     email: account.email,
     account_id: account.id,
+    ...(restore.restored ? { subscription_restored: true, subscription_tier: restore.tier } : {}),
   };
 }
 

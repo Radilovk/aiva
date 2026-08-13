@@ -55,7 +55,8 @@ export async function createCheckoutSession(
   userId: string,
   priceId: string,
   origin: string,
-  planId?: string
+  planId?: string,
+  customerEmail?: string | null
 ): Promise<{ url: string }> {
   const successUrl = `${appOrigin(env, origin)}/settings.html?billing=success`;
   const cancelUrl = `${appOrigin(env, origin)}/settings.html?billing=cancel`;
@@ -71,6 +72,10 @@ export async function createCheckoutSession(
     allow_promotion_codes: 'true',
     billing_address_collection: 'auto',
   };
+
+  if (customerEmail) {
+    body.customer_email = customerEmail;
+  }
 
   if (!isLifetime && planId === 'plus_yearly') {
     body['subscription_data[trial_period_days]'] = 7;
