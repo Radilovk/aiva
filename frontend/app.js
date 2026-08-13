@@ -517,6 +517,9 @@ function resolveTaskPriority(args) {
 
 function sortedTasks(items) {
   return [...items].sort((a, b) => {
+    const doneA = a.done ? 1 : 0;
+    const doneB = b.done ? 1 : 0;
+    if (doneA !== doneB) return doneA - doneB;
     const dateA = a.due_date || '9999-12-31';
     const dateB = b.due_date || '9999-12-31';
     if (dateA !== dateB) return dateA.localeCompare(dateB);
@@ -871,24 +874,27 @@ function getTaskDateTime(task) {
 }
 
 function isTaskOverdue(task) {
+  if (task?.done) return false;
   const dt = getTaskDateTime(task);
   if (!dt) return false;
   return dt < new Date();
 }
 
 function getTaskCountdown(task) {
+  if (task?.done) return '';
   const dt = getTaskDateTime(task);
   if (!dt || !window.AIVA_NOTIFIER?.formatCountdown) return '';
   return window.AIVA_NOTIFIER.formatCountdown(dt.getTime() - Date.now());
 }
 
 function renderTaskCard(task, mode = 'agenda') {
+  const isDone = Boolean(task.done);
   const overdue = isTaskOverdue(task);
   const countdown = getTaskCountdown(task);
   const taskDt = getTaskDateTime(task);
   const msUntil = taskDt ? taskDt.getTime() - Date.now() : Infinity;
   const synced = window.AIVA_NATIVE_CALENDAR?.isTaskSynced?.(task.id);
-  const statusClass = overdue ? 'is-overdue' : (msUntil > 0 && msUntil <= 3600000 ? 'is-upcoming' : '');
+  const statusClass = isDone ? 'is-done' : (overdue ? 'is-overdue' : (msUntil > 0 && msUntil <= 3600000 ? 'is-upcoming' : ''));
   const important = window.AIVA_TASK_PRIORITY?.isImportant?.(task.priority);
   const importantClass = important ? ' is-important' : '';
   const priorityLabel = important ? window.AIVA_TASK_PRIORITY.label(task.priority, assistantSettings.profile?.language) : '';
@@ -896,17 +902,26 @@ function renderTaskCard(task, mode = 'agenda') {
 
   return `
     <article class="task-item task-card task-${escapeHtml(task.emotion || 'neutral')}${importantClass} ${statusClass}${isExternal ? ' external-event' : ''}" data-id="${task.id}"${isExternal ? ' data-external="true"' : ''} tabindex="0" aria-expanded="false">
-      <div class="task-time">${escapeHtml(task.due_time || '—')}</div>
+      <div class="task-time-col">
+        <div class="task-time">${escapeHtml(task.due_time || '—')}</div>
+        ${priorityLabel ? `<span class="priority-pill important">${escapeHtml(priorityLabel)}</span>` : ''}
+      </div>
       <div class="task-body">
         <div class="task-row">
           <div class="task-title">${escapeHtml(task.content)}</div>
-          ${priorityLabel ? `<span class="priority-pill important">${escapeHtml(priorityLabel)}</span>` : ''}
           ${synced ? '<span class="calendar-badge">📅</span>' : ''}
         </div>
         ${countdown ? `<div class="task-countdown">${escapeHtml(countdown)}</div>` : ''}
         ${task.notes ? `<div class="task-note">${escapeHtml(task.notes)}</div>` : ''}
       </div>
-      ${!isExternal ? `<button class="task-modal-btn" type="button" data-action="open-modal" aria-label="${escapeHtml(t('notifOpen'))}">⋯</button>` : ''}
+      ${!isExternal ? `
+        <div class="task-actions">
+          <button class="task-modal-btn" type="button" data-action="open-modal" aria-label="${escapeHtml(t('notifOpen'))}">⋯</button>
+          <button class="task-complete-btn${isDone ? ' is-checked' : ''}" type="button" data-action="toggle-done" data-id="${task.id}" aria-label="${escapeHtml(t('markComplete'))}" aria-pressed="${isDone ? 'true' : 'false'}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
+      ` : ''}
     </article>
   `;
 }
@@ -1114,7 +1129,7 @@ function renderMonthView(renderOpts = {}) {
 
 function renderCalendar(renderOpts = {}) {
   setActiveViewButton();
-  tasksCount.textContent = tasks.length;
+  tasksCount.textContent = tasks.filter((task) => !task.done).length;
 
   if (calendarView === 'day') {
     renderAgendaView([currentDate], renderOpts);
@@ -1610,7 +1625,7 @@ async function loadTasks() {
       headers['If-None-Match'] = lastEtag;
     }
 
-    const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}`, { headers });
+    const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}?include_done=1`, { headers });
     if (res.status === 304) return; // кешираните задачи са актуални
     if (!res.ok) return;
     const ct = res.headers.get('content-type');
@@ -1629,27 +1644,96 @@ async function loadTasks() {
       window.AIVA_CALENDAR_ONBOARD.checkAfterLoad(tasks);
     }
     // Re-schedule notifications when tasks are refreshed
-    if (window.AIVA_NOTIFIER && assistantSettings.notifications?.enabled) {
-      window.AIVA_NOTIFIER.scheduleAll(tasks, assistantSettings.notifications.reminderMinutes);
-    }
+    rescheduleNotifications();
   } catch (e) {
     console.error('loadTasks:', e);
   }
 }
 
-async function markDone(taskId) {
+function persistTasksCache() {
   try {
-    await fetch(`${API_BASE}/api/tasks/${taskId}/done`, {
+    localStorage.setItem(TASKS_CACHE_KEY, JSON.stringify(tasks));
+    localStorage.removeItem('aiva_tasks_etag');
+  } catch (_e) { /* best-effort */ }
+}
+
+function rescheduleNotifications() {
+  if (window.AIVA_NOTIFIER && assistantSettings.notifications?.enabled) {
+    window.AIVA_NOTIFIER.scheduleAll(
+      tasks.filter((task) => !task.done),
+      assistantSettings.notifications.reminderMinutes
+    );
+  }
+}
+
+async function markDone(taskId) {
+  const idx = tasks.findIndex((task) => String(task.id) === String(taskId));
+  const previous = idx >= 0 ? { ...tasks[idx] } : null;
+  if (idx >= 0) {
+    tasks[idx] = { ...tasks[idx], done: 1 };
+    renderCalendar();
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/tasks/${taskId}/done`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId }),
     });
+    if (!res.ok) throw new Error('markDone failed');
+    const data = await res.json();
     if (window.AIVA_CALENDAR_SYNC?.onTaskDone) {
       await window.AIVA_CALENDAR_SYNC.onTaskDone(taskId);
     }
-    await loadTasks();
+    if (data.next_task) {
+      tasks.push(data.next_task);
+    }
+    persistTasksCache();
+    renderCalendar();
+    rescheduleNotifications();
   } catch (e) {
     console.error('markDone:', e);
+    if (idx >= 0 && previous) {
+      tasks[idx] = previous;
+      renderCalendar();
+    }
+  }
+}
+
+async function markUndone(taskId) {
+  const idx = tasks.findIndex((task) => String(task.id) === String(taskId));
+  const previous = idx >= 0 ? { ...tasks[idx] } : null;
+  if (idx >= 0) {
+    tasks[idx] = { ...tasks[idx], done: 0 };
+    renderCalendar();
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, done: 0 }),
+    });
+    if (!res.ok) throw new Error('markUndone failed');
+    persistTasksCache();
+    renderCalendar();
+    rescheduleNotifications();
+  } catch (e) {
+    console.error('markUndone:', e);
+    if (idx >= 0 && previous) {
+      tasks[idx] = previous;
+      renderCalendar();
+    }
+  }
+}
+
+async function toggleTaskDone(taskId) {
+  const task = getTaskById(taskId);
+  if (!task || task.isExternal) return;
+  if (task.done) {
+    await markUndone(taskId);
+  } else {
+    await markDone(taskId);
   }
 }
 
@@ -2231,6 +2315,13 @@ todayBtn?.addEventListener('click', () => {
 addTaskBtn?.addEventListener('click', () => openTaskModal());
 
 tasksContainer?.addEventListener('click', (e) => {
+  const completeBtn = e.target.closest('[data-action="toggle-done"]');
+  if (completeBtn) {
+    e.stopPropagation();
+    toggleTaskDone(completeBtn.dataset.id);
+    return;
+  }
+
   const modalBtn = e.target.closest('[data-action="open-modal"]');
   if (modalBtn) {
     e.stopPropagation();
@@ -2264,7 +2355,7 @@ tasksContainer?.addEventListener('click', (e) => {
 
 tasksContainer?.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
-  if (e.target.closest('.task-modal-btn')) return;
+  if (e.target.closest('.task-modal-btn') || e.target.closest('.task-complete-btn')) return;
   const card = e.target.closest('.task-card');
   if (!card) return;
   e.preventDefault();
@@ -2396,10 +2487,11 @@ window.addEventListener('aiva:notification-fired', () => {
 function updateCountdownsInPlace() {
   document.querySelectorAll('.task-card').forEach((card) => {
     const task = getTaskById(card.dataset.id);
-    if (!task) return;
+    if (!task || task.done) return;
     const countdownEl = card.querySelector('.task-countdown');
     if (countdownEl) countdownEl.textContent = getTaskCountdown(task);
     card.classList.toggle('is-overdue', isTaskOverdue(task));
+    card.classList.toggle('is-done', Boolean(task.done));
   });
 }
 
