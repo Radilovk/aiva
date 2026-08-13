@@ -41,6 +41,12 @@ import {
   handleStripeWebhook,
   type StripeEnv,
 } from './stripe';
+import {
+  requestLoginCode,
+  restoreSubscriptionByEmail,
+  verifyJwt,
+  verifyLoginCode,
+} from './auth';
 
 interface Env extends StripeEnv {
   DB: D1Database;
@@ -50,6 +56,10 @@ interface Env extends StripeEnv {
   MAX_SESSIONS_PER_IP?: string;
   MAX_PREVIEWS_PER_IP?: string;
   SUBSCRIPTION_ENFORCED?: string;
+  AUTH_JWT_SECRET?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM?: string;
+  AUTH_DEV_EXPOSE_CODE?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_REDIRECT_URI?: string;
@@ -904,6 +914,82 @@ app.post('/api/stripe/webhook', async (c) => {
   } catch (e) {
     console.error('Stripe webhook error:', e);
     return c.json({ error: (e as Error).message || 'Webhook failed' }, 400);
+  }
+});
+
+// --- Account auth (email magic code) ---
+
+app.post('/api/auth/request-code', async (c) => {
+  const body = await c.req.json<{ email?: string }>().catch(() => null);
+  const email = body?.email?.trim();
+  if (!email) return c.json({ error: 'Email е задължителен', code: 'INVALID_EMAIL' }, 400);
+
+  try {
+    const result = await requestLoginCode(c.env, email);
+    return c.json({
+      success: true,
+      ...(result.dev_code ? { dev_code: result.dev_code } : {}),
+    });
+  } catch (e) {
+    const message = (e as Error).message;
+    const codes: Record<string, string> = {
+      INVALID_EMAIL: 'Невалиден email адрес',
+      RATE_LIMIT: 'Твърде много опити. Опитайте след малко.',
+      EMAIL_NOT_CONFIGURED: 'Изпращането на email не е конфигурирано',
+    };
+    return c.json({ error: codes[message] || 'Грешка при изпращане на код', code: message }, 400);
+  }
+});
+
+app.post('/api/auth/verify-code', async (c) => {
+  const body = await c.req.json<{ email?: string; code?: string; user_id?: string }>().catch(() => null);
+  const email = body?.email?.trim();
+  const code = body?.code?.trim();
+  const userId = body?.user_id?.trim() || '';
+  if (!email || !code) {
+    return c.json({ error: 'Email и код са задължителни', code: 'INVALID_INPUT' }, 400);
+  }
+
+  try {
+    const session = await verifyLoginCode(c.env, email, code, userId);
+    return c.json(session);
+  } catch (e) {
+    const message = (e as Error).message;
+    const codes: Record<string, string> = {
+      INVALID_INPUT: 'Невалидни данни',
+      CODE_EXPIRED: 'Кодът е изтекъл. Поискайте нов.',
+      CODE_INVALID: 'Грешен код',
+    };
+    return c.json({ error: codes[message] || 'Грешка при вход', code: message }, 400);
+  }
+});
+
+app.get('/api/auth/me', async (c) => {
+  const auth = c.req.header('authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!token) return c.json({ error: 'Липсва сесия' }, 401);
+
+  const session = await verifyJwt(c.env, token);
+  if (!session) return c.json({ error: 'Невалидна или изтекла сесия' }, 401);
+  return c.json(session);
+});
+
+app.post('/api/auth/restore-subscription', async (c) => {
+  const body = await c.req.json<{ email?: string; user_id?: string }>().catch(() => null);
+  const email = body?.email?.trim();
+  const userId = body?.user_id?.trim();
+  if (!email || !userId) {
+    return c.json({ error: 'Email и user_id са задължителни' }, 400);
+  }
+
+  try {
+    const result = await restoreSubscriptionByEmail(c.env, email, userId);
+    if (!result.restored) {
+      return c.json({ restored: false, message: 'Не е намерен активен абонамент за този email' });
+    }
+    return c.json({ restored: true, tier: result.tier });
+  } catch (e) {
+    return c.json({ error: (e as Error).message || 'Грешка при възстановяване' }, 400);
   }
 });
 

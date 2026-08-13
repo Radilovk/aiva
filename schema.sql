@@ -26,6 +26,16 @@ CREATE TABLE users (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS accounts (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  primary_user_id TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  verified_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts (primary_user_id);
+
 CREATE TABLE IF NOT EXISTS calendar_connections (
   user_id TEXT NOT NULL,
   provider TEXT NOT NULL,

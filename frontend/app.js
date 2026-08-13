@@ -31,8 +31,6 @@ function getUserId() {
   return id;
 }
 
-const userId = getUserId();
-
 // --- DOM ---
 const recordBtn = document.getElementById('recordBtn');
 const statusEl = document.getElementById('status');
@@ -531,12 +529,12 @@ function sortedTasks(items) {
 }
 
 function syncProfileToServer() {
-  if (!API_BASE || !userId) return;
+  if (!API_BASE || !getUserId()) return;
   const lang = assistantSettings.profile?.language || 'bg';
   fetch(`${API_BASE}/api/profile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, language: lang }),
+    body: JSON.stringify({ user_id: getUserId(), language: lang }),
   }).catch(() => {});
 }
 
@@ -1208,7 +1206,7 @@ async function resolveTaskId(args) {
 
     try {
       const res = await fetch(
-        `${API_BASE}/api/tasks/${encodeURIComponent(userId)}/search?q=${encodeURIComponent(args.search_text)}`
+        `${API_BASE}/api/tasks/${encodeURIComponent(getUserId())}/search?q=${encodeURIComponent(args.search_text)}`
       );
       if (res.ok) {
         const data = await parseJsonResponse(res, 'Грешка при търсене на задача');
@@ -1474,7 +1472,7 @@ async function handleVoiceEditTask(args) {
   const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, ...updates }),
+    body: JSON.stringify({ user_id: getUserId(), ...updates }),
   });
   const data = await res.json();
   if (!res.ok) return { error: data.error || 'Грешка при редакция' };
@@ -1571,7 +1569,7 @@ async function handleVoiceDiscussTask(args) {
     await fetch(`${API_BASE}/api/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, notes: newNotes }),
+      body: JSON.stringify({ user_id: getUserId(), notes: newNotes }),
     });
     await loadTasks();
     return { success: true, message: 'Съветът е добавен като бележка към задачата.' };
@@ -1625,7 +1623,7 @@ async function loadTasks() {
       headers['If-None-Match'] = lastEtag;
     }
 
-    const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(userId)}?include_done=1`, { headers });
+    const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(getUserId())}?include_done=1`, { headers });
     if (res.status === 304) return; // кешираните задачи са актуални
     if (!res.ok) return;
     const ct = res.headers.get('content-type');
@@ -1678,7 +1676,7 @@ async function markDone(taskId) {
     const res = await fetch(`${API_BASE}/api/tasks/${taskId}/done`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify({ user_id: getUserId() }),
     });
     if (!res.ok) throw new Error('markDone failed');
     const data = await res.json();
@@ -1712,7 +1710,7 @@ async function markUndone(taskId) {
     const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, done: 0 }),
+      body: JSON.stringify({ user_id: getUserId(), done: 0 }),
     });
     if (!res.ok) throw new Error('markUndone failed');
     persistTasksCache();
@@ -1750,7 +1748,7 @@ async function persistTask(args) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      user_id: userId,
+      user_id: getUserId(),
       task: args.task,
       emotion: args.emotion || defaults.emotion,
       priority: resolveTaskPriority(args),
@@ -1780,7 +1778,7 @@ async function saveTaskFromForm() {
   const formData = new FormData(taskForm);
   const id = formData.get('id');
   const payload = {
-    user_id: userId,
+    user_id: getUserId(),
     content: String(formData.get('content') || '').trim(),
     emotion: formData.get('emotion') || 'neutral',
     priority: formData.get('important') === 'on' ? 1 : 0,
@@ -1821,7 +1819,7 @@ async function removeTask(taskId) {
   const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify({ user_id: getUserId() }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || t('errDelete'));
@@ -1859,7 +1857,7 @@ async function duplicateTaskToRows(taskId) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        user_id: userId,
+        user_id: getUserId(),
         due_date: row.due_date,
         due_time: row.due_time,
         repeat_rule: taskForm.elements.repeat_rule.value || null,
@@ -2110,7 +2108,7 @@ async function fetchToken() {
   const res = await fetch(`${API_BASE}/api/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify({ user_id: getUserId() }),
   });
   const data = await parseJsonResponse(res, 'Грешка при заявка за токен');
   if (!res.ok) {
@@ -2509,7 +2507,7 @@ const briefDismissBtn = document.getElementById('briefDismiss');
 async function loadDailyBrief() {
   if (!briefCard || !briefText) return;
   try {
-    const res = await fetch(`${API_BASE}/api/brief/${encodeURIComponent(userId)}`);
+    const res = await fetch(`${API_BASE}/api/brief/${encodeURIComponent(getUserId())}`);
     if (!res.ok) return;
     const data = await res.json();
     if (data.locked) return;
@@ -2556,13 +2554,16 @@ async function initDeviceBanner() {
   });
 }
 
-applyPreferences();
-syncProfileToServer();
-renderCalendar();
-loadTasks();
-refreshExternalEvents();
-loadDailyBrief();
-initDeviceBanner();
+(async function boot() {
+  await window.AIVA_ACCOUNT?.init?.();
+  applyPreferences();
+  syncProfileToServer();
+  renderCalendar();
+  loadTasks();
+  refreshExternalEvents();
+  loadDailyBrief();
+  initDeviceBanner();
+})();
 
 function tryShowDeviceBrief() {
   if (!window.AIVA_DEVICE_BRIEF?.shouldShow?.()) return;
