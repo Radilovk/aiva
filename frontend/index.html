@@ -1030,11 +1030,19 @@
       background: rgba(255, 59, 92, 0.1);
     }
 
-    .task-modal-btn {
+    .task-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       flex: 0 0 auto;
       align-self: center;
+      margin-left: 2px;
+    }
+
+    .task-modal-btn {
+      flex: 0 0 auto;
       border: 1px solid var(--border);
-      background: transparent;
+      background: rgba(255, 255, 255, 0.02);
       color: var(--text-secondary);
       border-radius: 8px;
       width: 28px;
@@ -1043,28 +1051,21 @@
       font-size: 1rem;
       line-height: 1;
       cursor: pointer;
-      transition: background 0.2s, color 0.2s;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
     }
 
     .task-modal-btn:hover {
       background: var(--surface-hover);
       color: var(--text);
-    }
-
-    .task-actions {
-      display: flex;
-      gap: 4px;
-      flex: 0 0 auto;
-      align-self: center;
+      border-color: rgba(255, 255, 255, 0.18);
     }
 
     .task-complete-btn {
       flex: 0 0 auto;
-      align-self: center;
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
-      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      border: 2px solid rgba(255, 255, 255, 0.18);
       background: transparent;
       color: var(--text-secondary);
       padding: 0;
@@ -1072,32 +1073,48 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: border-color 0.2s, background 0.2s;
+      transition: border-color 0.2s, background 0.2s, transform 0.15s, box-shadow 0.2s;
     }
 
     .task-complete-btn:hover {
-      border-color: var(--success);
-      background: var(--success-glow);
+      border-color: rgba(45, 212, 168, 0.75);
+      background: rgba(45, 212, 168, 0.1);
+      box-shadow: 0 0 0 3px rgba(45, 212, 168, 0.08);
+    }
+
+    .task-complete-btn:active {
+      transform: scale(0.94);
     }
 
     .task-complete-btn svg {
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       fill: none;
-      stroke: var(--success);
-      stroke-width: 2.5;
+      stroke: #0f1f1a;
+      stroke-width: 2.8;
       opacity: 0;
       transition: opacity 0.15s;
     }
 
-    .task-complete-btn:hover svg,
-    .task-complete-btn.is-checked svg {
-      opacity: 1;
+    .task-complete-btn:hover svg {
+      opacity: 0.55;
+      stroke: #2dd4a8;
     }
 
     .task-complete-btn.is-checked {
-      border-color: var(--success);
-      background: var(--success-glow);
+      border-color: #2dd4a8;
+      background: #2dd4a8;
+      box-shadow: 0 0 0 3px rgba(45, 212, 168, 0.14);
+    }
+
+    .task-complete-btn.is-checked svg {
+      opacity: 1;
+      stroke: #0f1f1a;
+    }
+
+    .task-complete-btn.is-checked:hover {
+      background: #26c095;
+      border-color: #26c095;
     }
 
     .task-item.is-done {

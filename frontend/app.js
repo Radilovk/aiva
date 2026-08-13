@@ -916,10 +916,10 @@ function renderTaskCard(task, mode = 'agenda') {
       </div>
       ${!isExternal ? `
         <div class="task-actions">
-          <button class="task-complete-btn${isDone ? ' is-checked' : ''}" type="button" data-action="toggle-done" data-id="${task.id}" aria-label="${escapeHtml(t('markComplete'))}" aria-pressed="${isDone ? 'true' : 'false'}">
-            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-          </button>
           <button class="task-modal-btn" type="button" data-action="open-modal" aria-label="${escapeHtml(t('notifOpen'))}">⋯</button>
+          <button class="task-complete-btn${isDone ? ' is-checked' : ''}" type="button" data-action="toggle-done" data-id="${task.id}" aria-label="${escapeHtml(t('markComplete'))}" aria-pressed="${isDone ? 'true' : 'false'}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
         </div>
       ` : ''}
     </article>
