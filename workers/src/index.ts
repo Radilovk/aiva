@@ -6,6 +6,7 @@ import {
   deleteTask,
   duplicateTask,
   getIncompleteTasks,
+  getUserTasks,
   getTaskById,
   markTaskDone,
   registerUser,
@@ -128,8 +129,11 @@ app.use(
 
 app.get('/api/tasks/:user_id', async (c) => {
   const userId = c.req.param('user_id');
+  const includeDone = c.req.query('include_done') === '1';
   try {
-    const tasks = await getIncompleteTasks(c.env.DB, userId);
+    const tasks = includeDone
+      ? await getUserTasks(c.env.DB, userId, true)
+      : await getIncompleteTasks(c.env.DB, userId);
     // ETag от съдържанието: при непроменен списък клиентът получава празен
     // 304 вместо целия JSON — нулев трансфер при всяко "нищо ново" опресняване.
     const etag = `"${await sha256Hex(JSON.stringify(tasks))}"`;

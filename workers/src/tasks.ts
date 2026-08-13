@@ -115,13 +115,18 @@ export async function createTask(db: D1Database, input: TaskInput): Promise<Task
 }
 
 export async function getIncompleteTasks(db: D1Database, userId: string): Promise<Task[]> {
+  return getUserTasks(db, userId, false);
+}
+
+export async function getUserTasks(db: D1Database, userId: string, includeDone = false): Promise<Task[]> {
   await ensureTaskSchema(db);
 
   const { results } = await db
     .prepare(
       `SELECT * FROM tasks
-       WHERE user_id = ? AND done = 0
-       ORDER BY COALESCE(due_date, '9999-12-31') ASC,
+       WHERE user_id = ?${includeDone ? '' : ' AND done = 0'}
+       ORDER BY done ASC,
+                COALESCE(due_date, '9999-12-31') ASC,
                 COALESCE(due_time, '99:99') ASC,
                 priority DESC,
                 created_at DESC`
