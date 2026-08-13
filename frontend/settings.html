@@ -707,6 +707,37 @@
       </div>
     </div>
 
+    <!-- Account -->
+    <div class="section" id="accountSection">
+      <div class="section-title" data-i18n="accountTitle" data-i18n-prefix="👤 ">Акаунт</div>
+      <p class="field-hint" data-i18n="accountSubtitle">Запазете задачите и абонамента на всички устройства с email.</p>
+
+      <div id="accountLoggedOut">
+        <div class="field">
+          <span class="field-label" data-i18n="accountEmailLabel">Email</span>
+          <input type="email" id="accountEmail" inputmode="email" autocomplete="email" placeholder="you@example.com">
+        </div>
+        <div class="btn-group" style="margin-top:8px">
+          <button class="btn primary" type="button" id="accountSendCodeBtn" data-i18n="accountSendCode">Изпрати код</button>
+        </div>
+        <div class="field account-code-step" id="accountCodeStep" hidden>
+          <span class="field-label" data-i18n="accountCodeLabel">6-цифрен код</span>
+          <input type="text" id="accountCode" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code">
+        </div>
+        <div class="btn-group account-code-step" id="accountVerifyGroup" hidden style="margin-top:8px">
+          <button class="btn primary" type="button" id="accountVerifyBtn" data-i18n="accountVerify">Вход</button>
+        </div>
+        <p class="billing-note" id="accountStatus" hidden></p>
+      </div>
+
+      <div id="accountLoggedIn" hidden>
+        <p class="billing-usage" id="accountLoggedInText"></p>
+        <div class="btn-group" style="margin-top:8px">
+          <button class="btn danger" type="button" id="accountLogoutBtn" data-i18n="accountLogout">Изход</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Subscription / Billing -->
     <div class="section" id="billingSection">
       <div class="section-title" data-i18n="billingTitle" data-i18n-prefix="⭐ ">Абонамент</div>
@@ -787,6 +818,8 @@
   <script src="lib/i18n.js"></script>
   <script src="lib/i18n-extended.js"></script>
   <script src="lib/i18n-billing.js"></script>
+  <script src="lib/i18n-account.js"></script>
+  <script src="lib/account.js"></script>
   <script src="lib/subscription.js"></script>
   <script src="lib/voices.js"></script>
   <script src="lib/geminilive.js"></script>
@@ -1668,6 +1701,100 @@
       });
     }
 
+    async function initAccount() {
+      const section = document.getElementById('accountSection');
+      if (!section || !window.AIVA_ACCOUNT) return;
+
+      const loggedOut = document.getElementById('accountLoggedOut');
+      const loggedIn = document.getElementById('accountLoggedIn');
+      const statusEl = document.getElementById('accountStatus');
+      const emailInput = document.getElementById('accountEmail');
+      const codeInput = document.getElementById('accountCode');
+      const codeStep = document.getElementById('accountCodeStep');
+      const verifyGroup = document.getElementById('accountVerifyGroup');
+      const loggedInText = document.getElementById('accountLoggedInText');
+
+      function showStatus(msg, isError = false) {
+        if (!statusEl) return;
+        statusEl.hidden = !msg;
+        statusEl.textContent = msg || '';
+        statusEl.style.color = isError ? '#ff8aa0' : '';
+      }
+
+      function renderAccountState() {
+        const email = window.AIVA_ACCOUNT.getAccountEmail();
+        const signedIn = window.AIVA_ACCOUNT.isLoggedIn();
+        if (signedIn && email) {
+          loggedOut.hidden = true;
+          loggedIn.hidden = false;
+          if (loggedInText) loggedInText.textContent = tf('accountLoggedInAs', { email });
+        } else {
+          loggedOut.hidden = false;
+          loggedIn.hidden = true;
+        }
+      }
+
+      await window.AIVA_ACCOUNT.init();
+      renderAccountState();
+
+      document.getElementById('accountSendCodeBtn')?.addEventListener('click', async () => {
+        const email = emailInput?.value?.trim();
+        if (!email) {
+          showStatus(t('accountErrInvalidEmail'), true);
+          return;
+        }
+        showStatus('');
+        try {
+          const result = await window.AIVA_ACCOUNT.requestCode(email);
+          codeStep.hidden = false;
+          verifyGroup.hidden = false;
+          codeInput?.focus();
+          if (result.dev_code) {
+            showStatus(tf('accountDevCode', { code: result.dev_code }));
+          } else {
+            showStatus(t('accountCodeSent'));
+          }
+        } catch (e) {
+          showStatus(e.message || t('accountErrGeneric'), true);
+        }
+      });
+
+      async function submitVerify() {
+        const email = emailInput?.value?.trim();
+        const code = codeInput?.value?.trim();
+        if (!email || !code) {
+          showStatus(t('accountErrGeneric'), true);
+          return;
+        }
+        showStatus('');
+        try {
+          const result = await window.AIVA_ACCOUNT.verifyCode(email, code);
+          if (result.subscription_restored) {
+            showStatus(tf('accountLoginSuccessWithSub', { tier: result.subscription_tier || 'Plus' }));
+          } else {
+            showStatus(t('accountLoginSuccess'));
+          }
+          setTimeout(() => location.reload(), 700);
+        } catch (e) {
+          showStatus(e.message || t('accountErrGeneric'), true);
+        }
+      }
+
+      document.getElementById('accountVerifyBtn')?.addEventListener('click', submitVerify);
+      codeInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitVerify();
+      });
+      emailInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('accountSendCodeBtn')?.click();
+      });
+
+      document.getElementById('accountLogoutBtn')?.addEventListener('click', async () => {
+        await window.AIVA_ACCOUNT.clearAuth();
+        showStatus(t('accountLogoutDone'));
+        renderAccountState();
+      });
+    }
+
     async function initBilling() {
       const usageEl = document.getElementById('billingUsage');
       const grid = document.getElementById('billingPlanGrid');
@@ -1762,6 +1889,17 @@
         if (noteEl) noteEl.textContent = t('billingSuccess');
         history.replaceState({}, '', location.pathname);
         await window.AIVA_SUBSCRIPTION.fetchSubscription(true);
+        if (!window.AIVA_ACCOUNT?.isLoggedIn?.()) {
+          const accountSection = document.getElementById('accountSection');
+          const statusEl = document.getElementById('accountStatus');
+          if (accountSection) {
+            accountSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          if (statusEl) {
+            statusEl.hidden = false;
+            statusEl.textContent = t('accountBillingHint');
+          }
+        }
       } else if (params.get('billing') === 'cancel') {
         if (noteEl) noteEl.textContent = t('billingCancel');
         history.replaceState({}, '', location.pathname);
@@ -1781,6 +1919,7 @@
       populateUI();
       await refreshMemoryFieldFromCloud();
       await syncPermissionTogglesOnLoad();
+      await initAccount();
       await initBilling();
       document.getElementById('paywallDismissBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.hidePaywall?.());
       document.getElementById('paywallMonthlyBtn')?.addEventListener('click', () => window.AIVA_SUBSCRIPTION?.openCheckout?.('plus_monthly'));
