@@ -161,11 +161,21 @@
   async function previewVoice(opts) {
     await stopPreview();
     previewAborted = false;
+    let voiceSessionHeld = false;
     try {
-      await previewViaRest(opts);
-    } catch (restErr) {
-      console.warn('REST voice preview failed, falling back to Live:', restErr);
-      await previewViaLive(opts);
+      await window.AIVA_DEVICE_CONTEXT?.ensureMediaVolumeKeys?.();
+      await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(true);
+      voiceSessionHeld = true;
+      try {
+        await previewViaRest(opts);
+      } catch (restErr) {
+        console.warn('REST voice preview failed, falling back to Live:', restErr);
+        await previewViaLive(opts);
+      }
+    } finally {
+      if (voiceSessionHeld) {
+        await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(false);
+      }
     }
   }
 

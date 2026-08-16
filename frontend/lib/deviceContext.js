@@ -109,6 +109,16 @@
     });
   }
 
+  async function ensureMediaVolumeKeys() {
+    const plugin = getPlugin();
+    if (!plugin?.ensureMediaVolumeKeys) return { ok: false };
+    try {
+      return await plugin.ensureMediaVolumeKeys();
+    } catch (_e) {
+      return { ok: false };
+    }
+  }
+
   async function setVoiceSessionActive(active) {
     const plugin = getPlugin();
     if (!plugin?.setVoiceSessionActive) return { ok: false };
@@ -124,6 +134,7 @@
     readCache,
     formatForPrompt,
     ensureMemorySeed,
+    ensureMediaVolumeKeys,
     setVoiceSessionActive,
   };
 })();

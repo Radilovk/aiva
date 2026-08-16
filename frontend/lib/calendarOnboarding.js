@@ -190,7 +190,7 @@
       provider: 'native',
       setupComplete: true,
       preferredProvider: 'android-native',
-      autoExportOnSave: true,
+      autoExportOnSave: false,
     });
 
     await enableNotifications();
@@ -213,7 +213,7 @@
     saveCalendarSettings({
       provider: 'manual',
       setupComplete: true,
-      autoExportOnSave: true,
+      autoExportOnSave: false,
     });
 
     await enableNotifications();

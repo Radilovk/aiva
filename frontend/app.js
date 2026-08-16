@@ -618,13 +618,24 @@ function clearGreetingMicTimer() {
   }
 }
 
-async function ensureMicStreaming() {
-  if (!client || audioStreamer?.isStreaming) return;
-  if (!audioStreamer) audioStreamer = new AudioStreamer(client);
+async function ensureVoiceAudioSession() {
+  await window.AIVA_DEVICE_CONTEXT?.ensureMediaVolumeKeys?.();
   if (!voiceSessionNativeActive) {
     await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(true);
     voiceSessionNativeActive = true;
   }
+}
+
+async function releaseVoiceAudioSession() {
+  if (!voiceSessionNativeActive) return;
+  await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(false);
+  voiceSessionNativeActive = false;
+}
+
+async function ensureMicStreaming() {
+  if (!client || audioStreamer?.isStreaming) return;
+  if (!audioStreamer) audioStreamer = new AudioStreamer(client);
+  await ensureVoiceAudioSession();
   await audioStreamer.start();
 }
 
@@ -2223,6 +2234,9 @@ async function connectSession() {
       await audioPlayer.audioContext.resume().catch(() => {});
     }
 
+    // Bind hardware volume to media stream before greeting audio plays.
+    await ensureVoiceAudioSession();
+
     client.connect();
   } catch (e) {
     console.error('connectSession:', e);
@@ -2253,10 +2267,7 @@ async function disconnectSession(options = {}) {
       await waitForFarewellPlaybackIdle(2500);
     }
     audioPlayer?.interrupt?.();
-    if (voiceSessionNativeActive) {
-      await window.AIVA_DEVICE_CONTEXT?.setVoiceSessionActive?.(false);
-      voiceSessionNativeActive = false;
-    }
+    await releaseVoiceAudioSession();
     if (audioStreamer) {
       audioStreamer.stop();
       audioStreamer = null;
@@ -2610,7 +2621,7 @@ function initPaywallUi() {
 
 function initHardwareShortcut() {
   if (!window.AIVA_SHORTCUT?.isAndroid?.()) return;
-  const cfg = assistantSettings.hardwareShortcut || { enabled: true };
+  const cfg = assistantSettings.hardwareShortcut || { enabled: false };
   window.AIVA_SHORTCUT.applyShortcutConfig(cfg);
   window.AIVA_SHORTCUT.onShortcutTriggered(tryAutoStartListening);
   window.AIVA_SHORTCUT.consumePendingLaunch().then((pending) => {
@@ -2661,6 +2672,7 @@ if ('serviceWorker' in navigator) {
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
+  window.AIVA_DEVICE_CONTEXT?.ensureMediaVolumeKeys?.();
   if (audioPlayer?.audioContext?.state === 'suspended') {
     audioPlayer.audioContext.resume().catch(() => {});
   }
@@ -2668,6 +2680,10 @@ document.addEventListener('visibilitychange', () => {
     audioStreamer.audioContext.resume().catch(() => {});
   }
 });
+
+if (window.Capacitor?.getPlatform?.() === 'android') {
+  window.AIVA_DEVICE_CONTEXT?.ensureMediaVolumeKeys?.();
+}
 
 window.AIVA_DEVICE_CONTEXT?.collect?.().catch(() => {});
 window.AIVA_MEMORY?.syncInBackground?.();

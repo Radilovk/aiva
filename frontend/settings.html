@@ -494,10 +494,7 @@
         </div>
 
         <div class="field" id="manualSection" style="display:none">
-          <div class="toggle-row">
-            <span class="toggle-label" data-i18n="offerCalOnNew">Предлагай календар при нова задача</span>
-            <div class="toggle" id="toggleAutoExport"></div>
-          </div>
+          <p class="sync-note" data-i18n="manualCalHint">За всяка задача използвайте бутона „Календар“ в модала — без автоматично изтегляне на файлове.</p>
         </div>
 
         <details class="cal-cloud-panel" id="cloudPlusPanel">
@@ -933,7 +930,6 @@
       const provider = settings.calendarSync?.provider || 'none';
       const normalizedProvider = provider === 'ics' ? 'subscribe' : provider === 'device' ? 'manual' : provider;
       document.getElementById('calendarProvider').value = normalizedProvider;
-      setToggle('toggleAutoExport', settings.calendarSync?.autoExportOnSave);
       updateCalendarSyncUI();
 
       // Voice
@@ -1364,7 +1360,7 @@
         calendarSync: {
           provider: isAndroidPlatform ? 'native' : document.getElementById('calendarProvider').value,
           setupComplete: isAndroidPlatform ? !!calendarCrud?.getSelectedCalendarId?.() : document.getElementById('calendarProvider').value !== 'none',
-          autoExportOnSave: getToggle('toggleAutoExport'),
+          autoExportOnSave: false,
           preferredProvider: settings.calendarSync?.preferredProvider || null,
           subscribedAt: (!isAndroidPlatform && document.getElementById('calendarProvider').value === 'subscribe')
             ? (settings.calendarSync?.subscribedAt || new Date().toISOString())

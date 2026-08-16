@@ -102,6 +102,14 @@ public class AivaVolumeKeyHandler {
      * presses pass through and volume control keeps working.
      */
     public boolean handleKeyEvent(Context context, int keyCode, KeyEvent event) {
+        return handleKeyEvent(context, keyCode, event, true);
+    }
+
+    /**
+     * @param allowSequenceFallback when false (app in foreground), only the
+     *        simultaneous chord triggers — normal volume up/down is never eaten.
+     */
+    public boolean handleKeyEvent(Context context, int keyCode, KeyEvent event, boolean allowSequenceFallback) {
         reloadFromPrefs(context);
         if (!enabled || event == null) {
             return false;
@@ -152,7 +160,11 @@ public class AivaVolumeKeyHandler {
             return true; // consume the completing press
         }
 
-        // Sequence fallback: +, −, +, − within a short window per press.
+        if (!allowSequenceFallback) {
+            return false;
+        }
+
+        // Sequence fallback (background / accessibility only): +, −, +, −.
         if (now - lastSeqPressTime > SEQ_WINDOW_MS) {
             seqIndex = 0;
         }
