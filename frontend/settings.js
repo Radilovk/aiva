@@ -192,6 +192,7 @@
     if (merged.calendarSync.provider !== 'none' && !merged.calendarSync.setupComplete) {
       merged.calendarSync.setupComplete = true;
     }
+    merged.calendarSync.autoExportOnSave = false;
     return merged;
   }
 

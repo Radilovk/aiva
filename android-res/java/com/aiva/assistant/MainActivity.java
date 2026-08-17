@@ -47,6 +47,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        // Re-bind hardware volume keys to media stream after task switch / overlay.
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
         applyDarkSystemBars();
         if (pendingListenStart) {
             pendingListenStart = false;
@@ -153,7 +155,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (AivaVolumeKeyHandler.getInstance().handleKeyEvent(this, event.getKeyCode(), event)) {
+        // In foreground, only the simultaneous +/− chord is a shortcut — never
+        // the + − + − sequence, which steals normal volume-key presses.
+        if (AivaVolumeKeyHandler.getInstance().handleKeyEvent(this, event.getKeyCode(), event, false)) {
             return true;
         }
         return super.dispatchKeyEvent(event);

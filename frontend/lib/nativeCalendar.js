@@ -4,7 +4,7 @@
  * Strategy:
  *   Android APK  → AivaCalendar Capacitor plugin (CalendarContract) when available
  *   iOS / mobile → ICS share sheet + webcal subscribe
- *   Web          → Google Calendar deep link + ICS download
+ *   Web          → Google Calendar deep link + ICS share sheet (no auto-download)
  */
 (function () {
   const SYNC_MAP_KEY = 'aiva_native_calendar_map';
@@ -195,13 +195,15 @@
       }
     }
 
-    // Web fallback: Google Calendar deep link
+    // Web fallback: Google Calendar deep link (never silent .ics download)
     if (options.allowGoogle !== false) {
       return { method: 'google', platform, result: await openGoogleCalendar(task) };
     }
 
-    const result = await shareICS(task);
-    return { method: 'ics-download', platform, result };
+    throw new Error(
+      window.AIVA_I18N?.t?.('errShareUnavailable')
+        || 'Споделянето не е налично на това устройство.'
+    );
   }
 
   async function syncTaskToDevice(task) {

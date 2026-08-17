@@ -5,7 +5,7 @@
  * Strategy:
  *   1. Build ICS with Europe/Sofia timezone + configurable reminders.
  *   2. On mobile → Web Share API hands .ics to OS calendar picker.
- *   3. On web → download .ics or Google Calendar deep link.
+ *   3. On web → Web Share API or Google Calendar deep link (no silent download).
  */
 (function () {
   function getReminderOptions() {
@@ -29,23 +29,19 @@
 
     try {
       const file = new File([blob], fileName, { type: 'text/calendar' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: task.content || 'KASY задача' });
         return 'shared';
       }
     } catch (e) {
       if (e && e.name === 'AbortError') return 'aborted';
+      throw e;
     }
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    return 'downloaded';
+    throw new Error(
+      window.AIVA_I18N?.t?.('errShareUnavailable')
+        || 'Споделянето не е налично. Използвайте „Добави в Google Calendar“ или ICS абонамент.'
+    );
   }
 
   async function addToDevice(task, options = {}) {

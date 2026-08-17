@@ -257,6 +257,24 @@ public class AivaDevicePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void ensureMediaVolumeKeys(PluginCall call) {
+        JSObject result = new JSObject();
+        try {
+            android.app.Activity activity = getActivity();
+            if (activity != null) {
+                activity.setVolumeControlStream(AudioManager.STREAM_MUSIC);
+                result.put("ok", true);
+            } else {
+                result.put("ok", false);
+            }
+        } catch (Exception e) {
+            result.put("ok", false);
+            result.put("error", e.getMessage());
+        }
+        call.resolve(result);
+    }
+
+    @PluginMethod
     public void setVoiceSessionActive(PluginCall call) {
         boolean active = call.getBoolean("active", false);
         JSObject result = new JSObject();

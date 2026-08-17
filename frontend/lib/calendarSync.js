@@ -80,20 +80,15 @@
     const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
     const file = new File([blob], fileName, { type: 'text/calendar' });
 
-    if (navigator.canShare?.({ files: [file] })) {
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: title || 'KASY задачи' });
       return 'shared';
     }
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    return 'downloaded';
+    throw new Error(
+      window.AIVA_I18N?.t?.('errShareUnavailable')
+        || 'Споделянето не е налично. Използвайте „Добави в Google Calendar“ или ICS абонамент.'
+    );
   }
 
   async function exportAllToDevice(tasks) {
@@ -147,15 +142,6 @@
         return { action: 'native', ...result };
       } catch (e) {
         if (e?.name !== 'AbortError') console.warn('Native calendar sync:', e);
-      }
-    }
-
-    if (isManualMode() && getSyncSettings().autoExportOnSave && window.AIVA_NATIVE_CALENDAR) {
-      try {
-        const result = await window.AIVA_NATIVE_CALENDAR.addToDeviceCalendar(task);
-        if (result?.method !== 'aborted') return { action: 'shared', ...result };
-      } catch (e) {
-        if (e?.name !== 'AbortError') console.warn('Manual calendar export:', e);
       }
     }
 
