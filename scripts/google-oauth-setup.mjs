@@ -38,9 +38,10 @@ APP_URL: ${appUrl}
    • Testing: add Test users OR submit for verification (production)
 
 2) Credentials → OAuth client ID → Web application
-   Authorized redirect URIs (exact match):
+   Authorized redirect URIs (exact match — add BOTH):
 
      ${redirectUri}
+     ${appUrl}/settings
 
 3) Cloudflare secrets:
 

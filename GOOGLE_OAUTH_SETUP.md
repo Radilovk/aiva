@@ -31,10 +31,11 @@ node scripts/google-oauth-setup.mjs
 
 4. **Credentials → Create credentials → OAuth client ID**
    - Type: **Web application**
-   - **Authorized redirect URIs** (задължително, точно съвпадение):
+   - **Authorized redirect URIs** (add **both** — Cloudflare may canonicalize `.html` to `/settings`):
 
 ```
-https://ТВОЯТ-WORKER.workers.dev/settings.html
+https://aiva.radilov-k.workers.dev/settings.html
+https://aiva.radilov-k.workers.dev/settings
 ```
 
 Ако ползваш custom домейн, добави и него, напр. `https://kasy.app/settings.html`.
