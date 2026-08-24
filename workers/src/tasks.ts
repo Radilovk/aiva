@@ -370,16 +370,6 @@ export async function countIncompleteTasks(db: D1Database, userId: string): Prom
   return Number(row?.c ?? 0);
 }
 
-export async function registerUser(db: D1Database, userId: string, appToken: string): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO users (id, app_token) VALUES (?, ?)
-       ON CONFLICT(id) DO UPDATE SET app_token = excluded.app_token`
-    )
-    .bind(userId, appToken)
-    .run();
-}
-
 export async function searchTasks(db: D1Database, userId: string, query: string): Promise<Task[]> {
   await ensureTaskSchema(db);
 

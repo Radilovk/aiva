@@ -1677,6 +1677,22 @@ function rescheduleNotifications() {
   }
 }
 
+/**
+ * Довършва „Готово ✓“ от нотификация, натисната при затворено приложение.
+ * Service Worker няма достъп до токена, затова само отваря приложението с ?done=<id>.
+ */
+async function completePendingDoneFromNotification() {
+  const pending = new URLSearchParams(location.search).get('done');
+  if (!pending) return;
+
+  // Адресът се изчиства веднага, за да не се повтори при презареждане.
+  const url = new URL(location.href);
+  url.searchParams.delete('done');
+  history.replaceState(null, '', url);
+
+  await markDone(pending);
+}
+
 async function markDone(taskId) {
   const idx = tasks.findIndex((task) => String(task.id) === String(taskId));
   const previous = idx >= 0 ? { ...tasks[idx] } : null;
@@ -1689,7 +1705,6 @@ async function markDone(taskId) {
     const res = await fetch(`${API_BASE}/api/tasks/${taskId}/done`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId }),
     });
     if (!res.ok) throw new Error('markDone failed');
     const data = await res.json();
@@ -2570,7 +2585,7 @@ async function initDeviceBanner() {
 applyPreferences();
 syncProfileToServer();
 renderCalendar();
-loadTasks();
+loadTasks().then(completePendingDoneFromNotification);
 refreshExternalEvents();
 loadDailyBrief();
 initDeviceBanner();
@@ -2660,6 +2675,11 @@ if (window.AIVA_NOTIFIER) {
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', async (event) => {
+    // Нотификацията „Готово ✓“ идва тук, защото Service Worker няма достъп до токена.
+    if (event.data?.type === 'aiva:done' && event.data.taskId) {
+      await markDone(event.data.taskId);
+      return;
+    }
     if (event.data?.type === 'aiva:snooze' && window.AIVA_NOTIFIER) {
       const task = getTaskById(event.data.taskId);
       if (task) {

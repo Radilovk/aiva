@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v48';
+const CACHE_NAME = 'aiva-v49';
 const ASSETS = [
   'index.html',
   'landing.html',
@@ -21,6 +21,7 @@ const ASSETS = [
   'terms.html',
   'admin.html',
   'config.js',
+  'lib/auth.js',
   'settings.js',
   'lib/i18n-boot.js',
   'lib/logger.js',
@@ -174,18 +175,17 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const taskId = event.notification.data?.task_id;
 
+  // API-то иска Bearer токен, а той живее в localStorage, до който Service Worker няма
+  // достъп. Затова маркирането минава през прозорец на приложението: отворен клиент го
+  // прави веднага, иначе отваряме приложението с ?done=<id> и то довършва.
   if (event.action === 'done' && taskId) {
-    const host = self.location.hostname;
-    const apiBase = (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.github.io'))
-      ? 'https://aiva.radilov-k.workers.dev'
-      : self.location.origin;
-    const userId = event.notification.data?.user_id;
-    if (!userId) return;
     event.waitUntil(
-      fetch(`${apiBase}/api/tasks/${taskId}/done`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId }),
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) {
+          client.postMessage({ type: 'aiva:done', taskId });
+          if ('focus' in client) return client.focus();
+        }
+        return self.clients.openWindow(asset(`index.html?done=${encodeURIComponent(taskId)}`));
       })
     );
     return;

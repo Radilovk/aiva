@@ -9,10 +9,15 @@ import {
   getUserTasks,
   getTaskById,
   markTaskDone,
-  registerUser,
   searchTasks,
   updateTask,
 } from './tasks';
+import {
+  issueIdentity,
+  requireAuth,
+  type AuthEnv,
+  type AuthVariables,
+} from './auth';
 import { handleCron } from './cron';
 import {
   calendarCapabilities,
@@ -42,7 +47,7 @@ import {
   type StripeEnv,
 } from './stripe';
 
-interface Env extends StripeEnv {
+interface Env extends StripeEnv, AuthEnv {
   DB: D1Database;
   SESSIONS: KVNamespace;
   GEMINI_API_KEY: string;
@@ -113,22 +118,44 @@ function isAllowedOrigin(origin: string): boolean {
   return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 app.use(
   '*',
   cors({
     origin: (origin) => (origin && isAllowedOrigin(origin) ? origin : ''),
-    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'If-None-Match'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'If-None-Match', 'Authorization'],
     exposeHeaders: ['ETag'],
   })
 );
 
+/**
+ * Маршрути без Bearer токен.
+ * - register: издава самия токен, тоест не може да го изисква
+ * - stripe/webhook: Stripe подписва тялото; проверката е на подписа
+ * - brand-config: публична конфигурация, без лични данни
+ * - calendar.ics: чете се от чужди календарни услуги, които не могат да носят хедър;
+ *   пази се със собствен таен feed токен (виж docs/LAUNCH-PLAN.md — Фаза 0)
+ */
+const PUBLIC_API_PATHS = new Set([
+  '/api/users/register',
+  '/api/stripe/webhook',
+  '/api/brand-config',
+  '/api/calendar.ics',
+]);
+
+app.use('/api/*', async (c, next) => {
+  if (c.req.method === 'OPTIONS') return next();
+  if (PUBLIC_API_PATHS.has(new URL(c.req.url).pathname)) return next();
+  return requireAuth<{ Bindings: Env; Variables: AuthVariables }>()(c, next);
+});
+
 // --- REST API ---
 
+// `:user_id` в пътя се пази заради стари клиенти, но се пренебрегва — меродавен е токенът.
 app.get('/api/tasks/:user_id', async (c) => {
-  const userId = c.req.param('user_id');
+  const userId = c.get('userId');
   const includeDone = c.req.query('include_done') === '1';
   try {
     const tasks = includeDone
@@ -152,12 +179,7 @@ app.patch('/api/tasks/:id/done', async (c) => {
   if (!Number.isFinite(id)) {
     return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
   }
-  const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as { user_id?: string }));
-  const userId = body?.user_id || c.req.query('user_id');
-  if (!userId) {
-    return c.json({ error: 'user_id е задължителен' }, 400);
-  }
-  const result = await markTaskDone(c.env.DB, id, userId);
+  const result = await markTaskDone(c.env.DB, id, c.get('userId'));
   if (!result.changed) return c.json({ error: 'Задачата не е намерена' }, 404);
 
   const origin = requestOrigin(new URL(c.req.url));
@@ -210,7 +232,7 @@ app.patch('/api/tasks/:id', async (c) => {
         tags: body.tags,
         done: body.done,
       },
-      body.user_id
+      c.get('userId')
     );
     if (!task) return c.json({ error: 'Задачата не е намерена' }, 404);
     c.executionCtx.waitUntil(syncTaskToCloudCalendars(c.env, task, requestOrigin(new URL(c.req.url))));
@@ -223,15 +245,15 @@ app.patch('/api/tasks/:id', async (c) => {
 
 app.delete('/api/tasks/:id', async (c) => {
   const id = parseInt(c.req.param('id'), 10);
-  const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as { user_id?: string }));
+  const userId = c.get('userId');
 
   if (!Number.isFinite(id)) {
     return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
   }
 
   try {
-    const existingTask = await getTaskById(c.env.DB, id, body.user_id);
-    const success = await deleteTask(c.env.DB, id, body.user_id);
+    const existingTask = await getTaskById(c.env.DB, id, userId);
+    const success = await deleteTask(c.env.DB, id, userId);
     if (!success) return c.json({ error: 'Задачата не е намерена' }, 404);
     if (existingTask) {
       c.executionCtx.waitUntil(
@@ -248,7 +270,6 @@ app.delete('/api/tasks/:id', async (c) => {
 app.post('/api/tasks/:id/duplicate', async (c) => {
   const id = parseInt(c.req.param('id'), 10);
   const body = await c.req.json<{
-    user_id: string;
     due_date?: string | null;
     due_time?: string | null;
     repeat_rule?: string | null;
@@ -258,12 +279,9 @@ app.post('/api/tasks/:id/duplicate', async (c) => {
   if (!Number.isFinite(id)) {
     return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
   }
-  if (!body.user_id) {
-    return c.json({ error: 'user_id е задължителен' }, 400);
-  }
 
   try {
-    const task = await duplicateTask(c.env.DB, id, body.user_id, {
+    const task = await duplicateTask(c.env.DB, id, c.get('userId'), {
       due_date: body.due_date,
       due_time: body.due_time,
       repeat_rule: body.repeat_rule,
@@ -277,22 +295,50 @@ app.post('/api/tasks/:id/duplicate', async (c) => {
   }
 });
 
+/**
+ * Издава идентичност при първо стартиране. Единственият маршрут, който няма как да
+ * изисква токен — той го създава.
+ *
+ * `claim_user_id` е миграционният път: заварените потребители имат `user_id` в localStorage
+ * и задачи в D1, но никога не са били регистрирани. Осиновяването на непретендиран стар ID
+ * запазва задачите им; вече претендиран ID не може да бъде превзет.
+ */
 app.post('/api/users/register', async (c) => {
-  const body = await c.req.json<{ user_id: string; app_token: string }>();
-  if (!body.user_id || !body.app_token) {
-    return c.json({ error: 'user_id и app_token са задължителни' }, 400);
+  const body = await c.req
+    .json<{ claim_user_id?: string }>()
+    .catch(() => ({} as { claim_user_id?: string }));
+
+  const claim = typeof body.claim_user_id === 'string' ? body.claim_user_id.trim() : '';
+  if (claim && !/^user_[0-9a-f-]{36}$/i.test(claim)) {
+    return c.json({ error: 'Невалиден claim_user_id' }, 400);
   }
-  await registerUser(c.env.DB, body.user_id, body.app_token);
-  return c.json({ success: true });
+
+  // Регистрацията създава редове в D1 — без лимит това е безплатен запис за целия интернет.
+  const ip = c.req.header('cf-connecting-ip') || 'unknown';
+  if (!(await incrementDailyLimit(c.env.SESSIONS, `rate:register:ip:${ip}`, 20))) {
+    return c.json({ error: 'Твърде много регистрации от тази мрежа. Опитайте утре.' }, 429);
+  }
+
+  const result = await issueIdentity(c.env, claim || undefined);
+
+  if (!result.ok) {
+    // Заето означава, че ID-то вече е регистрирано от друг клиент — новият получава свежа
+    // идентичност, вместо да остане без достъп.
+    const fresh = await issueIdentity(c.env);
+    if (!fresh.ok) return c.json({ error: 'Неуспешна регистрация' }, 500);
+    return c.json({ ...fresh.identity, claimed: false, claim_rejected: result.reason });
+  }
+
+  return c.json({ ...result.identity, claimed: result.claimed });
 });
 
 // --- Ephemeral token endpoint for frontend (includes rate limiting) ---
 
 app.post('/api/token', async (c) => {
-  const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as any));
-  const userId = body?.user_id || 'anonymous';
+  const userId = c.get('userId');
 
-  // Двоен дневен лимит: по потребител + по IP (user_id идва от клиента и може да се ротира)
+  // Лимитът по потребител вече е меродавен (идентичността се издава от сървъра); този по IP
+  // остава като втора преграда срещу масова регистрация на нови идентичности.
   const userLimit = await resolveSessionLimit(c.env, userId);
   const ipLimit = envInt(c.env.MAX_SESSIONS_PER_IP, DEFAULT_MAX_SESSIONS_PER_IP);
   const ip = c.req.header('cf-connecting-ip') || 'unknown';
@@ -339,12 +385,11 @@ app.post('/api/voice-preview', async (c) => {
     voice_name?: string;
     text?: string;
     language?: string;
-    user_id?: string;
-  }>().catch(() => ({} as { voice_name?: string; text?: string; language?: string; user_id?: string }));
+  }>().catch(() => ({} as { voice_name?: string; text?: string; language?: string }));
 
   const voiceName = /^[A-Za-z][A-Za-z -]{0,30}$/.test(body.voice_name || '') ? body.voice_name! : 'Kore';
   const text = (body.text || 'Здравейте! Аз съм KASY, вашият AI Secretary. С какво мога да ви помогна?').slice(0, 120);
-  const userId = body.user_id || 'anonymous';
+  const userId = c.get('userId');
 
   // Кеш по глас+текст: гласовете са краен брой, така TTS API се вика веднъж на комбинация
   const cacheKey = `tts:${voiceName}:${await sha256Hex(text)}`;
@@ -411,7 +456,7 @@ app.post('/api/voice-preview', async (c) => {
 // --- Daily brief (generated by the evening cron, stored in KV) ---
 
 app.get('/api/brief/:user_id', async (c) => {
-  const userId = c.req.param('user_id');
+  const userId = c.get('userId');
   const effective = await getEffectiveSubscription(c.env, userId, envInt);
   if (effective.enforced && !effective.limits.daily_brief) {
     return c.json({ brief: null, locked: true });
@@ -424,11 +469,11 @@ app.get('/api/brief/:user_id', async (c) => {
 
 app.post('/api/tasks', async (c) => {
   const body = await c.req.json<{
-    user_id: string;
     task: string;
     content?: string;
     emotion?: string;
-    priority?: number;
+    // Клиентът праща ту число, ту низ — приемаме и двете, вместо да мълчим при несъвпадение.
+    priority?: number | string;
     due_date?: string;
     due_time?: string;
     estimated_minutes?: number;
@@ -438,13 +483,15 @@ app.post('/api/tasks', async (c) => {
     tags?: string;
   }>();
 
-  if (!body.user_id || !(body.task || body.content)) {
-    return c.json({ error: 'user_id и task са задължителни' }, 400);
+  const userId = c.get('userId');
+
+  if (!(body.task || body.content)) {
+    return c.json({ error: 'task е задължителен' }, 400);
   }
 
-  const effective = await getEffectiveSubscription(c.env, body.user_id, envInt);
+  const effective = await getEffectiveSubscription(c.env, userId, envInt);
   if (effective.enforced) {
-    const activeCount = await countIncompleteTasks(c.env.DB, body.user_id);
+    const activeCount = await countIncompleteTasks(c.env.DB, userId);
     if (activeCount >= effective.limits.max_active_tasks) {
       return c.json({
         error: 'Достигнат е лимитът на активни задачи. Надградете до KASY Plus.',
@@ -455,7 +502,7 @@ app.post('/api/tasks', async (c) => {
 
   try {
     const task = await createTask(c.env.DB, {
-      user_id: body.user_id,
+      user_id: userId,
       content: body.task || body.content || '',
       emotion: body.emotion || 'neutral',
       priority: body.priority === 1 || body.priority === '1' ? 1 : 0,
@@ -478,7 +525,7 @@ app.post('/api/tasks', async (c) => {
 // --- Cloud calendar providers (Google + Microsoft primary flow) ---
 
 app.get('/api/calendar/providers/status/:user_id', async (c) => {
-  const userId = c.req.param('user_id');
+  const userId = c.get('userId');
   const providers = await getProviderStatuses(c.env, userId);
   return c.json({
     providers,
@@ -488,17 +535,17 @@ app.get('/api/calendar/providers/status/:user_id', async (c) => {
 
 app.post('/api/calendar/connect/start', async (c) => {
   const body = await c.req.json<{
-    user_id?: string;
     provider?: string;
     redirect_uri?: string;
-  }>().catch(() => ({} as { user_id?: string; provider?: string; redirect_uri?: string }));
+  }>().catch(() => ({} as { provider?: string; redirect_uri?: string }));
 
+  const userId = c.get('userId');
   const provider = normalizeProvider(body.provider);
-  if (!body.user_id || !provider) {
-    return c.json({ error: 'user_id и provider са задължителни' }, 400);
+  if (!provider) {
+    return c.json({ error: 'provider е задължителен' }, 400);
   }
 
-  const effective = await getEffectiveSubscription(c.env, body.user_id, envInt);
+  const effective = await getEffectiveSubscription(c.env, userId, envInt);
   if (effective.enforced && !effective.limits.cloud_calendar) {
     return plusRequiredResponse(c);
   }
@@ -507,7 +554,7 @@ app.post('/api/calendar/connect/start', async (c) => {
     const { url, state } = await startOAuthConnect(
       c.env,
       provider,
-      body.user_id,
+      userId,
       requestOrigin(new URL(c.req.url)),
       body.redirect_uri
     );
@@ -519,16 +566,16 @@ app.post('/api/calendar/connect/start', async (c) => {
 
 app.post('/api/calendar/connect/apple', async (c) => {
   const body = await c.req.json<{
-    user_id?: string;
     apple_id?: string;
     password?: string;
   }>().catch(() => ({} as any));
 
-  if (!body.user_id || !body.apple_id || !body.password) {
-    return c.json({ error: 'user_id, apple_id и password са задължителни' }, 400);
+  const userId = c.get('userId');
+  if (!body.apple_id || !body.password) {
+    return c.json({ error: 'apple_id и password са задължителни' }, 400);
   }
 
-  const effective = await getEffectiveSubscription(c.env, body.user_id, envInt);
+  const effective = await getEffectiveSubscription(c.env, userId, envInt);
   if (effective.enforced && !effective.limits.cloud_calendar) {
     return plusRequiredResponse(c);
   }
@@ -536,7 +583,7 @@ app.post('/api/calendar/connect/apple', async (c) => {
   try {
     await connectAppleAccount(
       c.env.DB,
-      body.user_id,
+      userId,
       body.apple_id,
       body.password,
       requestOrigin(new URL(c.req.url))
@@ -549,21 +596,20 @@ app.post('/api/calendar/connect/apple', async (c) => {
 
 app.post('/api/calendar/connect/callback', async (c) => {
   const body = await c.req.json<{
-    user_id?: string;
     provider?: string;
     code?: string;
     state?: string;
     redirect_uri?: string;
-  }>().catch(() => ({} as { user_id?: string; provider?: string; code?: string; state?: string; redirect_uri?: string }));
+  }>().catch(() => ({} as { provider?: string; code?: string; state?: string; redirect_uri?: string }));
 
   const provider = normalizeProvider(body.provider);
-  if (!body.user_id || !provider || !body.code || !body.state) {
-    return c.json({ error: 'user_id, provider, code и state са задължителни' }, 400);
+  if (!provider || !body.code || !body.state) {
+    return c.json({ error: 'provider, code и state са задължителни' }, 400);
   }
 
   try {
     await completeOAuthConnect(c.env, {
-      userId: body.user_id,
+      userId: c.get('userId'),
       provider,
       code: body.code,
       state: body.state,
@@ -577,10 +623,10 @@ app.post('/api/calendar/connect/callback', async (c) => {
 });
 
 app.get('/api/calendar/calendars', async (c) => {
-  const userId = c.req.query('user_id');
+  const userId = c.get('userId');
   const provider = normalizeProvider(c.req.query('provider'));
-  if (!userId || !provider) {
-    return c.json({ error: 'user_id и provider са задължителни' }, 400);
+  if (!provider) {
+    return c.json({ error: 'provider е задължителен' }, 400);
   }
 
   try {
@@ -593,34 +639,33 @@ app.get('/api/calendar/calendars', async (c) => {
 
 app.post('/api/calendar/calendars/select', async (c) => {
   const body = await c.req.json<{
-    user_id?: string;
     provider?: string;
     calendar_id?: string;
-  }>().catch(() => ({} as { user_id?: string; provider?: string; calendar_id?: string }));
+  }>().catch(() => ({} as { provider?: string; calendar_id?: string }));
   const provider = normalizeProvider(body.provider);
-  if (!body.user_id || !provider || !body.calendar_id) {
-    return c.json({ error: 'user_id, provider и calendar_id са задължителни' }, 400);
+  if (!provider || !body.calendar_id) {
+    return c.json({ error: 'provider и calendar_id са задължителни' }, 400);
   }
 
-  await setSelectedCalendar(c.env.DB, body.user_id, provider, body.calendar_id);
+  await setSelectedCalendar(c.env.DB, c.get('userId'), provider, body.calendar_id);
   return c.json({ success: true });
 });
 
 app.delete('/api/calendar/connect', async (c) => {
-  const body = await c.req.json<{ user_id?: string; provider?: string }>().catch(() => ({} as { user_id?: string; provider?: string }));
+  const body = await c.req.json<{ provider?: string }>().catch(() => ({} as { provider?: string }));
   const provider = normalizeProvider(body.provider);
-  if (!body.user_id || !provider) {
-    return c.json({ error: 'user_id и provider са задължителни' }, 400);
+  if (!provider) {
+    return c.json({ error: 'provider е задължителен' }, 400);
   }
-  await disconnectProvider(c.env.DB, body.user_id, provider);
+  await disconnectProvider(c.env.DB, c.get('userId'), provider);
   return c.json({ success: true });
 });
 
 app.get('/api/calendar/events', async (c) => {
-  const userId = c.req.query('user_id');
+  const userId = c.get('userId');
   const provider = normalizeProvider(c.req.query('provider'));
-  if (!userId || !provider) {
-    return c.json({ error: 'user_id и provider са задължителни' }, 400);
+  if (!provider) {
+    return c.json({ error: 'provider е задължителен' }, 400);
   }
 
   const from = c.req.query('from') || new Date().toISOString();
@@ -632,7 +677,7 @@ app.get('/api/calendar/events', async (c) => {
 // --- Search tasks endpoint (for voice commands) ---
 
 app.get('/api/tasks/:user_id/search', async (c) => {
-  const userId = c.req.param('user_id');
+  const userId = c.get('userId');
   const query = c.req.query('q') || '';
   if (!query.trim()) return c.json({ tasks: [] });
 
@@ -773,11 +818,8 @@ app.get('/api/calendar.ics', async (c) => {
 
 // --- User profile sync (language for server-side briefs) ---
 
-// --- User profile sync (language for server-side briefs) ---
-
 app.get('/api/memory', async (c) => {
-  const userId = c.req.query('user_id');
-  if (!userId) return c.json({ error: 'user_id е задължителен' }, 400);
+  const userId = c.get('userId');
   const raw = await c.env.SESSIONS.get(`memory:${userId}`);
   if (!raw) return c.json({ entries: [], updated_at: null });
   try {
@@ -790,17 +832,15 @@ app.get('/api/memory', async (c) => {
 
 app.put('/api/memory', async (c) => {
   const body = await c.req.json<{
-    user_id?: string;
     entries?: unknown[];
     updated_at?: string;
   }>().catch(() => null);
-  if (!body?.user_id) return c.json({ error: 'user_id е задължителен' }, 400);
   const payload = {
-    entries: Array.isArray(body.entries) ? body.entries : [],
-    updated_at: body.updated_at || new Date().toISOString(),
+    entries: Array.isArray(body?.entries) ? body!.entries : [],
+    updated_at: body?.updated_at || new Date().toISOString(),
   };
   try {
-    await c.env.SESSIONS.put(`memory:${body.user_id}`, JSON.stringify(payload), {
+    await c.env.SESSIONS.put(`memory:${c.get('userId')}`, JSON.stringify(payload), {
       expirationTtl: 365 * 86400,
     });
     return c.json({ success: true });
@@ -811,14 +851,11 @@ app.put('/api/memory', async (c) => {
 });
 
 app.post('/api/profile', async (c) => {
-  const body = await c.req.json<{ user_id?: string; language?: string }>().catch(() => null);
-  if (!body?.user_id) {
-    return c.json({ error: 'user_id е задължителен' }, 400);
-  }
-  const language = body.language || 'bg';
+  const body = await c.req.json<{ language?: string }>().catch(() => null);
+  const language = body?.language || 'bg';
   try {
     await c.env.SESSIONS.put(
-      `profile:${body.user_id}`,
+      `profile:${c.get('userId')}`,
       JSON.stringify({ language }),
       { expirationTtl: 365 * 86400 }
     );
@@ -832,8 +869,7 @@ app.post('/api/profile', async (c) => {
 // --- Subscription & Stripe (see docs/MONETIZATION.md) ---
 
 app.get('/api/subscription', async (c) => {
-  const userId = c.req.query('user_id');
-  if (!userId) return c.json({ error: 'user_id е задължителен' }, 400);
+  const userId = c.get('userId');
 
   const effective = await getEffectiveSubscription(c.env, userId, envInt);
   const catalog = getStripeCatalog(c.env);
@@ -862,19 +898,16 @@ app.get('/api/subscription', async (c) => {
 });
 
 app.post('/api/stripe/checkout', async (c) => {
-  const body = await c.req.json<{ user_id?: string; plan?: string; price_id?: string }>().catch(() => null);
-  if (!body?.user_id) {
-    return c.json({ error: 'user_id е задължителен' }, 400);
-  }
-  const priceId = body.plan
+  const body = await c.req.json<{ plan?: string; price_id?: string }>().catch(() => null);
+  const priceId = body?.plan
     ? resolvePlanPriceId(body.plan, c.env)
-    : body.price_id;
+    : body?.price_id;
   if (!priceId) {
     return c.json({ error: 'Невалиден план или липсва price_id' }, 400);
   }
   try {
     const origin = requestOrigin(new URL(c.req.url));
-    const { url } = await createCheckoutSession(c.env, body.user_id, priceId, origin, body.plan);
+    const { url } = await createCheckoutSession(c.env, c.get('userId'), priceId, origin, body?.plan);
     return c.json({ url });
   } catch (e) {
     console.error('Stripe checkout error:', e);
@@ -883,11 +916,9 @@ app.post('/api/stripe/checkout', async (c) => {
 });
 
 app.post('/api/stripe/portal', async (c) => {
-  const body = await c.req.json<{ user_id?: string }>().catch(() => null);
-  if (!body?.user_id) return c.json({ error: 'user_id е задължителен' }, 400);
   try {
     const origin = requestOrigin(new URL(c.req.url));
-    const { url } = await createPortalSession(c.env, body.user_id, origin);
+    const { url } = await createPortalSession(c.env, c.get('userId'), origin);
     return c.json({ url });
   } catch (e) {
     console.error('Stripe portal error:', e);
@@ -920,13 +951,13 @@ app.post('/api/admin/brand-package', async (c) => {
 // --- Push subscription endpoint ---
 
 app.post('/api/push/subscribe', async (c) => {
-  const body = await c.req.json<{ user_id: string; subscription: any }>().catch(() => null);
-  if (!body?.user_id || !body?.subscription) {
-    return c.json({ error: 'user_id и subscription са задължителни' }, 400);
+  const body = await c.req.json<{ subscription: any }>().catch(() => null);
+  if (!body?.subscription) {
+    return c.json({ error: 'subscription е задължителен' }, 400);
   }
 
   try {
-    const key = `push:${body.user_id}`;
+    const key = `push:${c.get('userId')}`;
     await c.env.SESSIONS.put(key, JSON.stringify(body.subscription), { expirationTtl: 30 * 86400 });
     return c.json({ success: true });
   } catch (e) {

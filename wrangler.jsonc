@@ -34,6 +34,9 @@
     "MAX_SESSIONS_PER_IP": "40",
     "MAX_PREVIEWS_PER_IP": "10",
     "SUBSCRIPTION_ENFORCED": "false",
+    // Позволява на заварен клиент да осинови своя стар user_id при първа регистрация,
+    // за да не загуби задачите си. Смени на "false", след като старите клиенти се обновят.
+    "ALLOW_LEGACY_CLAIM": "true",
     "APP_URL": "https://aiva.radilov-k.workers.dev",
     "STRIPE_PRICE_PLUS_MONTHLY": "",
     "STRIPE_PRICE_PLUS_YEARLY": "",

@@ -1,4 +1,4 @@
-CREATE TABLE tasks (
+CREATE TABLE IF NOT EXISTS tasks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id TEXT NOT NULL,
   content TEXT NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE tasks (
 CREATE INDEX IF NOT EXISTS idx_tasks_user_schedule
 ON tasks (user_id, done, due_date, due_time, priority);
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   app_token TEXT,
   created_at TEXT DEFAULT (datetime('now'))
