@@ -1179,6 +1179,11 @@
       await renderCloudStatus();
     }
 
+    function getOAuthRedirectUri() {
+      // Must exactly match Google Cloud Console → Authorized redirect URIs.
+      return `${location.origin}/settings.html`;
+    }
+
     async function startCloudConnect(provider) {
       if (isAndroidPlatform) return;
       const sub = await window.AIVA_SUBSCRIPTION?.fetchSubscription?.(true);
@@ -1198,7 +1203,7 @@
         body: JSON.stringify({
           user_id: userId,
           provider,
-          redirect_uri: `${location.origin}${location.pathname}`,
+          redirect_uri: getOAuthRedirectUri(),
         }),
       });
       const data = await res.json();
@@ -1233,7 +1238,7 @@
           provider,
           code,
           state,
-          redirect_uri: `${location.origin}${location.pathname}`,
+          redirect_uri: getOAuthRedirectUri(),
         }),
       });
       const data = await res.json().catch(() => ({}));
