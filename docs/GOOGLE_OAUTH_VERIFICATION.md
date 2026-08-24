@@ -3,7 +3,9 @@
 **App URL:** https://aiva.radilov-k.workers.dev  
 **Privacy policy:** https://aiva.radilov-k.workers.dev/privacy.html  
 **Support / developer email:** radilov.k@gmail.com  
-**Redirect URI (exact):** `https://aiva.radilov-k.workers.dev/settings.html`
+**Redirect URIs (register both in Google Cloud Console):**
+- `https://aiva.radilov-k.workers.dev/settings.html`
+- `https://aiva.radilov-k.workers.dev/settings`
 
 Use this document when submitting **Submit for verification** in Google Cloud Console → **OAuth consent screen** → **Verification Center**.
 

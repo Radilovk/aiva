@@ -676,6 +676,20 @@ export async function getProviderStatuses(env: CalendarEnv, userId: string): Pro
   ];
 }
 
+function isAllowedOAuthRedirect(origin: string, redirectUri: string): boolean {
+  try {
+    const url = new URL(redirectUri);
+    const base = origin.replace(/\/$/, '');
+    const allowed = new Set([
+      `${base}/settings.html`,
+      `${base}/settings`,
+    ]);
+    return allowed.has(`${url.origin}${url.pathname}`);
+  } catch {
+    return false;
+  }
+}
+
 export async function startOAuthConnect(
   env: CalendarEnv,
   provider: CalendarProvider,
@@ -688,7 +702,10 @@ export async function startOAuthConnect(
     throw new Error(`${provider} не е конфигуриран на сървъра`);
   }
 
-  const finalRedirect = redirectUri || cfg.redirectUri;
+  const requested = redirectUri || cfg.redirectUri;
+  const finalRedirect = isAllowedOAuthRedirect(origin, requested)
+    ? requested
+    : cfg.redirectUri;
   const state = await storeOAuthState(env, { userId, provider, redirectUri: finalRedirect });
 
   const query = new URLSearchParams({
