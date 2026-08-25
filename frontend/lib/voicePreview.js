@@ -153,7 +153,8 @@
 
   async function prefetch() {
     try {
-      await ensurePreviewPlayer();
+      // Token warm-up only — AudioContext.resume() requires a user gesture.
+      await fetchToken();
     } catch {
       // warm-up is best-effort
     }
