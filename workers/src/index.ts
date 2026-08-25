@@ -16,6 +16,7 @@ import {
 import { handleCron } from './cron';
 import {
   calendarCapabilities,
+  checkGoogleOAuthCredentials,
   completeOAuthConnect,
   connectAppleAccount,
   disconnectProvider,
@@ -483,6 +484,19 @@ app.get('/api/calendar/providers/status/:user_id', async (c) => {
   return c.json({
     providers,
     capabilities: calendarCapabilities(),
+  });
+});
+
+app.get('/api/calendar/google-credential-check', async (c) => {
+  const result = await checkGoogleOAuthCredentials(c.env, requestOrigin(new URL(c.req.url)));
+  return c.json({
+    ...result,
+    hint:
+      result.credentialsValid
+        ? 'Cloudflare secrets match Google. OAuth should work.'
+        : result.googleError === 'invalid_client'
+          ? 'GOOGLE_CLIENT_SECRET in Cloudflare does NOT match Google Console. Re-set with scripts/set-google-oauth-from-json.mjs'
+          : 'Google OAuth credentials missing or misconfigured.',
   });
 });
 

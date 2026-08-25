@@ -1109,6 +1109,52 @@ export function requestOrigin(url: URL): string {
   return `${url.protocol}//${url.host}`;
 }
 
+/** Probes Google token endpoint with a dummy code — invalid_grant means credentials match. */
+export async function checkGoogleOAuthCredentials(env: CalendarEnv, origin: string): Promise<{
+  configured: boolean;
+  clientIdSuffix: string | null;
+  secretLength: number;
+  redirectUri: string | null;
+  googleError: string | null;
+  credentialsValid: boolean;
+}> {
+  const cfg = providerConfig(env, 'google', origin);
+  if (!cfg) {
+    return {
+      configured: false,
+      clientIdSuffix: null,
+      secretLength: 0,
+      redirectUri: null,
+      googleError: null,
+      credentialsValid: false,
+    };
+  }
+
+  const resp = await fetch(cfg.tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: cfg.clientId,
+      client_secret: cfg.clientSecret,
+      code: 'credential-check',
+      redirect_uri: cfg.redirectUri,
+    }).toString(),
+  });
+
+  const data = parseJsonSafe<{ error?: string }>(await resp.text());
+  const googleError = data?.error || null;
+
+  return {
+    configured: true,
+    clientIdSuffix: cfg.clientId.slice(-24),
+    secretLength: cfg.clientSecret.length,
+    redirectUri: cfg.redirectUri,
+    googleError,
+    credentialsValid: googleError === 'invalid_grant',
+  };
+}
+
 export function providerLabel(provider: CalendarProvider): string {
   if (provider === 'apple') return 'Apple Calendar (iCloud)';
   return provider === 'google' ? 'Google Calendar' : 'Outlook Calendar';
