@@ -725,6 +725,11 @@ export async function startOAuthConnect(
     hl: 'en',
   });
 
+  if (provider === 'google') {
+    // Required so Google returns refresh_token (not only on very first grant).
+    query.set('prompt', 'consent');
+  }
+
   if (provider === 'microsoft') {
     query.delete('access_type');
     query.delete('prompt');
@@ -787,8 +792,13 @@ export async function completeOAuthConnect(
     scope?: string;
   }>(await tokenResp.text());
 
-  if (!token?.access_token || !token?.refresh_token || !token?.expires_in) {
-    throw new Error('Липсва валиден token от провайдъра');
+  if (!token?.access_token || !token?.expires_in) {
+    throw new Error('Липсва access token от Google');
+  }
+  if (!token.refresh_token) {
+    throw new Error(
+      'Google не върна refresh token. Отвори https://myaccount.google.com/permissions, премахни достъпа на KASY, после Connect Google отново.'
+    );
   }
 
   await saveConnection(
@@ -1107,6 +1117,52 @@ export function normalizeProvider(value: string | null | undefined): CalendarPro
 
 export function requestOrigin(url: URL): string {
   return `${url.protocol}//${url.host}`;
+}
+
+/** Probes Google token endpoint with a dummy code — invalid_grant means credentials match. */
+export async function checkGoogleOAuthCredentials(env: CalendarEnv, origin: string): Promise<{
+  configured: boolean;
+  clientIdSuffix: string | null;
+  secretLength: number;
+  redirectUri: string | null;
+  googleError: string | null;
+  credentialsValid: boolean;
+}> {
+  const cfg = providerConfig(env, 'google', origin);
+  if (!cfg) {
+    return {
+      configured: false,
+      clientIdSuffix: null,
+      secretLength: 0,
+      redirectUri: null,
+      googleError: null,
+      credentialsValid: false,
+    };
+  }
+
+  const resp = await fetch(cfg.tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: cfg.clientId,
+      client_secret: cfg.clientSecret,
+      code: 'credential-check',
+      redirect_uri: cfg.redirectUri,
+    }).toString(),
+  });
+
+  const data = parseJsonSafe<{ error?: string }>(await resp.text());
+  const googleError = data?.error || null;
+
+  return {
+    configured: true,
+    clientIdSuffix: cfg.clientId.slice(-24),
+    secretLength: cfg.clientSecret.length,
+    redirectUri: cfg.redirectUri,
+    googleError,
+    credentialsValid: googleError === 'invalid_grant',
+  };
 }
 
 export function providerLabel(provider: CalendarProvider): string {
