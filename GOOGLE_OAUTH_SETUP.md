@@ -25,7 +25,7 @@ node scripts/google-oauth-setup.mjs
 3. **OAuth consent screen**
    - User type: **External**
    - App name, support email, logo (по желание)
-   - Scopes: добави `https://www.googleapis.com/auth/calendar` (и `calendar.events` ако го изисква)
+   - Scopes: добави само `https://www.googleapis.com/auth/calendar.events` (View and edit events on all your calendars)
    - **За тестване:** Publishing status = **Testing** → добави имейлите на тестовите потребители под **Test users**
    - **За всички потребители:** Submit for **verification** (Google преглежда приложението; без това външните потребители виждат „непотвърдено приложение“)
 

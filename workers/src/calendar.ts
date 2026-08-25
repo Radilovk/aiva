@@ -112,18 +112,20 @@ async function ensureCalendarSchema(db: D1Database): Promise<void> {
 
 function providerConfig(env: CalendarEnv, provider: CalendarProvider, origin: string): ProviderConfig | null {
   if (provider === 'google') {
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
+    const clientId = env.GOOGLE_CLIENT_ID?.trim();
+    const clientSecret = env.GOOGLE_CLIENT_SECRET?.trim();
+    if (!clientId || !clientSecret) return null;
     return {
       provider,
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      clientId,
+      clientSecret,
       authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
       scopes: [
         'openid',
         'profile',
         'email',
-        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/calendar.events',
       ],
       redirectUri: env.GOOGLE_REDIRECT_URI || `${origin}/settings.html`,
     };
@@ -133,8 +135,8 @@ function providerConfig(env: CalendarEnv, provider: CalendarProvider, origin: st
   const tenant = env.MICROSOFT_TENANT_ID || 'common';
   return {
     provider,
-    clientId: env.MICROSOFT_CLIENT_ID,
-    clientSecret: env.MICROSOFT_CLIENT_SECRET,
+    clientId: env.MICROSOFT_CLIENT_ID.trim(),
+    clientSecret: env.MICROSOFT_CLIENT_SECRET.trim(),
     authUrl: `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize`,
     tokenUrl: `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
     scopes: ['offline_access', 'User.Read', 'Calendars.ReadWrite'],
@@ -308,18 +310,23 @@ async function fetchGoogleCalendars(accessToken: string): Promise<Array<{ id: st
   const resp = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
     headers: { Authorization: 'B' + 'earer ' + accessToken },
   });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Google calendar list failed: ${err}`);
+  if (resp.ok) {
+    const data = parseJsonSafe<{ items?: Array<{ id: string; summary: string; primary?: boolean; timeZone?: string }> }>(await resp.text());
+    return (data?.items || []).map((c) => ({
+      id: c.id,
+      name: c.summary,
+      primary: !!c.primary,
+      timezone: c.timeZone,
+    }));
   }
 
-  const data = parseJsonSafe<{ items?: Array<{ id: string; summary: string; primary?: boolean; timeZone?: string }> }>(await resp.text());
-  return (data?.items || []).map((c) => ({
-    id: c.id,
-    name: c.summary,
-    primary: !!c.primary,
-    timezone: c.timeZone,
-  }));
+  // calendar.events cannot call calendarList — fall back to the primary calendar alias.
+  if (resp.status === 403 || resp.status === 401) {
+    return [{ id: 'primary', name: 'Primary calendar', primary: true }];
+  }
+
+  const err = await resp.text();
+  throw new Error(`Google calendar list failed: ${err}`);
 }
 
 async function fetchMicrosoftCalendars(accessToken: string): Promise<Array<{ id: string; name: string; primary: boolean; timezone?: string }>> {
@@ -715,6 +722,7 @@ export async function startOAuthConnect(
     scope: cfg.scopes.join(' '),
     state,
     access_type: 'offline',
+    hl: 'en',
   });
 
   if (provider === 'microsoft') {

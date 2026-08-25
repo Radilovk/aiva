@@ -1,16 +1,17 @@
 === Paste into Google Cloud Console → OAuth verification → Scope justification ===
 
-Scope: https://www.googleapis.com/auth/calendar
+Scope: https://www.googleapis.com/auth/calendar.events
 
-KASY is a voice-first personal assistant for tasks and calendar management (web PWA and Android APK at https://aiva.radilov-k.workers.dev). Calendar access is optional and only requested when the user taps "Connect Google" in Settings.
+KASY is a voice-first personal assistant for tasks and calendar management (https://aiva.radilov-k.workers.dev). Calendar access is optional and only requested when the user taps "Connect Google" in Settings.
 
-We use the Google Calendar scope to:
-1) List the user's calendars so they can choose which calendar to sync;
-2) Read events in the selected date range to display in the app calendar and provide context to the voice assistant;
-3) Create calendar events when the user saves tasks with due dates/times;
-4) Update or delete events when the user edits or removes tasks via the UI or voice commands.
+We use calendar.events to:
+1) Read events from the user's selected Google calendar to display in the app and provide context to the voice assistant;
+2) Create calendar events when the user saves tasks with due dates/times;
+3) Update or delete events when the user edits or removes synced tasks via the UI or voice.
 
-We do not use Google Calendar data for advertising, profiling, or resale. Users can disconnect Google at any time from Settings. A narrower scope such as calendar.events.readonly is insufficient because users must create, update, and delete events from KASY, and we must list available calendars for selection.
+We do not use Google Calendar data for advertising, profiling, or resale. Users can disconnect Google at any time from Settings.
+
+The full calendar scope (calendar) is not required — we only need event read/write on calendars the user already has access to.
 
 Scopes email, profile, and openid are used only to identify and display the connected Google account in Settings.
 

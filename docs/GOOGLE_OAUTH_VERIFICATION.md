@@ -18,28 +18,27 @@ Use this document when submitting **Submit for verification** in Google Cloud Co
 | `openid` | Non-sensitive | Identify the Google account during OAuth |
 | `email` | Sensitive | Show which Google account is connected in Settings |
 | `profile` | Sensitive | Display account name in Settings |
-| `https://www.googleapis.com/auth/calendar` | Sensitive | Core calendar sync (see justification below) |
+| `https://www.googleapis.com/auth/calendar.events` | Sensitive | View and edit events on all calendars (see justification below) |
 
-> **Important:** The privacy policy and consent screen must list the **same** scopes you submit. KASY requests `calendar` (not only `calendar.events`) because the app lists calendars (`calendarList`) and syncs read/write events on the user-selected calendar.
+> **Important:** The privacy policy, consent screen, and verification form must list the **same** scopes. KASY requests only `calendar.events` (not the full `calendar` scope).
 
 ---
 
 ## 2. Scope justification (copy-paste for Google form)
 
-### `https://www.googleapis.com/auth/calendar`
+### `https://www.googleapis.com/auth/calendar.events`
 
 KASY is a voice-first personal assistant for tasks and calendar management (web PWA and Android APK). Calendar access is **optional** and only used after the user taps **Connect Google** in Settings.
 
 We use this scope to:
 
-1. **List calendars** — so the user can pick which Google calendar to sync (`GET calendarList`).
-2. **Read events** — show upcoming events in the in-app calendar and give the voice assistant context (`read_calendar_events` tool).
-3. **Create events** — when the user creates a task with a date/time, KASY creates a matching Google Calendar event.
-4. **Update / delete events** — when the user edits or removes a synced task or calendar event via UI or voice (`edit_calendar_event`, `delete_calendar_event`).
+1. **Read events** — show upcoming events in the in-app calendar and give the voice assistant context (`read_calendar_events` tool).
+2. **Create events** — when the user creates a task with a date/time, KASY creates a matching Google Calendar event.
+3. **Update / delete events** — when the user edits or removes a synced task or calendar event via UI or voice (`edit_calendar_event`, `delete_calendar_event`).
 
 Data is used only to provide these features. We do **not** use Google Calendar data for ads, profiling, or resale. Users can disconnect Google at any time from Settings → Disconnect.
 
-A narrower scope such as `calendar.events.readonly` is **not sufficient** because users must create, update, and delete events from KASY, and we must list available calendars for selection.
+The full `calendar` scope is **not** required — we only need to view and edit events on calendars the user already has access to.
 
 ### `email` / `profile` / `openid`
 
