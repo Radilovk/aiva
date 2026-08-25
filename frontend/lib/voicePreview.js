@@ -38,15 +38,19 @@
     return window.AIVA_I18N?.t?.('voicePreviewPhrase') || 'Hello, I am KASY, your AI Secretary.';
   }
 
-  async function ensurePreviewPlayer() {
+  async function ensurePreviewPlayer({ resume = true } = {}) {
     if (!previewPlayer) {
       previewPlayer = new AudioPlayer({ minBufferSamples: 480 });
       await previewPlayer.init();
     } else if (!previewPlayer.isInitialized) {
       await previewPlayer.init();
     }
-    if (previewPlayer.audioContext?.state === 'suspended') {
-      await previewPlayer.audioContext.resume();
+    if (resume && previewPlayer.audioContext?.state === 'suspended') {
+      try {
+        await previewPlayer.audioContext.resume();
+      } catch {
+        // Autoplay policy — resumes on the next user-triggered preview click.
+      }
     }
     return previewPlayer;
   }
