@@ -725,6 +725,11 @@ export async function startOAuthConnect(
     hl: 'en',
   });
 
+  if (provider === 'google') {
+    // Required so Google returns refresh_token (not only on very first grant).
+    query.set('prompt', 'consent');
+  }
+
   if (provider === 'microsoft') {
     query.delete('access_type');
     query.delete('prompt');
@@ -787,8 +792,13 @@ export async function completeOAuthConnect(
     scope?: string;
   }>(await tokenResp.text());
 
-  if (!token?.access_token || !token?.refresh_token || !token?.expires_in) {
-    throw new Error('Липсва валиден token от провайдъра');
+  if (!token?.access_token || !token?.expires_in) {
+    throw new Error('Липсва access token от Google');
+  }
+  if (!token.refresh_token) {
+    throw new Error(
+      'Google не върна refresh token. Отвори https://myaccount.google.com/permissions, премахни достъпа на KASY, после Connect Google отново.'
+    );
   }
 
   await saveConnection(
