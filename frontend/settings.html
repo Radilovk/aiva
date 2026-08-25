@@ -820,7 +820,11 @@
     document.getElementById('voiceSearch')?.addEventListener('input', (e) => {
       window.AIVA_VOICES.filterVoiceSelect(document.getElementById('voiceName'), e.target.value);
     });
-    window.AIVA_VOICE_PREVIEW?.prefetch?.();
+    const oauthCallback = new URLSearchParams(location.search).has('code')
+      && new URLSearchParams(location.search).has('state');
+    if (!oauthCallback) {
+      window.AIVA_VOICE_PREVIEW?.prefetch?.();
+    }
 
     let deviceProfile = null;
 
