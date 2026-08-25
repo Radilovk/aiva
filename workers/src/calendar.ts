@@ -112,11 +112,13 @@ async function ensureCalendarSchema(db: D1Database): Promise<void> {
 
 function providerConfig(env: CalendarEnv, provider: CalendarProvider, origin: string): ProviderConfig | null {
   if (provider === 'google') {
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
+    const clientId = env.GOOGLE_CLIENT_ID?.trim();
+    const clientSecret = env.GOOGLE_CLIENT_SECRET?.trim();
+    if (!clientId || !clientSecret) return null;
     return {
       provider,
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      clientId,
+      clientSecret,
       authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
       scopes: [
