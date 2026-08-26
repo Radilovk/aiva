@@ -128,9 +128,8 @@ async function generateBriefForUser(env: CronEnv, userId: string, tasks: Task[])
 
   await env.SESSIONS.put(
     `brief:${userId}`,
-    JSON.stringify({ text: String(text).trim(), generated_at: new Date().toISOString() }),
-    { expirationTtl: 2 * 86400 }
+    JSON.stringify({ text: String(text).trim(), generated_at: new Date().toISOString() })
   );
-  await env.SESSIONS.put(hashKey, taskHash, { expirationTtl: 7 * 86400 });
+  await env.SESSIONS.put(hashKey, taskHash);
   return true;
 }
