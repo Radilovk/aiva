@@ -1185,7 +1185,7 @@
 
     function getOAuthRedirectUri() {
       // Must exactly match Google Cloud Console → Authorized redirect URIs.
-      return `${location.origin}/settings.html`;
+      return new URL(window.AIVA_CONFIG.appUrl('settings.html'), location.origin).href;
     }
 
     async function startCloudConnect(provider) {

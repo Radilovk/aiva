@@ -104,6 +104,7 @@ async function sha256Hex(text: string): Promise<string> {
 
 const ALLOWED_ORIGINS = new Set([
   'https://aiva.radilov-k.workers.dev',
+  'https://ai-kasy.online',
   'https://radilovk.github.io',
   'https://localhost', // Capacitor Android shell
   'capacitor://localhost', // Capacitor iOS shell

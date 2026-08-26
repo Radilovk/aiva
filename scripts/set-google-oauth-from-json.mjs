@@ -46,7 +46,7 @@ function putSecret(name, value) {
 putSecret('GOOGLE_CLIENT_ID', clientId);
 putSecret('GOOGLE_CLIENT_SECRET', clientSecret);
 
-const redirect = web.redirect_uris?.[0] || 'https://aiva.radilov-k.workers.dev/settings.html';
+const redirect = web.redirect_uris?.[0] || 'https://ai-kasy.online/frontend/settings.html';
 putSecret('GOOGLE_REDIRECT_URI', redirect.trim());
 
 console.log('\nDeploy: npx wrangler deploy');

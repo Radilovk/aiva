@@ -683,15 +683,27 @@ export async function getProviderStatuses(env: CalendarEnv, userId: string): Pro
   ];
 }
 
-function isAllowedOAuthRedirect(origin: string, redirectUri: string): boolean {
+export const OAUTH_APP_ORIGINS = new Set([
+  'https://aiva.radilov-k.workers.dev',
+  'https://ai-kasy.online',
+  'https://radilovk.github.io',
+]);
+
+const OAUTH_REDIRECT_PATHS = new Set([
+  '/settings.html',
+  '/settings',
+  '/frontend/settings.html',
+  '/frontend/settings',
+  '/aiva/frontend/settings.html',
+  '/aiva/frontend/settings',
+]);
+
+function isAllowedOAuthRedirect(_origin: string, redirectUri: string): boolean {
   try {
     const url = new URL(redirectUri);
-    const base = origin.replace(/\/$/, '');
-    const allowed = new Set([
-      `${base}/settings.html`,
-      `${base}/settings`,
-    ]);
-    return allowed.has(`${url.origin}${url.pathname}`);
+    if (!OAUTH_APP_ORIGINS.has(url.origin)) return false;
+    const path = url.pathname.replace(/\/$/, '') || '/';
+    return OAUTH_REDIRECT_PATHS.has(path);
   } catch {
     return false;
   }
