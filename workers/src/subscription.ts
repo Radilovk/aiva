@@ -78,7 +78,7 @@ export async function getSubscription(
 }
 
 export async function setSubscription(kv: KVNamespace, userId: string, record: SubscriptionRecord): Promise<void> {
-  await kv.put(SUB_KEY(userId), JSON.stringify(record), { expirationTtl: 400 * 86400 });
+  await kv.put(SUB_KEY(userId), JSON.stringify(record));
 }
 
 export function getTierLimits(tier: SubscriptionTier): TierLimits {

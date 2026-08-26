@@ -42,6 +42,7 @@ import {
   handleStripeWebhook,
   type StripeEnv,
 } from './stripe';
+import { getDailyCount, incrementDailyLimit } from './kvDaily';
 
 interface Env extends StripeEnv {
   DB: D1Database;
@@ -70,12 +71,6 @@ function envInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-async function getDailyCount(kv: KVNamespace, key: string): Promise<number> {
-  const val = await kv.get(key);
-  const n = parseInt(val || '', 10);
-  return Number.isFinite(n) ? n : 0;
-}
-
 async function resolveSessionLimit(env: Env, userId: string): Promise<number> {
   const effective = await getEffectiveSubscription(env, userId, envInt);
   return effective.limits.sessions_per_day;
@@ -86,15 +81,6 @@ function plusRequiredResponse(c: { json: (body: unknown, status?: number) => Res
     error: 'Тази функция изисква KASY Plus.',
     code: 'PLUS_REQUIRED',
   }, 403);
-}
-
-/** Increments a per-day KV counter; returns false when the limit is reached. */
-async function incrementDailyLimit(kv: KVNamespace, key: string, limit: number): Promise<boolean> {
-  const fullKey = `${key}:${new Date().toISOString().slice(0, 10)}`;
-  const current = parseInt((await kv.get(fullKey)) || '0', 10);
-  if (current >= limit) return false;
-  await kv.put(fullKey, String(current + 1), { expirationTtl: 86400 });
-  return true;
 }
 
 async function sha256Hex(text: string): Promise<string> {
@@ -405,7 +391,7 @@ app.post('/api/voice-preview', async (c) => {
     mime_type: inlineData?.mimeType || 'audio/L16;codec=pcm;rate=24000',
   };
   c.executionCtx.waitUntil(
-    c.env.SESSIONS.put(cacheKey, JSON.stringify(payload), { expirationTtl: 30 * 86400 })
+    c.env.SESSIONS.put(cacheKey, JSON.stringify(payload))
   );
   return c.json(payload);
 });
@@ -815,9 +801,7 @@ app.put('/api/memory', async (c) => {
     updated_at: body.updated_at || new Date().toISOString(),
   };
   try {
-    await c.env.SESSIONS.put(`memory:${body.user_id}`, JSON.stringify(payload), {
-      expirationTtl: 365 * 86400,
-    });
+    await c.env.SESSIONS.put(`memory:${body.user_id}`, JSON.stringify(payload));
     return c.json({ success: true });
   } catch (e) {
     console.error('Memory sync error:', e);
@@ -834,8 +818,7 @@ app.post('/api/profile', async (c) => {
   try {
     await c.env.SESSIONS.put(
       `profile:${body.user_id}`,
-      JSON.stringify({ language }),
-      { expirationTtl: 365 * 86400 }
+      JSON.stringify({ language })
     );
     return c.json({ success: true });
   } catch (e) {
@@ -852,8 +835,7 @@ app.get('/api/subscription', async (c) => {
 
   const effective = await getEffectiveSubscription(c.env, userId, envInt);
   const catalog = getStripeCatalog(c.env);
-  const day = new Date().toISOString().slice(0, 10);
-  const sessionsUsed = await getDailyCount(c.env.SESSIONS, `rate:${userId}:${day}`);
+  const sessionsUsed = await getDailyCount(c.env.SESSIONS, `rate:${userId}`);
   const activeTasks = await countIncompleteTasks(c.env.DB, userId);
 
   return c.json({
@@ -942,7 +924,7 @@ app.post('/api/push/subscribe', async (c) => {
 
   try {
     const key = `push:${body.user_id}`;
-    await c.env.SESSIONS.put(key, JSON.stringify(body.subscription), { expirationTtl: 30 * 86400 });
+    await c.env.SESSIONS.put(key, JSON.stringify(body.subscription));
     return c.json({ success: true });
   } catch (e) {
     console.error('Push subscribe error:', e);

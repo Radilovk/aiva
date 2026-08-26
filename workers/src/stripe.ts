@@ -209,5 +209,5 @@ export async function linkStripeCustomer(
   customerId: string,
   userId: string
 ): Promise<void> {
-  await kv.put(`stripe:cust:${customerId}`, userId, { expirationTtl: 400 * 86400 });
+  await kv.put(`stripe:cust:${customerId}`, userId);
 }
