@@ -1,10 +1,12 @@
 # Google OAuth Verification — KASY (Production)
 
-**App URL:** https://aiva.radilov-k.workers.dev  
-**Privacy policy:** https://aiva.radilov-k.workers.dev/privacy.html  
+**App URL:** https://ai-kasy.online/frontend/  
+**Privacy policy:** https://ai-kasy.online/frontend/privacy.html  
 **Support / developer email:** radilov.k@gmail.com  
 **Redirect URIs (register both in Google Cloud Console):**
-- `https://aiva.radilov-k.workers.dev/settings.html`
+- `https://ai-kasy.online/frontend/settings.html`
+- `https://ai-kasy.online/frontend/settings`
+- `https://aiva.radilov-k.workers.dev/settings.html` (legacy Worker URL)
 - `https://aiva.radilov-k.workers.dev/settings`
 
 Use this document when submitting **Submit for verification** in Google Cloud Console → **OAuth consent screen** → **Verification Center**.

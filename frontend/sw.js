@@ -176,7 +176,7 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'done' && taskId) {
     const host = self.location.hostname;
-    const apiBase = (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.github.io'))
+    const apiBase = (host === 'localhost' || host === '127.0.0.1' || host === 'ai-kasy.online' || host.endsWith('.github.io'))
       ? 'https://aiva.radilov-k.workers.dev'
       : self.location.origin;
     const userId = event.notification.data?.user_id;
