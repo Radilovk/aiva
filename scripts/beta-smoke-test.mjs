@@ -213,15 +213,40 @@ async function testBillingI18n() {
 async function testLiveApi() {
   console.log('\n[api]');
   const testUser = `beta-smoke-${Date.now()}`;
+  const appToken = crypto.randomUUID();
+
+  async function register() {
+    const res = await fetch(`${API_BASE}/api/users/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: testUser, app_token: appToken }),
+    });
+    if (!res.ok) throw new Error('register failed: ' + res.status);
+    return res.json();
+  }
+
+  function authHeaders(extra = {}) {
+    return { Authorization: `Bearer ${appToken}`, ...extra };
+  }
 
   try {
-    const tasksRes = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(testUser)}`);
+    const reg = await register();
+    if (!reg.ics_feed_token) fail('register returns ics_feed_token');
+    else ok('POST /api/users/register returns ics_feed_token');
+
+    const unauth = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(testUser)}`);
+    if (unauth.status === 401) ok('GET /api/tasks requires auth');
+    else fail('GET /api/tasks unauthenticated', String(unauth.status));
+
+    const tasksRes = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(testUser)}`, {
+      headers: authHeaders(),
+    });
     if (!tasksRes.ok) fail('GET /api/tasks/:user_id', tasksRes.status);
     else ok('GET /api/tasks/:user_id');
 
     const createRes = await fetch(`${API_BASE}/api/tasks`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         user_id: testUser,
         task: 'Beta smoke test task',
@@ -238,52 +263,42 @@ async function testLiveApi() {
     ok('POST /api/tasks creates task');
     const taskId = createData.task.id;
 
-    const noUserDone = await fetch(`${API_BASE}/api/tasks/${taskId}/done`, { method: 'PATCH' });
-    if (noUserDone.status === 400) {
-      ok('PATCH /done rejects missing user_id');
-    } else if (noUserDone.ok) {
-      ok('PATCH /done (legacy API without user_id — deploy worker to enforce auth)');
+    const noAuthDone = await fetch(`${API_BASE}/api/tasks/${taskId}/done`, { method: 'PATCH' });
+    if (noAuthDone.status === 401) {
+      ok('PATCH /done requires auth');
     } else {
-      fail('PATCH /done without user_id', String(noUserDone.status));
+      fail('PATCH /done without auth', String(noAuthDone.status));
     }
 
-    const wrongUser = await fetch(`${API_BASE}/api/tasks/${taskId}/done`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: 'wrong-user' }),
+    const wrongUser = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent('wrong-user')}`, {
+      headers: authHeaders(),
     });
-    if (wrongUser.status === 404) {
-      ok('PATCH /done rejects wrong user_id');
-    } else if (wrongUser.ok) {
-      ok('PATCH /done (legacy — wrong user_id not rejected yet)');
-    } else {
-      fail('PATCH /done wrong user_id', String(wrongUser.status));
-    }
+    if (wrongUser.status === 403) ok('GET /api/tasks rejects foreign user_id');
+    else fail('GET /api/tasks foreign user', String(wrongUser.status));
 
-    if (!noUserDone.ok) {
-      const goodDone = await fetch(`${API_BASE}/api/tasks/${taskId}/done`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: testUser }),
-      });
-      if (!goodDone.ok) fail('PATCH /done with user_id', String(goodDone.status));
-      else ok('PATCH /done with valid user_id');
-    }
+    const goodDone = await fetch(`${API_BASE}/api/tasks/${taskId}/done`, {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+    });
+    if (!goodDone.ok) fail('PATCH /done with auth', String(goodDone.status));
+    else ok('PATCH /done with valid auth');
 
     const profileRes = await fetch(`${API_BASE}/api/profile`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ user_id: testUser, language: 'en' }),
     });
     if (profileRes.ok) ok('POST /api/profile syncs language');
     else if (profileRes.status === 404) ok('POST /api/profile (endpoint pending worker deploy)');
     else fail('POST /api/profile', String(profileRes.status));
 
-    const briefRes = await fetch(`${API_BASE}/api/brief/${encodeURIComponent(testUser)}`);
+    const briefRes = await fetch(`${API_BASE}/api/brief/${encodeURIComponent(testUser)}`, {
+      headers: authHeaders(),
+    });
     if (briefRes.status !== 404 && !briefRes.ok) fail('GET /api/brief', String(briefRes.status));
     else ok('GET /api/brief responds');
 
-    const icsRes = await fetch(`${API_BASE}/api/calendar.ics?user_id=${encodeURIComponent(testUser)}`);
+    const icsRes = await fetch(`${API_BASE}/api/calendar.ics?token=${encodeURIComponent(reg.ics_feed_token)}`);
     if (!icsRes.ok) fail('GET /api/calendar.ics', String(icsRes.status));
     else {
       const text = await icsRes.text();
@@ -291,7 +306,9 @@ async function testLiveApi() {
       else ok('GET /api/calendar.ics returns VCALENDAR');
     }
 
-    const subRes = await fetch(`${API_BASE}/api/subscription?user_id=${encodeURIComponent(testUser)}`);
+    const subRes = await fetch(`${API_BASE}/api/subscription?user_id=${encodeURIComponent(testUser)}`, {
+      headers: authHeaders(),
+    });
     if (!subRes.ok) {
       if (subRes.status === 404) ok('GET /api/subscription (endpoint pending worker deploy)');
       else fail('GET /api/subscription', String(subRes.status));

@@ -9,10 +9,16 @@ import {
   getUserTasks,
   getTaskById,
   markTaskDone,
-  registerUser,
   searchTasks,
   updateTask,
 } from './tasks';
+import {
+  authMiddleware,
+  authUserId,
+  forbidUnlessSelf,
+  getUserIdByIcsToken,
+  registerUserAuth,
+} from './auth';
 import { handleCron } from './cron';
 import {
   calendarCapabilities,
@@ -58,6 +64,7 @@ interface Env extends StripeEnv {
   MICROSOFT_CLIENT_SECRET?: string;
   MICROSOFT_REDIRECT_URI?: string;
   MICROSOFT_TENANT_ID?: string;
+  TOKEN_ENCRYPTION_KEY?: string;
 }
 
 // --- Cost protection: daily limits (overridable via wrangler vars) ---
@@ -104,6 +111,7 @@ async function sha256Hex(text: string): Promise<string> {
 
 const ALLOWED_ORIGINS = new Set([
   'https://aiva.radilov-k.workers.dev',
+  'https://ai-kasy.online',
   'https://radilovk.github.io',
   'https://localhost', // Capacitor Android shell
   'capacitor://localhost', // Capacitor iOS shell
@@ -114,22 +122,26 @@ function isAllowedOrigin(origin: string): boolean {
   return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
 
 app.use(
   '*',
   cors({
     origin: (origin) => (origin && isAllowedOrigin(origin) ? origin : ''),
-    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'If-None-Match'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS', 'PUT'],
+    allowHeaders: ['Content-Type', 'If-None-Match', 'Authorization'],
     exposeHeaders: ['ETag'],
   })
 );
 
+app.use('/api/*', authMiddleware());
+
 // --- REST API ---
 
 app.get('/api/tasks/:user_id', async (c) => {
-  const userId = c.req.param('user_id');
+  const denied = forbidUnlessSelf(c, c.req.param('user_id'));
+  if (denied) return denied;
+  const userId = authUserId(c);
   const includeDone = c.req.query('include_done') === '1';
   try {
     const tasks = includeDone
@@ -153,11 +165,7 @@ app.patch('/api/tasks/:id/done', async (c) => {
   if (!Number.isFinite(id)) {
     return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
   }
-  const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as { user_id?: string }));
-  const userId = body?.user_id || c.req.query('user_id');
-  if (!userId) {
-    return c.json({ error: 'user_id е задължителен' }, 400);
-  }
+  const userId = authUserId(c);
   const result = await markTaskDone(c.env.DB, id, userId);
   if (!result.changed) return c.json({ error: 'Задачата не е намерена' }, 404);
 
@@ -194,6 +202,8 @@ app.patch('/api/tasks/:id', async (c) => {
     return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
   }
 
+  const userId = authUserId(c);
+
   try {
     const task = await updateTask(
       c.env.DB,
@@ -211,7 +221,7 @@ app.patch('/api/tasks/:id', async (c) => {
         tags: body.tags,
         done: body.done,
       },
-      body.user_id
+      userId
     );
     if (!task) return c.json({ error: 'Задачата не е намерена' }, 404);
     c.executionCtx.waitUntil(syncTaskToCloudCalendars(c.env, task, requestOrigin(new URL(c.req.url))));
@@ -224,15 +234,15 @@ app.patch('/api/tasks/:id', async (c) => {
 
 app.delete('/api/tasks/:id', async (c) => {
   const id = parseInt(c.req.param('id'), 10);
-  const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as { user_id?: string }));
+  const userId = authUserId(c);
 
   if (!Number.isFinite(id)) {
     return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
   }
 
   try {
-    const existingTask = await getTaskById(c.env.DB, id, body.user_id);
-    const success = await deleteTask(c.env.DB, id, body.user_id);
+    const existingTask = await getTaskById(c.env.DB, id, userId);
+    const success = await deleteTask(c.env.DB, id, userId);
     if (!success) return c.json({ error: 'Задачата не е намерена' }, 404);
     if (existingTask) {
       c.executionCtx.waitUntil(
@@ -259,12 +269,11 @@ app.post('/api/tasks/:id/duplicate', async (c) => {
   if (!Number.isFinite(id)) {
     return c.json({ error: 'Невалиден идентификатор на задача' }, 400);
   }
-  if (!body.user_id) {
-    return c.json({ error: 'user_id е задължителен' }, 400);
-  }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
 
   try {
-    const task = await duplicateTask(c.env.DB, id, body.user_id, {
+    const task = await duplicateTask(c.env.DB, id, body.user_id!, {
       due_date: body.due_date,
       due_time: body.due_time,
       repeat_rule: body.repeat_rule,
@@ -283,15 +292,14 @@ app.post('/api/users/register', async (c) => {
   if (!body.user_id || !body.app_token) {
     return c.json({ error: 'user_id и app_token са задължителни' }, 400);
   }
-  await registerUser(c.env.DB, body.user_id, body.app_token);
-  return c.json({ success: true });
+  const { ics_feed_token } = await registerUserAuth(c.env.DB, body.user_id, body.app_token);
+  return c.json({ success: true, ics_feed_token });
 });
 
 // --- Ephemeral token endpoint for frontend (includes rate limiting) ---
 
 app.post('/api/token', async (c) => {
-  const body = await c.req.json<{ user_id?: string }>().catch(() => ({} as any));
-  const userId = body?.user_id || 'anonymous';
+  const userId = authUserId(c);
 
   // Двоен дневен лимит: по потребител + по IP (user_id идва от клиента и може да се ротира)
   const userLimit = await resolveSessionLimit(c.env, userId);
@@ -345,7 +353,7 @@ app.post('/api/voice-preview', async (c) => {
 
   const voiceName = /^[A-Za-z][A-Za-z -]{0,30}$/.test(body.voice_name || '') ? body.voice_name! : 'Kore';
   const text = (body.text || 'Здравейте! Аз съм KASY, вашият AI Secretary. С какво мога да ви помогна?').slice(0, 120);
-  const userId = body.user_id || 'anonymous';
+  const userId = authUserId(c);
 
   // Кеш по глас+текст: гласовете са краен брой, така TTS API се вика веднъж на комбинация
   const cacheKey = `tts:${voiceName}:${await sha256Hex(text)}`;
@@ -412,7 +420,9 @@ app.post('/api/voice-preview', async (c) => {
 // --- Daily brief (generated by the evening cron, stored in KV) ---
 
 app.get('/api/brief/:user_id', async (c) => {
-  const userId = c.req.param('user_id');
+  const denied = forbidUnlessSelf(c, c.req.param('user_id'));
+  if (denied) return denied;
+  const userId = authUserId(c);
   const effective = await getEffectiveSubscription(c.env, userId, envInt);
   if (effective.enforced && !effective.limits.daily_brief) {
     return c.json({ brief: null, locked: true });
@@ -442,6 +452,8 @@ app.post('/api/tasks', async (c) => {
   if (!body.user_id || !(body.task || body.content)) {
     return c.json({ error: 'user_id и task са задължителни' }, 400);
   }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
 
   const effective = await getEffectiveSubscription(c.env, body.user_id, envInt);
   if (effective.enforced) {
@@ -479,7 +491,9 @@ app.post('/api/tasks', async (c) => {
 // --- Cloud calendar providers (Google + Microsoft primary flow) ---
 
 app.get('/api/calendar/providers/status/:user_id', async (c) => {
-  const userId = c.req.param('user_id');
+  const denied = forbidUnlessSelf(c, c.req.param('user_id'));
+  if (denied) return denied;
+  const userId = authUserId(c);
   const providers = await getProviderStatuses(c.env, userId);
   return c.json({
     providers,
@@ -511,6 +525,8 @@ app.post('/api/calendar/connect/start', async (c) => {
   if (!body.user_id || !provider) {
     return c.json({ error: 'user_id и provider са задължителни' }, 400);
   }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
 
   const effective = await getEffectiveSubscription(c.env, body.user_id, envInt);
   if (effective.enforced && !effective.limits.cloud_calendar) {
@@ -541,6 +557,8 @@ app.post('/api/calendar/connect/apple', async (c) => {
   if (!body.user_id || !body.apple_id || !body.password) {
     return c.json({ error: 'user_id, apple_id и password са задължителни' }, 400);
   }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
 
   const effective = await getEffectiveSubscription(c.env, body.user_id, envInt);
   if (effective.enforced && !effective.limits.cloud_calendar) {
@@ -549,7 +567,7 @@ app.post('/api/calendar/connect/apple', async (c) => {
 
   try {
     await connectAppleAccount(
-      c.env.DB,
+      c.env,
       body.user_id,
       body.apple_id,
       body.password,
@@ -574,6 +592,8 @@ app.post('/api/calendar/connect/callback', async (c) => {
   if (!body.user_id || !provider || !body.code || !body.state) {
     return c.json({ error: 'user_id, provider, code и state са задължителни' }, 400);
   }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
 
   try {
     await completeOAuthConnect(c.env, {
@@ -596,6 +616,8 @@ app.get('/api/calendar/calendars', async (c) => {
   if (!userId || !provider) {
     return c.json({ error: 'user_id и provider са задължителни' }, 400);
   }
+  const denied = forbidUnlessSelf(c, userId);
+  if (denied) return denied;
 
   try {
     const calendars = await listProviderCalendars(c.env, userId, provider, requestOrigin(new URL(c.req.url)));
@@ -615,6 +637,8 @@ app.post('/api/calendar/calendars/select', async (c) => {
   if (!body.user_id || !provider || !body.calendar_id) {
     return c.json({ error: 'user_id, provider и calendar_id са задължителни' }, 400);
   }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
 
   await setSelectedCalendar(c.env.DB, body.user_id, provider, body.calendar_id);
   return c.json({ success: true });
@@ -626,6 +650,8 @@ app.delete('/api/calendar/connect', async (c) => {
   if (!body.user_id || !provider) {
     return c.json({ error: 'user_id и provider са задължителни' }, 400);
   }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
   await disconnectProvider(c.env.DB, body.user_id, provider);
   return c.json({ success: true });
 });
@@ -636,6 +662,8 @@ app.get('/api/calendar/events', async (c) => {
   if (!userId || !provider) {
     return c.json({ error: 'user_id и provider са задължителни' }, 400);
   }
+  const denied = forbidUnlessSelf(c, userId);
+  if (denied) return denied;
 
   const from = c.req.query('from') || new Date().toISOString();
   const to = c.req.query('to') || new Date(Date.now() + 14 * 86400000).toISOString();
@@ -646,7 +674,9 @@ app.get('/api/calendar/events', async (c) => {
 // --- Search tasks endpoint (for voice commands) ---
 
 app.get('/api/tasks/:user_id/search', async (c) => {
-  const userId = c.req.param('user_id');
+  const denied = forbidUnlessSelf(c, c.req.param('user_id'));
+  if (denied) return denied;
+  const userId = authUserId(c);
   const query = c.req.query('q') || '';
   if (!query.trim()) return c.json({ tasks: [] });
 
@@ -702,8 +732,17 @@ const SOFIA_TZ = [
 ];
 
 app.get('/api/calendar.ics', async (c) => {
-  const userId = c.req.query('user_id');
-  if (!userId) return c.text('user_id е задължителен', 400);
+  const feedToken = c.req.query('token');
+  const legacyUserId = c.req.query('user_id');
+  let userId: string | null = null;
+
+  if (feedToken) {
+    userId = await getUserIdByIcsToken(c.env.DB, feedToken);
+  } else if (legacyUserId) {
+    userId = legacyUserId;
+  }
+
+  if (!userId) return c.text('Невалиден или липсващ feed token', 401);
 
   const reminderParam = parseInt(c.req.query('reminder') || '15', 10);
   const reminderMinutes = Math.min(120, Math.max(0, Number.isNaN(reminderParam) ? 15 : reminderParam));
@@ -792,6 +831,8 @@ app.get('/api/calendar.ics', async (c) => {
 app.get('/api/memory', async (c) => {
   const userId = c.req.query('user_id');
   if (!userId) return c.json({ error: 'user_id е задължителен' }, 400);
+  const denied = forbidUnlessSelf(c, userId);
+  if (denied) return denied;
   const raw = await c.env.SESSIONS.get(`memory:${userId}`);
   if (!raw) return c.json({ entries: [], updated_at: null });
   try {
@@ -809,6 +850,8 @@ app.put('/api/memory', async (c) => {
     updated_at?: string;
   }>().catch(() => null);
   if (!body?.user_id) return c.json({ error: 'user_id е задължителен' }, 400);
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
   const payload = {
     entries: Array.isArray(body.entries) ? body.entries : [],
     updated_at: body.updated_at || new Date().toISOString(),
@@ -829,6 +872,8 @@ app.post('/api/profile', async (c) => {
   if (!body?.user_id) {
     return c.json({ error: 'user_id е задължителен' }, 400);
   }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
   const language = body.language || 'bg';
   try {
     await c.env.SESSIONS.put(
@@ -848,6 +893,8 @@ app.post('/api/profile', async (c) => {
 app.get('/api/subscription', async (c) => {
   const userId = c.req.query('user_id');
   if (!userId) return c.json({ error: 'user_id е задължителен' }, 400);
+  const denied = forbidUnlessSelf(c, userId);
+  if (denied) return denied;
 
   const effective = await getEffectiveSubscription(c.env, userId, envInt);
   const catalog = getStripeCatalog(c.env);
@@ -880,6 +927,8 @@ app.post('/api/stripe/checkout', async (c) => {
   if (!body?.user_id) {
     return c.json({ error: 'user_id е задължителен' }, 400);
   }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
   const priceId = body.plan
     ? resolvePlanPriceId(body.plan, c.env)
     : body.price_id;
@@ -899,6 +948,8 @@ app.post('/api/stripe/checkout', async (c) => {
 app.post('/api/stripe/portal', async (c) => {
   const body = await c.req.json<{ user_id?: string }>().catch(() => null);
   if (!body?.user_id) return c.json({ error: 'user_id е задължителен' }, 400);
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
   try {
     const origin = requestOrigin(new URL(c.req.url));
     const { url } = await createPortalSession(c.env, body.user_id, origin);
@@ -938,6 +989,8 @@ app.post('/api/push/subscribe', async (c) => {
   if (!body?.user_id || !body?.subscription) {
     return c.json({ error: 'user_id и subscription са задължителни' }, 400);
   }
+  const denied = forbidUnlessSelf(c, body.user_id);
+  if (denied) return denied;
 
   try {
     const key = `push:${body.user_id}`;

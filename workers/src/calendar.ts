@@ -1,5 +1,6 @@
 import { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import type { Task } from './tasks';
+import { openSecret, sealSecret } from './crypto';
 
 export type CalendarProvider = 'google' | 'microsoft' | 'apple';
 
@@ -13,6 +14,7 @@ export interface CalendarEnv {
   MICROSOFT_CLIENT_SECRET?: string;
   MICROSOFT_REDIRECT_URI?: string;
   MICROSOFT_TENANT_ID?: string;
+  TOKEN_ENCRYPTION_KEY?: string;
 }
 
 interface CalendarConnection {
@@ -188,7 +190,7 @@ function parseJsonSafe<T>(text: string): T | null {
 }
 
 async function saveConnection(
-  db: D1Database,
+  env: CalendarEnv,
   userId: string,
   provider: CalendarProvider,
   accessToken: string,
@@ -197,9 +199,12 @@ async function saveConnection(
   scope?: string,
   providerUserId?: string
 ): Promise<void> {
-  await ensureCalendarSchema(db);
+  await ensureCalendarSchema(env.DB);
 
-  await db
+  const access = await sealSecret(env.TOKEN_ENCRYPTION_KEY, accessToken);
+  const refresh = await sealSecret(env.TOKEN_ENCRYPTION_KEY, refreshToken);
+
+  await env.DB
     .prepare(
       `INSERT INTO calendar_connections (
          user_id, provider, access_token, refresh_token, expires_at, scope, provider_user_id, connected_at, updated_at
@@ -212,17 +217,26 @@ async function saveConnection(
          provider_user_id = excluded.provider_user_id,
          updated_at = datetime('now')`
     )
-    .bind(userId, provider, accessToken, refreshToken, expiresAt, scope || null, providerUserId || null)
+    .bind(userId, provider, access, refresh, expiresAt, scope || null, providerUserId || null)
     .run();
 }
 
-async function getConnection(db: D1Database, userId: string, provider: CalendarProvider): Promise<CalendarConnection | null> {
-  await ensureCalendarSchema(db);
-  const row = await db
+async function getConnection(
+  env: CalendarEnv,
+  userId: string,
+  provider: CalendarProvider
+): Promise<CalendarConnection | null> {
+  await ensureCalendarSchema(env.DB);
+  const row = await env.DB
     .prepare('SELECT * FROM calendar_connections WHERE user_id = ? AND provider = ?')
     .bind(userId, provider)
     .first<CalendarConnection>();
-  return row ?? null;
+  if (!row) return null;
+  return {
+    ...row,
+    access_token: await openSecret(env.TOKEN_ENCRYPTION_KEY, row.access_token),
+    refresh_token: await openSecret(env.TOKEN_ENCRYPTION_KEY, row.refresh_token),
+  };
 }
 
 async function refreshAccessToken(
@@ -274,7 +288,7 @@ async function refreshAccessToken(
   };
 
   await saveConnection(
-    env.DB,
+    env,
     next.user_id,
     next.provider,
     next.access_token,
@@ -293,7 +307,7 @@ async function getValidConnection(
   provider: CalendarProvider,
   origin: string
 ): Promise<CalendarConnection | null> {
-  const conn = await getConnection(env.DB, userId, provider);
+  const conn = await getConnection(env, userId, provider);
   if (!conn) return null;
 
   if (provider === 'apple') return conn;
@@ -683,15 +697,25 @@ export async function getProviderStatuses(env: CalendarEnv, userId: string): Pro
   ];
 }
 
-function isAllowedOAuthRedirect(origin: string, redirectUri: string): boolean {
+function isAllowedOAuthRedirect(_origin: string, redirectUri: string): boolean {
   try {
     const url = new URL(redirectUri);
-    const base = origin.replace(/\/$/, '');
-    const allowed = new Set([
-      `${base}/settings.html`,
-      `${base}/settings`,
+    const allowedOrigins = new Set([
+      'https://aiva.radilov-k.workers.dev',
+      'https://ai-kasy.online',
+      'https://radilovk.github.io',
     ]);
-    return allowed.has(`${url.origin}${url.pathname}`);
+    if (!allowedOrigins.has(url.origin)) return false;
+    const path = url.pathname.replace(/\/$/, '') || '/';
+    const allowedPaths = new Set([
+      '/settings.html',
+      '/settings',
+      '/frontend/settings.html',
+      '/frontend/settings',
+      '/aiva/frontend/settings.html',
+      '/aiva/frontend/settings',
+    ]);
+    return allowedPaths.has(path);
   } catch {
     return false;
   }
@@ -802,7 +826,7 @@ export async function completeOAuthConnect(
   }
 
   await saveConnection(
-    env.DB,
+    env,
     params.userId,
     params.provider,
     token.access_token,
@@ -1243,7 +1267,7 @@ async function fetchAppleCalendars(appleId: string, password: string): Promise<A
 }
 
 export async function connectAppleAccount(
-  db: D1Database,
+  env: CalendarEnv,
   userId: string,
   appleId: string,
   appSpecificPassword: string,
@@ -1253,7 +1277,7 @@ export async function connectAppleAccount(
   const calendars = await fetchAppleCalendars(appleId, appSpecificPassword);
 
   await saveConnection(
-    db,
+    env,
     userId,
     'apple',
     appSpecificPassword, // stored as access_token
@@ -1263,5 +1287,5 @@ export async function connectAppleAccount(
     appleId // stored as provider_user_id
   );
 
-  await upsertCalendars(db, userId, 'apple', calendars);
+  await upsertCalendars(env.DB, userId, 'apple', calendars);
 }

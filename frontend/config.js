@@ -5,6 +5,8 @@
  */
 (function () {
   const WORKER_ORIGIN = 'https://aiva.radilov-k.workers.dev';
+  const PUBLIC_SITE_URL = 'https://ai-kasy.online/frontend';
+  const REMOTE_API_HOSTS = new Set(['ai-kasy.online']);
 
   /** Directory of the current page — works on Workers, GitHub Pages (/aiva/frontend/), and local dev. */
   function resolveAppBasePath() {
@@ -32,7 +34,7 @@
     if (host === 'localhost' || host === '127.0.0.1') {
       return '';
     }
-    if (host.endsWith('.github.io') || location.protocol === 'file:') {
+    if (REMOTE_API_HOSTS.has(host) || host.endsWith('.github.io') || location.protocol === 'file:') {
       return WORKER_ORIGIN;
     }
     return location.origin;
@@ -44,6 +46,7 @@
     API_BASE: resolveApiBase(),
     LIVE_MODEL: 'gemini-3.1-flash-live-preview',
     WORKER_ORIGIN,
+    PUBLIC_SITE_URL,
     APP_BASE: resolveAppBasePath(),
     appUrl,
     GITHUB_REPO,

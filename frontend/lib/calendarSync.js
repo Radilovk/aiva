@@ -22,9 +22,13 @@
   }
 
   function getFeedUrl(userId) {
+    const token = window.AIVA_AUTH?.getIcsFeedToken?.() || '';
+    const reminder = getReminderMinutes();
+    if (token) {
+      return `${getApiBase()}/api/calendar.ics?token=${encodeURIComponent(token)}&reminder=${reminder}`;
+    }
     const id = userId || getUserId();
     if (!id) return '';
-    const reminder = getReminderMinutes();
     return `${getApiBase()}/api/calendar.ics?user_id=${encodeURIComponent(id)}&reminder=${reminder}`;
   }
 

@@ -23,6 +23,7 @@ ON tasks (user_id, done, due_date, due_time, priority);
 CREATE TABLE users (
   id TEXT PRIMARY KEY,
   app_token TEXT,
+  ics_feed_token TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
