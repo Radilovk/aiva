@@ -52,6 +52,7 @@ interface OAuthStatePayload {
   userId: string;
   provider: CalendarProvider;
   redirectUri: string;
+  createdAt: number;
 }
 
 let calendarSchemaReady = false;
@@ -154,20 +155,29 @@ function randomState(): string {
   return crypto.randomUUID().replace(/-/g, '');
 }
 
-async function storeOAuthState(env: CalendarEnv, payload: OAuthStatePayload): Promise<string> {
+async function storeOAuthState(env: CalendarEnv, payload: Omit<OAuthStatePayload, 'createdAt'>): Promise<string> {
   const state = randomState();
-  await env.SESSIONS.put(oauthStateKey(state), JSON.stringify(payload), { expirationTtl: 600 });
+  await env.SESSIONS.put(
+    oauthStateKey(state),
+    JSON.stringify({ ...payload, createdAt: Date.now() })
+  );
   return state;
 }
 
-async function consumeOAuthState(env: CalendarEnv, state: string): Promise<OAuthStatePayload | null> {
+async function consumeOAuthState(env: CalendarEnv, state: string): Promise<Omit<OAuthStatePayload, 'createdAt'> | null> {
   const key = oauthStateKey(state);
   const raw = await env.SESSIONS.get(key);
   if (!raw) return null;
   await env.SESSIONS.delete(key);
 
   try {
-    return JSON.parse(raw) as OAuthStatePayload;
+    const parsed = JSON.parse(raw) as OAuthStatePayload;
+    if (!parsed.createdAt || Date.now() - parsed.createdAt > 10 * 60 * 1000) return null;
+    return {
+      userId: parsed.userId,
+      provider: parsed.provider,
+      redirectUri: parsed.redirectUri,
+    };
   } catch {
     return null;
   }
@@ -697,25 +707,27 @@ export async function getProviderStatuses(env: CalendarEnv, userId: string): Pro
   ];
 }
 
+export const OAUTH_APP_ORIGINS = new Set([
+  'https://aiva.radilov-k.workers.dev',
+  'https://ai-kasy.online',
+  'https://radilovk.github.io',
+]);
+
+const OAUTH_REDIRECT_PATHS = new Set([
+  '/settings.html',
+  '/settings',
+  '/frontend/settings.html',
+  '/frontend/settings',
+  '/aiva/frontend/settings.html',
+  '/aiva/frontend/settings',
+]);
+
 function isAllowedOAuthRedirect(_origin: string, redirectUri: string): boolean {
   try {
     const url = new URL(redirectUri);
-    const allowedOrigins = new Set([
-      'https://aiva.radilov-k.workers.dev',
-      'https://ai-kasy.online',
-      'https://radilovk.github.io',
-    ]);
-    if (!allowedOrigins.has(url.origin)) return false;
+    if (!OAUTH_APP_ORIGINS.has(url.origin)) return false;
     const path = url.pathname.replace(/\/$/, '') || '/';
-    const allowedPaths = new Set([
-      '/settings.html',
-      '/settings',
-      '/frontend/settings.html',
-      '/frontend/settings',
-      '/aiva/frontend/settings.html',
-      '/aiva/frontend/settings',
-    ]);
-    return allowedPaths.has(path);
+    return OAUTH_REDIRECT_PATHS.has(path);
   } catch {
     return false;
   }

@@ -34,11 +34,13 @@ node scripts/google-oauth-setup.mjs
    - **Authorized redirect URIs** (add **both** — Cloudflare may canonicalize `.html` to `/settings`):
 
 ```
+https://ai-kasy.online/frontend/settings.html
+https://ai-kasy.online/frontend/settings
 https://aiva.radilov-k.workers.dev/settings.html
 https://aiva.radilov-k.workers.dev/settings
 ```
 
-Ако ползваш custom домейн, добави и него, напр. `https://kasy.app/settings.html`.
+Ако ползваш и GitHub Pages: `https://radilovk.github.io/aiva/frontend/settings.html`
 
 5. Копирай **Client ID** и **Client secret**.
 
@@ -49,8 +51,9 @@ https://aiva.radilov-k.workers.dev/settings
 ```bash
 wrangler secret put GOOGLE_CLIENT_ID
 wrangler secret put GOOGLE_CLIENT_SECRET
-# По желание — фиксиран redirect (иначе се ползва APP_URL/settings.html):
+# По желание — фиксиран redirect (препоръчително за custom domain):
 wrangler secret put GOOGLE_REDIRECT_URI
+# https://ai-kasy.online/frontend/settings.html
 ```
 
 В `wrangler.jsonc` провери `APP_URL` — трябва да съвпада с публичния URL на приложението.

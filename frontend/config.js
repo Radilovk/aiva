@@ -5,7 +5,9 @@
  */
 (function () {
   const WORKER_ORIGIN = 'https://aiva.radilov-k.workers.dev';
+  /** Public marketing/app site (GitHub Pages + custom domain). API stays on WORKER_ORIGIN. */
   const PUBLIC_SITE_URL = 'https://ai-kasy.online/frontend';
+  /** Hostnames that serve static frontend only (no /api on same origin). */
   const REMOTE_API_HOSTS = new Set(['ai-kasy.online']);
 
   /** Directory of the current page — works on Workers, GitHub Pages (/aiva/frontend/), and local dev. */
