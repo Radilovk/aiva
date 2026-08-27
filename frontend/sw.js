@@ -180,11 +180,15 @@ self.addEventListener('notificationclick', (event) => {
       ? 'https://aiva.radilov-k.workers.dev'
       : self.location.origin;
     const userId = event.notification.data?.user_id;
+    const appToken = event.notification.data?.app_token;
     if (!userId) return;
     event.waitUntil(
       fetch(`${apiBase}/api/tasks/${taskId}/done`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(appToken ? { Authorization: `Bearer ${appToken}` } : {}),
+        },
         body: JSON.stringify({ user_id: userId }),
       })
     );

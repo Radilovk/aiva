@@ -780,6 +780,7 @@
   </div>
 
   <script src="config.js"></script>
+  <script src="lib/apiAuth.js"></script>
   <script src="settings.js"></script>
   <script src="lib/i18n.js"></script>
   <script src="lib/i18n-extended.js"></script>
@@ -1306,7 +1307,7 @@
 
       if (provider === 'subscribe') {
         const userId = getUserId() || 'unknown';
-        document.getElementById('icsUrl').value = calendarSync.getFeedUrl(userId) || `${getApiBase()}/api/calendar.ics?user_id=${encodeURIComponent(userId)}`;
+        document.getElementById('icsUrl').value = calendarSync.getFeedUrl(userId) || '';
       }
     }
 

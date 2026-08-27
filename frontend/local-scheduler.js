@@ -283,7 +283,16 @@
     if ('serviceWorker' in navigator && Notification.permission === 'granted') {
       const scheduled = JSON.parse(localStorage.getItem('aiva_scheduled_notifs') || '[]');
       const userId = getUserId();
-      scheduled.push({ id, task_id: taskId, user_id: userId, content: body, title, at: at.toISOString(), type });
+      scheduled.push({
+        id,
+        task_id: taskId,
+        user_id: userId,
+        app_token: window.AIVA_AUTH?.getAppToken?.() || localStorage.getItem('aiva_app_token') || '',
+        content: body,
+        title,
+        at: at.toISOString(),
+        type,
+      });
       localStorage.setItem('aiva_scheduled_notifs', JSON.stringify(scheduled));
       armPreciseTimer();
       return true;
@@ -465,7 +474,11 @@
             tag: `aiva-${entry.id}`,
             icon: window.AIVA_CONFIG?.appUrl?.('icons/icon-192.png') || 'icons/icon-192.png',
             badge: window.AIVA_CONFIG?.appUrl?.('icons/icon-192.png') || 'icons/icon-192.png',
-            data: { task_id: entry.task_id, user_id: entry.user_id || getUserId() },
+            data: {
+              task_id: entry.task_id,
+              user_id: entry.user_id || getUserId(),
+              app_token: entry.app_token || window.AIVA_AUTH?.getAppToken?.() || localStorage.getItem('aiva_app_token') || '',
+            },
             vibrate: [200, 100, 200],
             actions: [
               { action: 'open', title: t('notifOpen') },
