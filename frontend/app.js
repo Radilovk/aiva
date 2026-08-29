@@ -89,6 +89,7 @@ let touchStartX = null;
 let calendarNavLock = false;
 let voiceFocusTask = null;
 let cachedCalendarEvents = [];
+let cachedCalendarSource = null;
 let assistantTranscriptBuffer = '';
 let assistantTurnComplete = false;
 let sessionEnding = false;
@@ -1261,28 +1262,49 @@ function buildTasksContextForAssistant() {
 
 async function loadCalendarEventsForAssistant() {
   cachedCalendarEvents = [];
+  cachedCalendarSource = null;
   const crud = window.AIVA_CALENDAR_CRUD;
-  if (!crud?.isAndroid?.() || !crud.getSelectedCalendarId()) {
-    return [];
-  }
-
   const today = toISODate(new Date());
   const end = toISODate(addDays(new Date(), 14));
-  try {
-    const { events = [] } = await crud.readAivaEvents({ from: today, to: end });
-    cachedCalendarEvents = events;
-    return events;
-  } catch (e) {
-    console.warn('loadCalendarEventsForAssistant:', e);
-    return [];
+
+  if (crud?.isAndroid?.() && crud.getSelectedCalendarId()) {
+    try {
+      const { events = [] } = await crud.readAivaEvents({ from: today, to: end });
+      cachedCalendarEvents = events;
+      cachedCalendarSource = 'native';
+      return events;
+    } catch (e) {
+      console.warn('loadCalendarEventsForAssistant:', e);
+    }
   }
+
+  try {
+    const fromIso = `${today}T00:00:00`;
+    const toIso = `${end}T23:59:59`;
+    const cloudEvents = await window.AIVA_GOOGLE_CAL?.fetchEvents?.(fromIso, toIso);
+    if (cloudEvents?.length) {
+      cachedCalendarEvents = cloudEvents;
+      cachedCalendarSource = 'google';
+      return cloudEvents;
+    }
+  } catch (e) {
+    console.warn('loadCalendarEventsForAssistant (cloud):', e);
+  }
+
+  return [];
 }
 
 function buildCalendarContextForAssistant(events) {
-  if (!window.AIVA_CALENDAR_CRUD?.getSelectedCalendarId?.()) {
-    return '\n\nКАЛЕНДАР НА УСТРОЙСТВОТО: няма избран локален календар.';
+  const nativeSelected = window.AIVA_CALENDAR_CRUD?.getSelectedCalendarId?.();
+  const source = cachedCalendarSource || (nativeSelected ? 'native' : null);
+
+  if (!source) {
+    return '\n\nКАЛЕНДАР: няма свързан календар. Потребителят може да свърже Google Calendar от настройките.';
   }
   if (!events.length) {
+    if (source === 'google') {
+      return '\n\nКАЛЕНДАРНИ СЪБИТИЯ (Google Calendar): няма събития за следващите 2 седмици.';
+    }
     return '\n\nКАЛЕНДАРНИ СЪБИТИЯ (устройство): няма събития в избрания календар за следващите 2 седмици.';
   }
 
@@ -1292,6 +1314,10 @@ function buildCalendarContextForAssistant(events) {
     const when = event.startDate ? event.startDate.replace('T', ' ').slice(0, 16) : '';
     return `- event_id ${eventId}: "${title}" на ${when}`;
   });
+
+  if (source === 'google') {
+    return `\n\nКАЛЕНДАРНИ СЪБИТИЯ ОТ GOOGLE CALENDAR (${events.length}):\n${lines.join('\n')}\n\nТова са събития от свързания Google Calendar. Можеш да ги споменаваш в разговора, но не ги редактирай с инструменти за локален календар.`;
+  }
 
   return `\n\nКАЛЕНДАРНИ СЪБИТИЯ В ИЗБРАНИЯ КАЛЕНДАР (${events.length}):\n${lines.join('\n')}\n\nТова са събития от календара на устройството. За тях използвай read_calendar_events / edit_calendar_event / delete_calendar_event.`;
 }
@@ -2104,14 +2130,19 @@ function sendSessionGreeting() {
     prompt += ` ${tf('addressUserAs', { name: userName })}`;
   }
 
-  // Проактивен бриф: при първата сесия за деня асистентът обобщава днешните задачи
   const todayIso = toISODate(new Date());
   if (localStorage.getItem('aiva_last_brief_date') !== todayIso) {
     const todaysTasks = tasks.filter((task) => task.due_date === todayIso);
+    const todaysEvents = filterCalendarEvents(cachedCalendarEvents, 'today');
     if (todaysTasks.length) {
       prompt += ` ${tf('morningBriefPrompt', { count: todaysTasks.length })}`;
     }
-    localStorage.setItem('aiva_last_brief_date', todayIso);
+    if (todaysEvents.length) {
+      prompt += ` ${tf('morningBriefCalendarPrompt', { count: todaysEvents.length })}`;
+    }
+    if (todaysTasks.length || todaysEvents.length) {
+      localStorage.setItem('aiva_last_brief_date', todayIso);
+    }
   }
 
   client.sendTextMessage(prompt);
@@ -2582,9 +2613,17 @@ function tryShowDeviceBrief() {
   }, 700);
 }
 
-window.addEventListener('aiva:onboarding-complete', tryShowDeviceBrief);
+function tryGoogleCalendarActivation() {
+  window.AIVA_GOOGLE_CAL?.maybePromptAfterOnboarding?.();
+}
+
+window.addEventListener('aiva:onboarding-complete', () => {
+  tryShowDeviceBrief();
+  tryGoogleCalendarActivation();
+});
 if (window.AIVA_APP_ONBOARD?.isComplete?.()) {
   tryShowDeviceBrief();
+  window.AIVA_CALENDAR_ONBOARD?.prefetchCloudStatus?.();
 }
 
 document.getElementById('deviceIntelBriefOk')?.addEventListener('click', () => {

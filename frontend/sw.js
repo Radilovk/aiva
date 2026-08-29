@@ -10,7 +10,7 @@ function asset(path) {
   return `${SW_BASE}${String(path).replace(/^\//, '')}`;
 }
 
-const CACHE_NAME = 'aiva-v48';
+const CACHE_NAME = 'aiva-v49';
 const ASSETS = [
   'index.html',
   'landing.html',
@@ -57,6 +57,7 @@ const ASSETS = [
   'lib/nativeCalendar.js',
   'lib/calendarCrud.js',
   'lib/calendarSync.js',
+  'lib/googleCalendarActivation.js',
   'lib/calendarOnboarding.js',
   'manifest.json',
   'icons/brand.css',

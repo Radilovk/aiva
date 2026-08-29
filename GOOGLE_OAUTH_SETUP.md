@@ -29,6 +29,8 @@ node scripts/google-oauth-setup.mjs
    - **За тестване:** Publishing status = **Testing** → добави имейлите на тестовите потребители под **Test users**
    - **За всички потребители:** Submit for **verification** (Google преглежда приложението; без това външните потребители виждат „непотвърдено приложение“)
 
+> **Статус (авг. 2026):** OAuth verification е **одобрена** — публичните потребители могат да свързват Google Calendar без „unverified app“ екран.
+
 4. **Credentials → Create credentials → OAuth client ID**
    - Type: **Web application**
    - **Authorized redirect URIs** (add **both** — Cloudflare may canonicalize `.html` to `/settings`):

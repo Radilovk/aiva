@@ -803,6 +803,7 @@
   <script src="lib/nativeCalendar.js"></script>
   <script src="lib/calendarCrud.js"></script>
   <script src="lib/calendarSync.js"></script>
+  <script src="lib/googleCalendarActivation.js"></script>
   <script>
     const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.AIVA_SETTINGS;
     const { API_BASE, WORKER_ORIGIN } = window.AIVA_CONFIG;
@@ -1174,12 +1175,22 @@
       }
 
       select.innerHTML = '';
+      let selectedId = '';
       for (const cal of calendars) {
         const opt = document.createElement('option');
         opt.value = cal.id;
         opt.textContent = `${cal.name}${cal.primary ? ` ${t('primarySuffix')}` : ''}`;
-        if (cal.selected) opt.selected = true;
+        if (cal.selected) {
+          opt.selected = true;
+          selectedId = cal.id;
+        }
         select.appendChild(opt);
+      }
+      if (!selectedId) {
+        const primary = calendars.find((cal) => cal.primary) || calendars[0];
+        if (primary) {
+          select.value = primary.id;
+        }
       }
       await renderCloudStatus();
     }
@@ -1225,6 +1236,49 @@
       location.href = data.url;
     }
 
+    let oauthJustCompleted = false;
+
+    async function autoSelectPrimaryCloudCalendar() {
+      if (isAndroidPlatform) return false;
+      const userId = getUserId();
+      const provider = document.getElementById('cloudProviderSelect').value;
+      const select = document.getElementById('cloudCalendarSelect');
+      if (!userId || !select || !select.value) return false;
+
+      const res = await fetch(`${getApiBase()}/api/calendar/calendars/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, provider, calendar_id: select.value }),
+      });
+      if (!res.ok) return false;
+
+      const current = loadAssistantSettings();
+      saveAssistantSettings({
+        ...current,
+        calendarSync: {
+          ...current.calendarSync,
+          provider: 'google',
+          setupComplete: true,
+          preferredProvider: 'google',
+          connectedAt: new Date().toISOString(),
+        },
+      });
+      window.AIVA_GOOGLE_CAL?.markCalendarConfigured?.();
+      window.AIVA_GOOGLE_CAL?.clearStatusCache?.();
+      window.dispatchEvent(new CustomEvent('aiva:calendar-connected'));
+      return true;
+    }
+
+    async function maybeReturnAfterOAuth() {
+      const returnPath = window.AIVA_GOOGLE_CAL?.getReturnPath?.() || '';
+      if (!returnPath) return;
+      window.AIVA_GOOGLE_CAL?.clearReturnPath?.();
+      const target = returnPath.startsWith('http')
+        ? returnPath
+        : new URL(returnPath, location.origin).href;
+      location.href = target;
+    }
+
     async function handleCloudOauthCallback() {
       if (isAndroidPlatform) return;
       const code = new URLSearchParams(location.search).get('code');
@@ -1249,6 +1303,9 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         alert(data.error || t('errCalConnect'));
+      } else {
+        document.getElementById('cloudProviderSelect').value = provider;
+        oauthJustCompleted = true;
       }
 
       localStorage.removeItem('kaya_cloud_pending_provider');
@@ -1803,6 +1860,10 @@
       } else {
         await loadCloudCalendars();
         await renderCloudStatus();
+        if (oauthJustCompleted && document.getElementById('cloudCalendarSelect')?.value) {
+          await autoSelectPrimaryCloudCalendar();
+          await maybeReturnAfterOAuth();
+        }
       }
     })();
   </script>
