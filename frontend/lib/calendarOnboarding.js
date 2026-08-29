@@ -39,7 +39,7 @@
   function detectRecommendedMode() {
     if (isNative() && isAndroid()) return 'native';
     if (isIOS()) return 'subscribe';
-    return 'subscribe';
+    return 'cloud';
   }
 
   function getProviderLabel(provider) {
@@ -86,7 +86,12 @@
 
   function isConfigured() {
     const sync = window.AIVA_SETTINGS?.loadAssistantSettings?.()?.calendarSync || {};
-    return sync.setupComplete && sync.provider && sync.provider !== 'none';
+    if (sync.setupComplete && sync.provider && sync.provider !== 'none') return true;
+    if (window.AIVA_GOOGLE_CAL?.readCachedStatus?.()) {
+      const cached = window.AIVA_GOOGLE_CAL.readCachedStatus();
+      if (cached?.connected && cached?.selectedCalendarId) return true;
+    }
+    return false;
   }
 
   function shouldPrompt(task) {
@@ -120,15 +125,24 @@
     const platformLabel = window.AIVA_NATIVE_CALENDAR?.getPlatformLabel?.() || getProviderLabel(provider);
 
     if (text) {
-      text.textContent = task?.content
-        ? tf('calOnboardWithTask', { task: task.content, calendar: platformLabel })
-        : t('calOnboardDefault');
+      if (mode === 'cloud') {
+        text.textContent = task?.content
+          ? tf('calOnboardWithTask', { task: task.content, calendar: 'Google Calendar' })
+          : t('calOnboardGoogleWeb');
+      } else {
+        text.textContent = task?.content
+          ? tf('calOnboardWithTask', { task: task.content, calendar: platformLabel })
+          : t('calOnboardDefault');
+      }
     }
 
     if (primaryBtn) {
       if (mode === 'native') {
         primaryBtn.textContent = t('addPhoneCal');
         primaryBtn.dataset.mode = 'native';
+      } else if (mode === 'cloud') {
+        primaryBtn.textContent = tf('connectProvider', { provider: 'Google Calendar' });
+        primaryBtn.dataset.mode = 'cloud';
       } else {
         primaryBtn.textContent = tf('connectProvider', { provider: getProviderLabel(provider) });
         primaryBtn.dataset.mode = 'subscribe';
@@ -137,9 +151,13 @@
     }
 
     if (deviceBtn) {
-      deviceBtn.textContent = mode === 'native'
-        ? t('onlyThisIcs')
-        : t('onlyThisTask');
+      if (mode === 'native') {
+        deviceBtn.textContent = t('onlyThisIcs');
+      } else if (mode === 'cloud') {
+        deviceBtn.textContent = t('onlyThisIcs');
+      } else {
+        deviceBtn.textContent = t('onlyThisTask');
+      }
     }
 
     modal._pendingTask = task || null;
@@ -160,6 +178,11 @@
     const granted = await window.AIVA_NOTIFIER.requestPermission();
     saveNotificationSettings({ enabled: granted });
     return granted;
+  }
+
+  async function enableCloudGoogleSync() {
+    clearDismiss();
+    await window.AIVA_GOOGLE_CAL?.startConnect?.({ returnTo: window.AIVA_CONFIG?.appUrl?.('index.html') || 'index.html' });
   }
 
   async function enableAutoSync(provider, task) {
@@ -231,6 +254,12 @@
     window.dispatchEvent(new CustomEvent('aiva:calendar-connected'));
   }
 
+  function showGooglePrompt() {
+    if (isConfigured() || isDismissed()) return false;
+    showModal(null);
+    return true;
+  }
+
   function maybePrompt(task) {
     if (!shouldPrompt(task)) return false;
     showModal(task);
@@ -265,6 +294,8 @@
 
       if (mode === 'native') {
         await enableNativeSync(task);
+      } else if (mode === 'cloud') {
+        await enableCloudGoogleSync();
       } else {
         await enableAutoSync(provider, task);
       }
@@ -272,8 +303,13 @@
 
     document.getElementById('calendarOnboardDevice')?.addEventListener('click', async () => {
       const task = modal._pendingTask;
+      const mode = document.getElementById('calendarOnboardPrimary')?.dataset.mode || 'subscribe';
       hideModal();
-      await enableDevicePerTask(task);
+      if (mode === 'cloud') {
+        await enableAutoSync('google', task);
+      } else {
+        await enableDevicePerTask(task);
+      }
     });
 
     document.getElementById('calendarOnboardLater')?.addEventListener('click', () => {
@@ -299,19 +335,32 @@
     });
   }
 
+  async function prefetchCloudStatus() {
+    if (!window.AIVA_GOOGLE_CAL?.fetchGoogleStatus) return;
+    try {
+      await window.AIVA_GOOGLE_CAL.fetchGoogleStatus();
+      updateHeaderStatus();
+    } catch {
+      /* ignore */
+    }
+  }
+
   window.AIVA_CALENDAR_ONBOARD = {
     detectPreferredProvider,
     detectRecommendedMode,
     isConfigured,
     shouldPrompt,
     maybePrompt,
+    showGooglePrompt,
     checkAfterLoad,
     enableAutoSync,
+    enableCloudGoogleSync,
     enableNativeSync,
     enableDevicePerTask,
     enableNotifications,
     updateHeaderStatus,
     bindUI,
+    prefetchCloudStatus,
   };
 
   if (document.readyState === 'loading') {

@@ -180,6 +180,57 @@
       margin-bottom: 8px;
     }
 
+    .cal-simple-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .cal-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary);
+    }
+    .cal-status-pill.connected {
+      background: rgba(76, 217, 100, 0.12);
+      color: #7ddea0;
+    }
+    .cal-status-pill::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.5;
+    }
+    .cal-status-pill.connected::before {
+      background: #4cd964;
+      opacity: 1;
+    }
+    .cal-select-full {
+      width: 100%;
+      margin-top: 6px;
+    }
+    .cal-connect-btn {
+      width: 100%;
+      margin-top: 12px;
+      padding: 14px 18px;
+      font-size: 0.95rem;
+    }
+    .cal-disconnect-btn {
+      margin-top: 10px;
+      width: 100%;
+      font-size: 0.8rem;
+      padding: 10px;
+      opacity: 0.85;
+    }
+
     .saved-toast {
       position: fixed; bottom: calc(var(--safe-bottom) + var(--settings-bar-height) + 16px);
       left: 50%; transform: translateX(-50%) translateY(60px);
@@ -446,7 +497,7 @@
         <span class="toggle-label" data-i18n="showUpcomingBar">Показвай лента „Предстоящи"</span>
         <div class="toggle" id="toggleUpcomingStrip"></div>
       </div>
-      <p class="sync-note" data-i18n="notifPlatformNote">На Android APK напомнянията работят локално. На уеб/iOS — включете <a href="#calendar-sync" class="footer-link">календарен абонамент</a> за системни напомняния.</p>
+      <p class="sync-note" data-i18n="notifPlatformNote">На Android APK напомнянията работят локално. На уеб — свържете Google Calendar по-горе или използвайте ICS абонамент от „Други опции“.</p>
     </div>
 
     <!-- Calendar Sync -->
@@ -454,34 +505,47 @@
       <div class="section-title" data-i18n="calSyncTitle" data-i18n-prefix="📅 ">Синхронизация с календар</div>
 
       <div class="field" id="androidLocalCalendarSection" data-calendar-platform="android" style="display:none">
-        <p class="sync-note" id="localCalendarStatusText" data-i18n="localCalNotSelected" data-i18n-dynamic>Не е избран календар на телефона.</p>
-        <button class="btn primary" type="button" id="connectLocalCalendarBtn" data-i18n="connectLocal">Избери календар на телефона</button>
-        <div class="row-grid" id="localCalendarPicker" style="margin-top:10px;display:none">
-          <select id="localCalendarSelect">
-            <option value="" data-i18n="noLocalCalsFound">Няма намерени локални календари</option>
-          </select>
-          <button class="btn" type="button" id="saveLocalCalendarBtn" data-i18n="save">Запази</button>
+        <div class="cal-simple-card">
+          <span class="cal-status-pill" id="localCalStatusPill" data-i18n="localCalNotSelected" data-i18n-dynamic>Не е избран календар</span>
+          <p class="sync-note" data-i18n="androidCalHint">Задачите с дата се записват в избрания календар с напомняния.</p>
+          <button class="btn primary cal-connect-btn" type="button" id="connectLocalCalendarBtn" data-i18n="connectLocal">Избери календар на телефона</button>
+          <div id="localCalendarPicker" style="margin-top:12px;display:none">
+            <span class="field-label" data-i18n="calActiveCalendar">Активен календар</span>
+            <select id="localCalendarSelect" class="cal-select-full">
+              <option value="" data-i18n="noLocalCalsFound">Няма намерени локални календари</option>
+            </select>
+          </div>
         </div>
-        <p class="field-hint" data-i18n="androidCalHint">Задачите с дата се записват в избрания календар с напомняния.</p>
       </div>
 
       <div data-calendar-platform="web">
-        <div class="field">
-          <span class="field-label" data-i18n="calSyncModeLabel">Как да синхронизирате задачите</span>
-          <select id="calendarProvider">
-            <option value="none" data-i18n="provNone">Изключено</option>
-            <option value="subscribe" data-i18n="provSubscribeSimple">Абонамент в календар (препоръчано)</option>
-            <option value="manual" data-i18n="provManual">Ръчно при всяка нова задача</option>
-          </select>
-          <p class="field-hint" data-i18n="calSyncModeHint">Абонаментът добавя задачите в Google или Apple календар и ги обновява автоматично.</p>
+        <div class="cal-simple-card" id="googleCalCard">
+          <span class="cal-status-pill" id="googleCalStatusPill" data-i18n="cloudNotConnectedProvider" data-i18n-dynamic>Google Calendar не е свързан</span>
+          <p class="sync-note" data-i18n="calGoogleSimpleHint">Свържете Google Calendar с един клик — KASY ще вижда събитията ви и ще добавя задачи автоматично.</p>
+
+          <div id="googleCalConnectPanel">
+            <button class="btn primary cal-connect-btn" type="button" id="connectGoogleBtn" data-i18n="connectGoogleCalendar">Свържи Google Calendar</button>
+          </div>
+
+          <div id="googleCalManagePanel" hidden>
+            <div class="field" style="margin-top:12px;margin-bottom:0">
+              <span class="field-label" data-i18n="calActiveCalendar">Активен календар</span>
+              <select id="cloudCalendarSelect" class="cal-select-full">
+                <option value="" data-i18n="noCalendarsLoaded">Няма заредени календари</option>
+              </select>
+              <p class="field-hint" data-i18n="calAutoSaveHint">Промените се запазват автоматично.</p>
+            </div>
+            <button class="btn danger cal-disconnect-btn" type="button" id="disconnectCloudBtn" data-i18n="disconnectGoogle">Разкачи Google Calendar</button>
+          </div>
         </div>
 
-        <div class="field" id="subscribeSection" style="display:none">
-          <button class="btn primary" type="button" id="subscribePrimaryBtn" data-i18n="subscribePrimaryBtn">Отвори в календар</button>
-          <details class="cal-advanced">
-            <summary data-i18n="calAdvancedOptions">Други опции</summary>
+        <details class="cal-advanced" id="calOtherOptions">
+          <summary data-i18n="calOtherOptions">Други опции</summary>
+          <div style="margin-top:12px">
+            <p class="sync-note" data-i18n="calIcsHint">Без Google акаунт? Абонирайте се за ICS feed — задачите се появяват в календара, но без двупосочна синхронизация.</p>
+            <button class="btn" type="button" id="subscribePrimaryBtn" data-i18n="subscribePrimaryBtn" style="width:100%;margin-top:8px">Отвори в календар</button>
             <div class="subscribe-actions">
-              <button class="btn" type="button" id="subscribeGoogleBtn">Google</button>
+              <button class="btn" type="button" id="subscribeGoogleBtn">Google ICS</button>
               <button class="btn" type="button" id="subscribeAppleBtn">Apple</button>
               <button class="btn" type="button" id="subscribeOutlookBtn">Outlook</button>
             </div>
@@ -489,42 +553,12 @@
               <input type="text" id="icsUrl" readonly>
               <button class="btn" type="button" id="copyIcsBtn" data-i18n="copyBtn">Копирай</button>
             </div>
-            <button class="btn" type="button" id="exportAllIcsBtn" data-i18n="importAllIcs" style="margin-top:10px">Еднократен импорт (.ics)</button>
-          </details>
-        </div>
-
-        <div class="field" id="manualSection" style="display:none">
-          <p class="sync-note" data-i18n="manualCalHint">За всяка задача използвайте бутона „Календар“ в модала — без автоматично изтегляне на файлове.</p>
-        </div>
-
-        <details class="cal-cloud-panel" id="cloudPlusPanel">
-          <summary data-i18n="calCloudPlusTitle">Облачен календар — KASY Plus (двупосочен)</summary>
-          <div class="field" style="margin-top:12px">
-            <div class="subscribe-actions">
-              <button class="btn primary" type="button" id="connectGoogleBtn" data-i18n="connectGoogle">Свържи Google</button>
-              <button class="btn primary" type="button" id="connectMicrosoftBtn" data-i18n="connectOutlook">Свържи Outlook</button>
-            </div>
-            <p class="sync-note" id="cloudStatusText" data-i18n="cloudDisconnected" data-i18n-dynamic>Не е свързан облачен календар.</p>
-          </div>
-          <div class="field">
-            <div class="row-grid">
-              <select id="cloudProviderSelect">
-                <option value="google">Google</option>
-                <option value="microsoft">Outlook</option>
-                <option value="apple">Apple (iCloud)</option>
-              </select>
-              <select id="cloudCalendarSelect">
-                <option value="" data-i18n="noCalendarsLoaded">Няма заредени календари</option>
-              </select>
-            </div>
+            <button class="btn" type="button" id="exportAllIcsBtn" data-i18n="importAllIcs" style="margin-top:10px;width:100%">Еднократен импорт (.ics)</button>
+            <p class="sync-note" data-i18n="manualCalHint" style="margin-top:12px">Или добавяйте всяка задача ръчно с бутона „Календар“ в модала.</p>
             <div class="subscribe-actions" style="margin-top:10px">
-              <button class="btn" type="button" id="refreshCloudCalendarsBtn" data-i18n="refreshCals">Обнови</button>
-              <button class="btn" type="button" id="saveCloudCalendarBtn" data-i18n="savePick">Запази</button>
-              <button class="btn danger" type="button" id="disconnectCloudBtn" data-i18n="disconnectProv">Разкачи</button>
+              <button class="btn" type="button" id="connectMicrosoftBtn" data-i18n="connectOutlook">Свържи Outlook</button>
+              <button class="btn" type="button" id="showAppleFormBtn" data-i18n="showAppleCal">Apple iCloud</button>
             </div>
-          </div>
-          <div class="field">
-            <button class="btn" type="button" id="showAppleFormBtn" data-i18n="showAppleCal">Свържи Apple iCloud (CalDAV)</button>
             <div id="appleConnectForm" style="display:none; margin-top:10px; border:1px solid var(--border); padding:15px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.02);">
               <div class="field">
                 <span class="field-label" data-i18n="appleIdLabel">Apple ID (email)</span>
@@ -539,6 +573,9 @@
             </div>
           </div>
         </details>
+
+        <input type="hidden" id="calendarProvider" value="none">
+        <input type="hidden" id="cloudProviderSelect" value="google">
       </div>
     </div>
 
@@ -803,6 +840,7 @@
   <script src="lib/nativeCalendar.js"></script>
   <script src="lib/calendarCrud.js"></script>
   <script src="lib/calendarSync.js"></script>
+  <script src="lib/googleCalendarActivation.js"></script>
   <script>
     const { loadAssistantSettings, saveAssistantSettings, resetAssistantSettings } = window.AIVA_SETTINGS;
     const { API_BASE, WORKER_ORIGIN } = window.AIVA_CONFIG;
@@ -841,7 +879,7 @@
         syncAndroidCalendarStatus();
         refreshDeviceAccessStatus();
       } else {
-        renderCloudStatus();
+        renderGoogleCalUI();
       }
     }
 
@@ -931,11 +969,14 @@
       setToggle('toggleRemindAtStart', settings.notifications?.remindAtStart !== false);
       setToggle('toggleUpcomingStrip', settings.notifications?.showUpcomingStrip !== false);
 
-      // Calendar sync
-      const provider = settings.calendarSync?.provider || 'none';
-      const normalizedProvider = provider === 'ics' ? 'subscribe' : provider === 'device' ? 'manual' : provider;
-      document.getElementById('calendarProvider').value = normalizedProvider;
-      updateCalendarSyncUI();
+      // Calendar sync — web UI refreshed after populate
+      if (!isAndroidPlatform) {
+        const provider = settings.calendarSync?.provider || 'none';
+        const normalized = provider === 'ics' ? 'subscribe' : provider === 'device' ? 'manual' : provider;
+        const providerInput = document.getElementById('calendarProvider');
+        if (providerInput) providerInput.value = normalized;
+        refreshIcsUrl();
+      }
 
       // Voice
       document.getElementById('model').value = settings.model;
@@ -1085,23 +1126,33 @@
         }
       }
       document.getElementById('localCalendarPicker').style.display = '';
+      syncAndroidCalendarStatus();
     }
 
     function syncAndroidCalendarStatus() {
       if (!isAndroidPlatform) return;
-      const status = document.getElementById('localCalendarStatusText');
+      const pill = document.getElementById('localCalStatusPill');
+      const select = document.getElementById('localCalendarSelect');
       const selectedId = calendarCrud?.getSelectedCalendarId?.() || '';
-      status.textContent = selectedId
-        ? tf('localCalConnected', { id: selectedId })
-        : t('localCalNotSelected');
+      const selectedName = selectedId && select?.options?.length
+        ? Array.from(select.options).find((o) => o.value === selectedId)?.textContent
+        : '';
+
+      if (!pill) return;
+      if (selectedId) {
+        pill.textContent = selectedName
+          ? tf('localCalConnectedName', { name: selectedName })
+          : tf('localCalConnected', { id: selectedId });
+        pill.classList.add('connected');
+      } else {
+        pill.textContent = t('localCalNotSelected');
+        pill.classList.remove('connected');
+      }
     }
 
-    function saveSelectedLocalCalendar() {
+    async function saveSelectedLocalCalendar(silent) {
       const selectedId = document.getElementById('localCalendarSelect').value;
-      if (!selectedId) {
-        alert(t('pickLocalCal'));
-        return;
-      }
+      if (!selectedId) return;
       calendarCrud.setSelectedCalendarId(selectedId);
       settings = saveAssistantSettings({
         ...settings,
@@ -1112,7 +1163,7 @@
         },
       });
       syncAndroidCalendarStatus();
-      showSavedToast();
+      if (!silent) showSavedToast();
     }
 
     async function fetchCloudProviderStatus() {
@@ -1125,25 +1176,57 @@
       return data.providers || [];
     }
 
-    async function renderCloudStatus() {
+    async function renderGoogleCalUI() {
+      if (isAndroidPlatform) return;
+
+      const pill = document.getElementById('googleCalStatusPill');
+      const connectPanel = document.getElementById('googleCalConnectPanel');
+      const managePanel = document.getElementById('googleCalManagePanel');
+      const providerInput = document.getElementById('calendarProvider');
       const statuses = await fetchCloudProviderStatus();
-      const statusEl = document.getElementById('cloudStatusText');
-      const provider = document.getElementById('cloudProviderSelect').value;
-      const current = statuses.find((s) => s.provider === provider);
+      const google = statuses.find((s) => s.provider === 'google');
 
-      if (!current) {
-        statusEl.textContent = t('cloudDisconnected');
+      if (!google?.configured) {
+        if (pill) {
+          pill.textContent = tf('cloudNotConfigured', { provider: 'Google' });
+          pill.classList.remove('connected');
+        }
+        connectPanel.hidden = false;
+        managePanel.hidden = true;
+        if (providerInput) providerInput.value = 'none';
         return;
       }
 
-      if (!current.configured) {
-        statusEl.textContent = tf('cloudNotConfigured', { provider: provider === 'google' ? 'Google' : 'Outlook' });
-        return;
-      }
+      const isReady = !!(google.connected && google.selectedCalendarId);
 
-      statusEl.textContent = current.connected
-        ? tf('cloudConnected', { provider: provider === 'google' ? 'Google' : 'Outlook', name: current.selectedCalendarName ? ` · ${current.selectedCalendarName}` : '' })
-        : tf('cloudNotConnectedProvider', { provider: provider === 'google' ? 'Google' : 'Outlook' });
+      if (isReady) {
+        if (pill) {
+          pill.textContent = tf('cloudConnected', {
+            provider: 'Google',
+            name: google.selectedCalendarName ? ` · ${google.selectedCalendarName}` : '',
+          });
+          pill.classList.add('connected');
+        }
+        connectPanel.hidden = true;
+        managePanel.hidden = false;
+        if (providerInput) providerInput.value = 'google';
+      } else if (google.connected) {
+        if (pill) {
+          pill.textContent = t('calPickCalendarPrompt');
+          pill.classList.remove('connected');
+        }
+        connectPanel.hidden = true;
+        managePanel.hidden = false;
+        if (providerInput) providerInput.value = 'google';
+      } else {
+        if (pill) {
+          pill.textContent = tf('cloudNotConnectedProvider', { provider: 'Google' });
+          pill.classList.remove('connected');
+        }
+        connectPanel.hidden = false;
+        managePanel.hidden = true;
+        if (providerInput) providerInput.value = 'none';
+      }
     }
 
     async function loadCloudCalendars() {
@@ -1161,7 +1244,7 @@
       const res = await fetch(`${getApiBase()}/api/calendar/calendars?user_id=${encodeURIComponent(userId)}&provider=${encodeURIComponent(provider)}`);
       if (!res.ok) {
         select.innerHTML = `<option value="">${t('noProviderLink')}</option>`;
-        await renderCloudStatus();
+        await renderGoogleCalUI();
         return;
       }
 
@@ -1169,19 +1252,30 @@
       const calendars = data.calendars || [];
       if (!calendars.length) {
         select.innerHTML = `<option value="">${t('noCalendars')}</option>`;
-        await renderCloudStatus();
+        await renderGoogleCalUI();
         return;
       }
 
       select.innerHTML = '';
+      let selectedId = '';
       for (const cal of calendars) {
         const opt = document.createElement('option');
         opt.value = cal.id;
         opt.textContent = `${cal.name}${cal.primary ? ` ${t('primarySuffix')}` : ''}`;
-        if (cal.selected) opt.selected = true;
+        if (cal.selected) {
+          opt.selected = true;
+          selectedId = cal.id;
+        }
         select.appendChild(opt);
       }
-      await renderCloudStatus();
+      if (!selectedId) {
+        const primary = calendars.find((cal) => cal.primary) || calendars[0];
+        if (primary) {
+          select.value = primary.id;
+          await saveSelectedCloudCalendar(true);
+        }
+      }
+      await renderGoogleCalUI();
     }
 
     function getOAuthRedirectUri() {
@@ -1225,6 +1319,22 @@
       location.href = data.url;
     }
 
+    let oauthJustCompleted = false;
+
+    async function autoSelectPrimaryCloudCalendar() {
+      return saveSelectedCloudCalendar(true);
+    }
+
+    async function maybeReturnAfterOAuth() {
+      const returnPath = window.AIVA_GOOGLE_CAL?.getReturnPath?.() || '';
+      if (!returnPath) return;
+      window.AIVA_GOOGLE_CAL?.clearReturnPath?.();
+      const target = returnPath.startsWith('http')
+        ? returnPath
+        : new URL(returnPath, location.origin).href;
+      location.href = target;
+    }
+
     async function handleCloudOauthCallback() {
       if (isAndroidPlatform) return;
       const code = new URLSearchParams(location.search).get('code');
@@ -1249,21 +1359,21 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         alert(data.error || t('errCalConnect'));
+      } else {
+        document.getElementById('cloudProviderSelect').value = provider;
+        oauthJustCompleted = true;
       }
 
       localStorage.removeItem('kaya_cloud_pending_provider');
       history.replaceState({}, document.title, location.pathname + location.hash);
     }
 
-    async function saveSelectedCloudCalendar() {
+    async function saveSelectedCloudCalendar(silent) {
       if (isAndroidPlatform) return;
       const userId = getUserId();
-      const provider = document.getElementById('cloudProviderSelect').value;
+      const provider = document.getElementById('cloudProviderSelect').value || 'google';
       const calendarId = document.getElementById('cloudCalendarSelect').value;
-      if (!userId || !calendarId) {
-        alert(t('pickCalendar'));
-        return;
-      }
+      if (!userId || !calendarId) return;
 
       const res = await fetch(`${getApiBase()}/api/calendar/calendars/select`, {
         method: 'POST',
@@ -1272,17 +1382,31 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data.error || t('errSaveFailed'));
+        if (!silent) alert(data.error || t('errSaveFailed'));
         return;
       }
-      await renderCloudStatus();
-      showSavedToast();
+
+      settings = saveAssistantSettings({
+        ...settings,
+        calendarSync: {
+          ...settings.calendarSync,
+          provider: 'google',
+          setupComplete: true,
+          preferredProvider: 'google',
+          connectedAt: settings.calendarSync?.connectedAt || new Date().toISOString(),
+        },
+      });
+      window.AIVA_GOOGLE_CAL?.markCalendarConfigured?.();
+      window.AIVA_GOOGLE_CAL?.clearStatusCache?.();
+      window.dispatchEvent(new CustomEvent('aiva:calendar-connected'));
+      await renderGoogleCalUI();
+      if (!silent) showSavedToast();
     }
 
     async function disconnectCloudProvider() {
       if (isAndroidPlatform) return;
       const userId = getUserId();
-      const provider = document.getElementById('cloudProviderSelect').value;
+      const provider = document.getElementById('cloudProviderSelect').value || 'google';
       if (!userId) return;
       if (!confirm(t('confirmDisconnect'))) return;
 
@@ -1292,23 +1416,44 @@
         body: JSON.stringify({ user_id: userId, provider }),
       });
 
+      settings = saveAssistantSettings({
+        ...settings,
+        calendarSync: {
+          ...settings.calendarSync,
+          provider: 'none',
+          setupComplete: false,
+        },
+      });
+      window.AIVA_GOOGLE_CAL?.clearStatusCache?.();
       await loadCloudCalendars();
-      await renderCloudStatus();
+      await renderGoogleCalUI();
+    }
+
+    function refreshIcsUrl() {
+      const userId = getUserId() || 'unknown';
+      const icsInput = document.getElementById('icsUrl');
+      if (icsInput) {
+        icsInput.value = calendarSync.getFeedUrl(userId) || '';
+      }
+    }
+
+    function markSubscribeMode() {
+      const providerInput = document.getElementById('calendarProvider');
+      if (providerInput) providerInput.value = 'subscribe';
+      settings = saveAssistantSettings({
+        ...settings,
+        calendarSync: {
+          ...settings.calendarSync,
+          provider: 'subscribe',
+          setupComplete: true,
+          preferredProvider: getPreferredSubscribeProvider(),
+          subscribedAt: settings.calendarSync?.subscribedAt || new Date().toISOString(),
+        },
+      });
     }
 
     function updateCalendarSyncUI() {
-      if (isAndroidPlatform) return;
-      const provider = document.getElementById('calendarProvider').value;
-      const subscribeSection = document.getElementById('subscribeSection');
-      const manualSection = document.getElementById('manualSection');
-
-      subscribeSection.style.display = provider === 'subscribe' ? '' : 'none';
-      manualSection.style.display = provider === 'manual' ? '' : 'none';
-
-      if (provider === 'subscribe') {
-        const userId = getUserId() || 'unknown';
-        document.getElementById('icsUrl').value = calendarSync.getFeedUrl(userId) || '';
-      }
+      refreshIcsUrl();
     }
 
     function getPreferredSubscribeProvider() {
@@ -1368,11 +1513,15 @@
           showUpcomingStrip: getToggle('toggleUpcomingStrip'),
         },
         calendarSync: {
-          provider: isAndroidPlatform ? 'native' : document.getElementById('calendarProvider').value,
-          setupComplete: isAndroidPlatform ? !!calendarCrud?.getSelectedCalendarId?.() : document.getElementById('calendarProvider').value !== 'none',
+          provider: isAndroidPlatform
+            ? 'native'
+            : (document.getElementById('calendarProvider')?.value || settings.calendarSync?.provider || 'none'),
+          setupComplete: isAndroidPlatform
+            ? !!calendarCrud?.getSelectedCalendarId?.()
+            : document.getElementById('calendarProvider')?.value !== 'none',
           autoExportOnSave: false,
           preferredProvider: settings.calendarSync?.preferredProvider || null,
-          subscribedAt: (!isAndroidPlatform && document.getElementById('calendarProvider').value === 'subscribe')
+          subscribedAt: (!isAndroidPlatform && document.getElementById('calendarProvider')?.value === 'subscribe')
             ? (settings.calendarSync?.subscribedAt || new Date().toISOString())
             : settings.calendarSync?.subscribedAt || null,
         },
@@ -1449,15 +1598,12 @@
       el.addEventListener('click', () => el.classList.toggle('active'));
     });
 
-    document.getElementById('calendarProvider').addEventListener('change', updateCalendarSyncUI);
     if (!isAndroidPlatform) {
-      document.getElementById('cloudProviderSelect').addEventListener('change', async () => {
-        await loadCloudCalendars();
+      document.getElementById('cloudCalendarSelect').addEventListener('change', () => {
+        saveSelectedCloudCalendar(true);
       });
       document.getElementById('connectGoogleBtn').addEventListener('click', () => startCloudConnect('google'));
       document.getElementById('connectMicrosoftBtn').addEventListener('click', () => startCloudConnect('microsoft'));
-      document.getElementById('refreshCloudCalendarsBtn').addEventListener('click', loadCloudCalendars);
-      document.getElementById('saveCloudCalendarBtn').addEventListener('click', saveSelectedCloudCalendar);
       document.getElementById('disconnectCloudBtn').addEventListener('click', disconnectCloudProvider);
 
       document.getElementById('showAppleFormBtn').addEventListener('click', () => {
@@ -1506,10 +1652,13 @@
         alert(e.message || t('errLocalConnect'));
       }
     });
-    document.getElementById('saveLocalCalendarBtn')?.addEventListener('click', saveSelectedLocalCalendar);
+    document.getElementById('localCalendarSelect')?.addEventListener('change', () => {
+      saveSelectedLocalCalendar(true);
+    });
 
     document.getElementById('subscribePrimaryBtn')?.addEventListener('click', () => {
       try {
+        markSubscribeMode();
         calendarSync.openSubscribe(getPreferredSubscribeProvider());
       } catch (e) {
         alert(e.message);
@@ -1526,13 +1675,13 @@
     });
 
     document.getElementById('subscribeGoogleBtn').addEventListener('click', () => {
-      try { calendarSync.openSubscribe('google'); } catch (e) { alert(e.message); }
+      try { markSubscribeMode(); calendarSync.openSubscribe('google'); } catch (e) { alert(e.message); }
     });
     document.getElementById('subscribeAppleBtn').addEventListener('click', () => {
-      try { calendarSync.openSubscribe('apple'); } catch (e) { alert(e.message); }
+      try { markSubscribeMode(); calendarSync.openSubscribe('apple'); } catch (e) { alert(e.message); }
     });
     document.getElementById('subscribeOutlookBtn').addEventListener('click', () => {
-      try { calendarSync.openSubscribe('outlook'); } catch (e) { alert(e.message); }
+      try { markSubscribeMode(); calendarSync.openSubscribe('outlook'); } catch (e) { alert(e.message); }
     });
     document.getElementById('exportAllIcsBtn').addEventListener('click', async () => {
       const userId = getUserId();
@@ -1802,7 +1951,12 @@
         }
       } else {
         await loadCloudCalendars();
-        await renderCloudStatus();
+        await renderGoogleCalUI();
+        if (oauthJustCompleted && document.getElementById('cloudCalendarSelect')?.value) {
+          await autoSelectPrimaryCloudCalendar();
+          await renderGoogleCalUI();
+          await maybeReturnAfterOAuth();
+        }
       }
     })();
   </script>
