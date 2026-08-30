@@ -96,13 +96,82 @@
     sections.forEach((s) => observer.observe(s));
   }
 
-  function initLangSelect() {
-    const select = document.getElementById('langSelect');
-    if (!select || !window.AIVA_I18N) return;
-    window.AIVA_I18N.populateLanguageSelect(select, getLang());
-    select.addEventListener('change', () => {
-      saveLanguage(select.value);
-      applyLang(select.value);
+  function initLangPicker() {
+    const picker = document.getElementById('langPicker');
+    const btn = document.getElementById('langPickerBtn');
+    const menu = document.getElementById('langPickerMenu');
+    const codeEl = document.getElementById('langPickerCode');
+    const labelEl = document.getElementById('langPickerLabel');
+    if (!picker || !btn || !menu || !window.AIVA_I18N) return;
+
+    const langs = window.AIVA_I18N.SUPPORTED_LANGUAGES || [];
+    let backdrop = picker.querySelector('.lang-picker-backdrop');
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.className = 'lang-picker-backdrop';
+      backdrop.hidden = true;
+      picker.insertBefore(backdrop, picker.firstChild);
+    }
+
+    function updateButton(langCode) {
+      const lang = langs.find((l) => l.code === langCode) || langs[0];
+      if (!lang) return;
+      codeEl.textContent = lang.code.toUpperCase();
+      labelEl.textContent = lang.nativeLabel;
+      btn.setAttribute('aria-label', lang.nativeLabel);
+      menu.querySelectorAll('.lang-picker-option').forEach((opt) => {
+        const selected = opt.dataset.lang === langCode;
+        opt.setAttribute('aria-selected', selected ? 'true' : 'false');
+      });
+    }
+
+    function closeMenu() {
+      menu.hidden = true;
+      backdrop.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    }
+
+    function openMenu() {
+      menu.hidden = false;
+      backdrop.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      const selected = menu.querySelector('[aria-selected="true"]');
+      selected?.focus?.();
+    }
+
+    menu.innerHTML = '';
+    for (const lang of langs) {
+      const opt = document.createElement('button');
+      opt.type = 'button';
+      opt.className = 'lang-picker-option';
+      opt.role = 'option';
+      opt.dataset.lang = lang.code;
+      opt.innerHTML = `<span class="lang-picker-option-code">${lang.code.toUpperCase()}</span><span>${lang.nativeLabel}</span>`;
+      opt.addEventListener('click', () => {
+        saveLanguage(lang.code);
+        applyLang(lang.code);
+        updateButton(lang.code);
+        closeMenu();
+        btn.focus();
+      });
+      menu.appendChild(opt);
+    }
+
+    const current = getLang();
+    updateButton(current);
+
+    btn.addEventListener('click', () => {
+      if (menu.hidden) openMenu();
+      else closeMenu();
+    });
+
+    backdrop.addEventListener('click', closeMenu);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !menu.hidden) {
+        closeMenu();
+        btn.focus();
+      }
     });
   }
 
@@ -126,7 +195,7 @@
     initFaq();
     initSnapDots();
     initDockHighlight();
-    initLangSelect();
+    initLangPicker();
     initApkDownload();
     applyLang(getLang());
   }

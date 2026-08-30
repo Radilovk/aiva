@@ -34,7 +34,14 @@
           <a href="#faq" data-i18n="landingNavFaq">FAQ</a>
           <a class="nav-apk-link apk-download-btn" href="#" data-i18n="landingDownloadApkShort">Android app</a>
         </nav>
-        <select id="langSelect" class="lang-btn" aria-label="Language"></select>
+        <div class="lang-picker" id="langPicker">
+          <button type="button" class="lang-picker-btn" id="langPickerBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="langPickerMenu">
+            <span class="lang-picker-code" id="langPickerCode">BG</span>
+            <span class="lang-picker-label" id="langPickerLabel">Български</span>
+            <svg class="lang-picker-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="lang-picker-menu" id="langPickerMenu" role="listbox" hidden></div>
+        </div>
       </div>
     </header>
 
