@@ -6,10 +6,14 @@
   <script src="lib/i18n-boot.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#050508">
-  <meta name="description" content="KASY — voice assistant for tasks and calendar. Speak, sync Google Calendar, get reminders.">
+  <meta name="description" content="KASY AI Secretary — voice-first AI assistant for tasks and calendar. Free (€0) or Plus from €6.99/month. Speak naturally; KASY plans, reminds, and syncs Google Calendar.">
+  <meta name="application-name" content="KASY AI Secretary">
+  <link rel="canonical" href="https://ai-kasy.online/frontend/landing.html">
+  <meta property="og:url" content="https://ai-kasy.online/frontend/landing.html">
+  <meta property="og:type" content="website">
   <meta property="og:title" content="KASY — AI Secretary">
   <meta property="og:description" content="Speak. KASY organizes your day — tasks, calendar, and reminders by voice.">
-  <meta property="og:image" content="icons/og-image.png">
+  <meta property="og:image" content="https://ai-kasy.online/frontend/icons/og-image.png">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="icons/brand.css">
@@ -18,6 +22,59 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://ai-kasy.online/#organization",
+        "name": "KASY AI Secretary",
+        "alternateName": ["KASY", "kasy - ai secretary"],
+        "url": "https://ai-kasy.online/",
+        "logo": "https://ai-kasy.online/frontend/icons/brand.webp"
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://ai-kasy.online/#website",
+        "url": "https://ai-kasy.online/",
+        "name": "KASY AI Secretary",
+        "publisher": { "@id": "https://ai-kasy.online/#organization" }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://ai-kasy.online/frontend/landing.html#app",
+        "name": "KASY AI Secretary",
+        "applicationCategory": "ProductivityApplication",
+        "operatingSystem": "Web, Android",
+        "url": "https://ai-kasy.online/frontend/",
+        "description": "Voice-first AI secretary for tasks and calendar. Speak naturally — KASY plans, reminds, and syncs with Google Calendar.",
+        "offers": [
+          {
+            "@type": "Offer",
+            "name": "Free",
+            "price": "0",
+            "priceCurrency": "EUR",
+            "description": "5 voice sessions per day, up to 50 tasks"
+          },
+          {
+            "@type": "Offer",
+            "name": "KASY Plus Monthly",
+            "price": "6.99",
+            "priceCurrency": "EUR"
+          },
+          {
+            "@type": "Offer",
+            "name": "KASY Plus Yearly",
+            "price": "49.99",
+            "priceCurrency": "EUR"
+          }
+        ],
+        "publisher": { "@id": "https://ai-kasy.online/#organization" }
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
   <div class="landing-app">
@@ -345,6 +402,7 @@
           <a href="terms.html" data-i18n="landingFooterTerms">Terms</a>
           <a class="apk-download-btn" href="#" data-i18n="landingDownloadApkShort">Android app</a>
         </div>
+        <p class="footer-about">KASY AI Secretary (ai-kasy.online) — voice-first AI assistant for tasks and calendar. Pricing: Free €0 · Plus €6.99/month or €49.99/year.</p>
         <p class="footer-copy" data-i18n="landingFooterCopyright">© 2026 KASY</p>
       </footer>
     </main>

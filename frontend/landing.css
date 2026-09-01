@@ -1044,6 +1044,15 @@ body::before {
   color: rgba(255,255,255,0.3);
 }
 
+.footer-about {
+  max-width: 36rem;
+  margin: 0 auto 12px;
+  padding: 0 16px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.42);
+}
+
 /* ── Bottom chrome: dock + CTA unified ── */
 .bottom-chrome {
   position: fixed;
