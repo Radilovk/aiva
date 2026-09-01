@@ -360,6 +360,20 @@ body::before {
   margin-bottom: 12px;
 }
 
+.hero-brand-name {
+  display: block;
+  font-size: clamp(0.8rem, 3.2vw, 0.95rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent-2);
+  margin-bottom: 10px;
+}
+
+.hero-brand-lead {
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
 .hero-title .gradient {
   background: linear-gradient(135deg, #fff 20%, var(--accent-2) 80%);
   -webkit-background-clip: text;
