@@ -55,6 +55,30 @@
     return 'stock';
   }
 
+  function localizedOemHints(oem) {
+    const keys = [];
+    switch (oem) {
+      case 'xiaomi':
+        keys.push('deviceAccessOemHintXiaomi1', 'deviceAccessOemHintXiaomi2');
+        break;
+      case 'huawei':
+        keys.push('deviceAccessOemHintHuawei1', 'deviceAccessOemHintHuawei2');
+        break;
+      case 'samsung':
+        keys.push('deviceAccessOemHintSamsung1', 'deviceAccessOemHintSamsung2');
+        break;
+      case 'oppo':
+      case 'vivo':
+      case 'oneplus':
+        keys.push('deviceAccessOemHintColorOs1');
+        break;
+      default:
+        keys.push('deviceAccessOemHintStock1', 'deviceAccessOemHintStock2');
+    }
+    keys.push('deviceAccessOemHintContacts', 'deviceAccessOemHintMessaging');
+    return keys.map((k) => t(k));
+  }
+
   function buildInfoHtml(profile) {
     const brand = profile?.manufacturer || profile?.brand || 'Android';
     const model = profile?.model || '';
@@ -72,10 +96,10 @@
       lines.push('', tf('deviceAccessInfoAutostart', { brand }));
     }
 
-    const hints = profile?.aiControlHints;
-    if (Array.isArray(hints) && hints.length) {
+    const hints = localizedOemHints(oem);
+    if (hints.length) {
       lines.push('', t('deviceAccessInfoAiHints'));
-      for (const h of hints.slice(0, 3)) lines.push(`• ${h}`);
+      for (const h of hints) lines.push(`• ${h}`);
     }
 
     lines.push('', tf('deviceAccessInfoDetected', { brand, model, version }));
