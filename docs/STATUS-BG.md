@@ -27,7 +27,7 @@
 | A3 | ICS feed с secret token (не `user_id`) | ✅ | Код | PR #139 |
 | A4 | CORS whitelist | ✅ | Код | |
 | A5 | `TOKEN_ENCRYPTION_KEY` в Cloudflare | 👤 ⏳ | Ти | `wrangler secret put TOKEN_ENCRYPTION_KEY` |
-| A6 | Worker deploy | 👤 ⏳ | Ти | `cd workers && npm run deploy` |
+| A6 | Worker deploy (Workers Builds CI) | ✅ | Auto | Merge в `main` → Cloudflare deploy; fix sep. 2026 (PR #146 + stub) |
 
 ---
 
