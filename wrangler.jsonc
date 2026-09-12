@@ -38,11 +38,5 @@
     "STRIPE_PRICE_PLUS_MONTHLY": "",
     "STRIPE_PRICE_PLUS_YEARLY": "",
     "STRIPE_PRICE_PRO_LIFETIME": ""
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "deleted_classes": ["VoiceWebSocket"]
-    }
-  ]
+  }
 }
