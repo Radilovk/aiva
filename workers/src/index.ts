@@ -990,6 +990,15 @@ app.get('/', async (c) => {
   return c.redirect('/landing.html');
 });
 
+// Legacy Durable Object stub — keep exported so Workers Builds (versions upload)
+// does not fail with error 10064. Do NOT add deleted_classes migrations here;
+// the class is unused but may still be registered on the Cloudflare account.
+export class VoiceWebSocket {
+  async fetch(_request: Request) {
+    return new Response('This Durable Object is no longer used', { status: 410 });
+  }
+}
+
 // --- Export ---
 
 export default {
