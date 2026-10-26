@@ -10,7 +10,8 @@ def opts(it):
     if it["type"] == "text": return "свободен текст"
     if it["type"] == "notice": return "съобщение"
     o = it.get("options") or (S[it["scale"]] if it.get("scale") else None)
-    return " / ".join(o) if o else ""
+    rows = f'два отговора ({" · ".join(r["label"].lower() for r in it["rows"])}): ' if it.get("rows") else ""
+    return rows + (" / ".join(o) if o else "")
 
 
 def scoring(it):

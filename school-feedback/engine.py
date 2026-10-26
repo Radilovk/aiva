@@ -60,9 +60,12 @@ def variant(q: dict, it: dict, role: str, grade: int) -> dict:
     if y and "options" not in y and "scale" not in y:
         options = it.get("options") or (q["scales"][it["scale"]] if it.get("scale") else None)
     score = (y or {}).get("score", it.get("score"))
-    return {"id": it["id"], "text": text, "options": options, "score": score,
-            "type": (y or {}).get("type", it["type"]), "dimension": it.get("dimension"),
-            "weight": it.get("weight", 1.0), "aspect": it.get("aspect"), "module": it["module"]}
+    v = {"id": it["id"], "text": text, "options": options, "score": score,
+         "type": (y or {}).get("type", it["type"]), "dimension": it.get("dimension"),
+         "weight": it.get("weight", 1.0), "aspect": it.get("aspect"), "module": it["module"]}
+    if it.get("rows"):
+        v["rows"] = it["rows"]   # grid: each row is answered on its own id (e.g. SC01_S / SC01_V)
+    return v
 
 
 def applies(q: dict, it: dict, role: str, grade: int) -> bool:
@@ -309,9 +312,69 @@ def _indicators(a: dict, role: str, grade: int, q: dict) -> dict:
         "labelled_aggression_disputed": None if a.get("CD06") in (None, 3) else int(a["CD06"] in (1, 2)),
         "recess_removed": None if a.get("CD08") in (None, 3) else int(a["CD08"] in (1, 2)),
         "bullying_repeated": None if a.get("SF01") is None else int(a["SF01"] >= (2 if young else 2)),
-        "psychosomatic_often": None if a.get("WB01") is None else int(a["WB01"] >= (2 if young else 3)),
+        # weekly or more often in school weeks (SC01); the short grade-4 form asks WB01 instead
+        "psychosomatic_often": int(a["SC01_S"] >= 2) if isinstance(a.get("SC01_S"), int)
+        else (None if a.get("WB01") is None else int(a["WB01"] >= (2 if young else 3))),
+        "shouting_weekly": _at_least(a, "HP01", 2),
+        "class_punishment": _at_least(a, "HP02", 1),
+        "threats_weekly": _at_least(a, "HP03", 2),
+        "sent_out": _at_least(a, "HP04", 1),
+        "physical_force": None if a.get("HP05") in (None, 3) else int(a["HP05"] in (1, 2)),
+        "grade_as_punishment": None if a.get("HP06") in (None, 2) else int(a["HP06"] == 1),
     }
+    ind.update(_wellbeing(a, q))
+    ind["school_worse"] = _school_worse(a, q)
+    ind["sleep_short"] = _sleep_short(a, q, grade)
+    ind["homework_over_norm"] = _homework_over(a, q, role, grade)
     return ind
+
+
+def _at_least(a: dict, qid: str, k: int):
+    v = a.get(qid)
+    return None if not isinstance(v, int) else int(v >= k)
+
+
+def _wellbeing(a: dict, q: dict) -> dict:
+    """WHO-5 raw score 0..100 = 4 x sum of (5 - answer index); only when all five items are answered."""
+    vals = [a.get(f"WH0{i}") for i in range(1, 6)]
+    if not all(isinstance(v, int) for v in vals):
+        return {"low_wellbeing": None, "very_low_wellbeing": None}
+    raw = 4 * sum(5 - v for v in vals)
+    p = q["params"]["who5"]
+    return {"low_wellbeing": int(raw <= p["low"]), "very_low_wellbeing": int(raw <= p["very_low"])}
+
+
+def _school_worse(a: dict, q: dict):
+    """Same child, two periods: symptoms at least `worse_steps` more frequent in school weeks than in the vacation."""
+    c = q["params"]["contrast"]
+    pairs = [(a.get(f"{s}_S"), a.get(f"{s}_V")) for s in c["symptoms"]]
+    pairs = [(x, y) for x, y in pairs if isinstance(x, int) and isinstance(y, int)]
+    if len(pairs) < c["worse_min_symptoms"]:
+        return None
+    return int(sum(1 for x, y in pairs if x - y >= c["worse_steps"]) >= c["worse_min_symptoms"])
+
+
+def _sleep_short(a: dict, q: dict, grade: int):
+    d = next((x for x in q["derived"] if x["kind"] == "sleep_hours"), None)
+    b, w = a.get("SL01"), a.get("SL02")
+    if d is None or not isinstance(b, int) or not isinstance(w, int):
+        return None
+    hours = 24 - d["bed_hours"][b] + d["wake_hours"][w]
+    need = q["params"]["norms"]["sleep"]["min_hours_by_grade"]["1-6" if grade <= 6 else "7-12"]
+    return int(hours < need)
+
+
+def _homework_over(a: dict, q: dict, role: str, grade: int):
+    v = a.get("WL01")
+    if not isinstance(v, int):
+        return None
+    spec = variant(q, q["_by_id"]["WL01"], role, grade).get("score") or {}
+    mins = spec.get("minutes") or []
+    if v >= len(mins) or mins[v] is None:
+        return None
+    hw = q["params"]["norms"]["homework_weekday"]
+    norm = min(hw["minutes_per_grade"] * grade, hw["cap_minutes"])
+    return int(mins[v] > q["params"]["homework_over_multiple"] * norm)
 
 
 def _answer_vector(a: dict) -> str:
@@ -819,11 +882,34 @@ def _pick(q: dict, v: dict, target: float, grade: int):
     return best
 
 
+def _sim_grid(ans: dict, v: dict, rng: random.Random, latent: float, grade: int):
+    """School weeks vs vacation: the vacation level is the child's own; a weak school adds symptoms and cuts sleep."""
+    s_id, v_id = v["rows"][0]["id"], v["rows"][1]["id"]
+    n = len(v["options"])
+    clamp = lambda x: int(min(n - 1, max(0, round(x))))
+    if v["id"] == "SC06":
+        vac = clamp(3 + rng.gauss(0, 0.7) - (grade - 6) / 6)
+        ans[v_id], ans[s_id] = vac, clamp(vac - max(0.0, 0.6 + (grade - 4) / 5 - 0.6 * latent + rng.gauss(0, 0.6)))
+    else:
+        vac = clamp(0.8 + rng.gauss(0, 0.7))
+        ans[v_id], ans[s_id] = vac, clamp(vac + max(0.0, 0.3 - 0.8 * latent + rng.gauss(0, 0.6)))
+
+
+def _sim_rare(ans: dict, v: dict, rng: random.Random, latent: float):
+    """Harmful practices are rare events, more frequent where the school climate is poor."""
+    if v["id"] == "HP05":
+        ans[v["id"]] = 1 if rng.random() < 0.01 + (0.08 if latent < -1.5 else 0.0) else 0
+    elif v["id"] == "HP06":
+        ans[v["id"]] = 1 if rng.random() < 0.04 + (0.12 if latent < -1.0 else 0.0) else 0
+    else:
+        ans[v["id"]] = int(min(3, max(0, round(-0.8 - 0.9 * latent + rng.gauss(0, 0.8)))))
+
+
 def _sim_answers(q: dict, rng: random.Random, role: str, grade: int, latent: float, gender: int, token: str) -> dict:
     ans = {}
     for _ in range(3):  # iterate so that conditional questions see their parents' answers
         for v in flow(q, {"role": role, "grade": grade, "token": token}, ans, []):
-            if v["id"] in ans or v["type"] in ("notice", "text"):
+            if v["id"] in ans or v["type"] in ("notice", "text") or (v["type"] == "grid" and v["rows"][0]["id"] in ans):
                 continue
             if v["id"] == "PR01":
                 ans[v["id"]] = gender
@@ -838,6 +924,10 @@ def _sim_answers(q: dict, rng: random.Random, role: str, grade: int, latent: flo
                 ans[v["id"]] = 1 if rng.random() > 0.05 else 3
             elif v["type"] == "multi":
                 ans[v["id"]] = [rng.randrange(len(v["options"]))]
+            elif v["type"] == "grid":
+                _sim_grid(ans, v, rng, latent, grade)
+            elif v["module"] == "HP":
+                _sim_rare(ans, v, rng, latent)
             elif v.get("score"):
                 ans[v["id"]] = _pick(q, v, 62 + 14 * latent + rng.gauss(0, 12), grade)
             elif v.get("options"):

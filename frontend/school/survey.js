@@ -10,12 +10,13 @@
   const SECTIONS = {
     PR: ["За детето", "За теб"], WL: ["Домашни и натоварване"], SL: ["Сън и свободно време"],
     WB: ["Как се чувства детето", "Как се чувстваш"], TQ: ["Часовете"], TC: ["Учителите"], SU: ["Подкрепа"],
-    CD: ["Правила и дисциплина"], SF: ["Безопасност"], QC: ["Проверка"], CP: ["Връзка с училището"],
+    CD: ["Правила и дисциплина"], SF: ["Безопасност"], WH: ["Последните две седмици"], SC: ["Учебно време и ваканция"],
+    HP: ["Какво се случва в час"], QC: ["Проверка"], CP: ["Връзка с училището"],
     SY: ["Учебната система"], OT: ["Със свои думи"],
   };
   // Answers that mean "no answer"; shown apart, smaller, so they never get picked by accident.
   const ALT = /^(не знам|не помня|предпочитам да не посоча|не искам да кажа)/i;
-  const SECONDS = { single: 6, multi: 10, text: 30, notice: 4 };   // measured tap-through pace, not reading-every-word pace
+  const SECONDS = { single: 6, multi: 10, text: 30, notice: 4, grid: 9 };   // measured tap-through pace, not reading-every-word pace
 
   const st = { code: "", s: null, qs: [], answers: {}, idx: 0, started: 0, triggers: new Set(), dir: 1, busy: false };
 
@@ -37,7 +38,7 @@
   const keepCase = (a, b) => (a[0] === a[0].toUpperCase() ? b[0].toUpperCase() + b.slice(1) : b);
 
   function optionText(q, text) {
-    if (text === "Не сме / не съм казвал(а)") return st.s.role === "parent" ? "Не сме сигнализирали" : adapt("Не съм казвал(а)");
+    if (text === "Не сме / не съм казвал(а)") return st.s.role === "parent" ? "Не сме казвали" : adapt("Не съм казвал(а)");
     return adapt(text);
   }
 
@@ -138,7 +139,7 @@
     const items = [
       [ICON.clock, `Около ${min} минути. Повечето въпроси са с едно докосване.`],
       [ICON.shield, s.role === "parent"
-        ? "Отговаряте анонимно. Мислете за последния месец от учебната година."
+        ? "Отговаряте анонимно. Мислете за последния месец."
         : "Никой няма да види отговорите ти – нито учителите, нито родителите ти. Мисли за последния месец."],
       [ICON.check, s.role === "parent"
         ? "Няма верни и грешни отговори. Ако не знаете – пропуснете въпроса или изберете „Не знам“."
@@ -204,6 +205,7 @@
       if (q.type === "single") box.appendChild(singleOptions(q));
       else if (q.type === "multi") box.appendChild(multiOptions(q));
       else if (q.type === "text") box.appendChild(textInput(q));
+      else if (q.type === "grid") box.appendChild(gridOptions(q));
     }
     stage.appendChild(box);
     const nb = box.querySelector('[data-act="next"]');
@@ -270,6 +272,57 @@
     if (alt.children.length) wrap.appendChild(alt);
     wrap.appendChild(actions(q, false));
     return wrap;
+  }
+
+  /** Same question for two periods (school weeks / vacation): one row of answers each, advances when both are set. */
+  function gridOptions(q) {
+    const wrap = document.createElement("div");
+    const hint = document.createElement("p");
+    hint.className = "q-hint";
+    hint.textContent = st.s.role === "student" ? "Отговори и за двата периода." : "Отговорете и за двата периода.";
+    wrap.appendChild(hint);
+    for (const row of q.rows || []) {
+      const box = document.createElement("div");
+      box.className = "grid-row";
+      box.dataset.row = row.id;
+      const h = document.createElement("div");
+      h.className = "grid-label";
+      h.id = "gl-" + row.id;
+      h.textContent = row.label;
+      box.appendChild(h);
+      const seg = document.createElement("div");
+      seg.className = "seg";
+      seg.setAttribute("role", "radiogroup");
+      seg.setAttribute("aria-labelledby", "q-text gl-" + row.id);
+      (q.options || []).forEach((o, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "opt";
+        b.setAttribute("role", "radio");
+        b.setAttribute("aria-checked", String(st.answers[row.id] === i));
+        b.dataset.i = String(i);
+        b.innerHTML = `<span class="lbl">${esc(o)}</span>`;
+        b.addEventListener("click", () => chooseRow(q, row.id, i, seg));
+        seg.appendChild(b);
+      });
+      box.appendChild(seg);
+      wrap.appendChild(box);
+    }
+    wrap.appendChild(actions(q, false));
+    return wrap;
+  }
+
+  function chooseRow(q, rowId, i, seg) {
+    st.answers[rowId] = i;
+    for (const b of seg.querySelectorAll(".opt")) b.setAttribute("aria-checked", String(Number(b.dataset.i) === i));
+    save();
+    clearTimeout(advanceTimer);
+    if (answered(q)) advanceTimer = setTimeout(() => { if (st.qs[st.idx]?.id === q.id) next(); }, 320);
+    else {
+      // phones: bring the period that is still open into view
+      const open = [...$("stage").querySelectorAll(".grid-row")].find((r) => !Number.isInteger(st.answers[r.dataset.row]));
+      if (open && open.getBoundingClientRect().top > window.innerHeight * 0.6) open.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }
 
   function multiOptions(q) {
@@ -341,6 +394,7 @@
   }
 
   function answered(q) {
+    if (q.type === "grid") return (q.rows || []).every((r) => Number.isInteger(st.answers[r.id]));
     const v = st.answers[q.id];
     return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && !v.length);
   }
@@ -387,7 +441,12 @@
     if (st.idx >= st.qs.length) return review();
     render();
   }
-  function skip() { delete st.answers[st.qs[st.idx].id]; save(); next(); }
+  function skip() {
+    const q = st.qs[st.idx];
+    delete st.answers[q.id];
+    for (const r of q.rows || []) delete st.answers[r.id];
+    save(); next();
+  }
   function goBack() {
     if (!$("s-review").hidden) { st.idx = st.qs.length - 1; show("s-q"); st.dir = -1; return render(); }
     if (st.idx === 0) { renderIntro(); return show("s-intro"); }
@@ -403,7 +462,11 @@
     const q = st.qs[st.idx];
     if (!q) return;
     if (!typing && /^[1-9]$/.test(e.key)) {
-      const b = $("stage").querySelectorAll(".opt")[Number(e.key) - 1];
+      // grid: digits answer the first row that is still open
+      const scope = q.type === "grid"
+        ? ([...$("stage").querySelectorAll(".grid-row")].find((r) => !Number.isInteger(st.answers[r.dataset.row])) || $("stage").querySelector(".grid-row:last-of-type"))
+        : $("stage");
+      const b = scope?.querySelectorAll(".opt")[Number(e.key) - 1];
       if (b) { e.preventDefault(); b.click(); }
     } else if (e.key === "Enter" && !(typing && e.target instanceof HTMLTextAreaElement && !e.ctrlKey)) {
       if (q.type !== "single" || answered(q)) { e.preventDefault(); next(); }
@@ -432,7 +495,7 @@
   }
 
   async function submit() {
-    const visible = new Set(st.qs.map((q) => q.id));
+    const visible = new Set(st.qs.flatMap((q) => [q.id, ...(q.rows || []).map((r) => r.id)]));
     const answers = {}, teacher_answers = {};
     for (const [k, v] of Object.entries(st.answers)) {
       if (!visible.has(k)) continue;                       // answers to sub-questions that are hidden again
@@ -463,7 +526,7 @@
     $("done-text").textContent = s.demo
       ? "Нищо не беше записано. С истински код отговорите влизат анонимно в резултатите на класа и училището."
       : s.role === "student"
-        ? "Отговорите ти са записани анонимно. Те ще помогнат училището да стане по-добро място за всички."
+        ? "Отговорите ти са записани анонимно. Те ще помогнат на училището да стане по-добро място."
         : "Отговорите са записани анонимно. Резултатите ще бъдат публикувани обобщено, след като се съберат достатъчно отговори.";
     const sup = $("done-support");
     sup.hidden = s.role !== "student";

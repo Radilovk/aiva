@@ -12,7 +12,7 @@
 
   /** Stable ids from names, so the same school keeps its id (and its trend) across waves. */
   const slug = (s) => String(s || "").toLowerCase().replace(/[„“"'«»]/g, "").trim().replace(/\s+/g, "-").replace(/[^\p{L}\p{N}_.-]/gu, "").slice(0, 60);
-  const SCOPE = { school_admin: "Директор", teacher: "Учител", researcher: "Изследовател", admin: "Администратор" };
+  const SCOPE = { school_admin: "Директор", teacher: "Учител", inspector: "Инспекторат", researcher: "Изследовател", admin: "Администратор" };
 
   async function call(path, opts = {}) { return api(path, { ...opts, key: KEY }); }
 
@@ -128,6 +128,7 @@
     const s = $("k-scope").value;
     $("k-school-f").hidden = s !== "school_admin";
     $("k-teacher-f").hidden = s !== "teacher";
+    $("k-region-f").hidden = s !== "inspector";
   }
   $("k-scope").addEventListener("change", syncKeyForm);
   syncKeyForm();
@@ -142,7 +143,8 @@
 
   $("key-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const body = { scope: $("k-scope").value, label: $("k-label").value.trim(), school_id: $("k-school").value.trim() || undefined, teacher_id: $("k-teacher").value.trim() || undefined };
+    const body = { scope: $("k-scope").value, label: $("k-label").value.trim(), school_id: $("k-school").value.trim() || undefined, teacher_id: $("k-teacher").value.trim() || undefined,
+      region_id: $("k-region").value.trim() || undefined };
     try {
       const r = await call("/admin/keys", { method: "POST", body });
       $("key-out").hidden = false;
@@ -153,7 +155,7 @@
 
   async function loadKeys() {
     const { keys } = await call("/admin/keys");
-    $("keys").innerHTML = keys.map((k) => `<tr><td>${esc(k.label || "–")}</td><td>${esc(SCOPE[k.scope] || k.scope)}</td><td class="small">${esc(k.school_id || k.teacher_id || "всичко")}</td>
+    $("keys").innerHTML = keys.map((k) => `<tr><td>${esc(k.label || "–")}</td><td>${esc(SCOPE[k.scope] || k.scope)}</td><td class="small">${esc(k.school_id || k.teacher_id || k.region_id || (k.scope === "inspector" ? "цялата страна" : "всичко"))}</td>
       <td style="text-align:right"><button class="btn quiet small" data-id="${esc(k.id)}">Отнеми</button></td></tr>`).join("") || `<tr><td colspan="4" class="muted">Няма ключове.</td></tr>`;
     for (const b of $("keys").querySelectorAll("button[data-id]")) b.addEventListener("click", async () => {
       if (!confirm("Да се отнеме ли този ключ?")) return;
@@ -217,7 +219,7 @@
     const q = E.loadQuestionnaire();
     const res = E.runWave(q, items.map((x) => x.r), { classSizes: classSizes && Object.keys(classSizes).length ? classSizes : null });
     const rows = E.unitRows(res, items.map((x) => ({ region_id: x.r.region_id, school_id: x.r.school_id, themes: x.t })));
-    const meta = { ...res.meta, campaign_alerts: res.campaign_alerts };
+    const meta = { ...res.meta, campaign_alerts: res.campaign_alerts, references: res.references };
     await upload(waveId, rows, { meta }, progress);
     return meta;
   }
@@ -245,7 +247,7 @@
           ...Object.entries(s.classGrades).map(([cid, g]) => ["class", cid, `${g} клас`]),
           ...Object.keys(res.teacher).map((tid) => ["teacher", tid, `Учител ${tid.split("-T")[1]} (демо)`]),
         ];
-        await upload(wid, rows, { demo: true, title, created_at: sqlTime(at), names, meta: { ...res.meta, campaign_alerts: res.campaign_alerts } }, (t) => { btn.textContent = t; });
+        await upload(wid, rows, { demo: true, title, created_at: sqlTime(at), names, meta: { ...res.meta, campaign_alerts: res.campaign_alerts, references: res.references } }, (t) => { btn.textContent = t; });
       }
       toast("Демо данните са готови.");
       loadWaves();

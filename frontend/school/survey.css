@@ -113,3 +113,15 @@ body.sv main { flex: 1; padding: 0; display: flex; flex-direction: column; }
   .sv-stage { padding-top: 28px; }
   .q-text { margin-top: 20px; }
 }
+
+/* two periods of the same question (school weeks / vacation) */
+.grid-row { margin-top: 16px; }
+.grid-label { font-size: .82rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.seg { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.seg .opt { min-height: 56px; padding: 8px 10px; justify-content: center; text-align: center; font-size: .9rem; line-height: 1.25; }
+.seg .opt .lbl { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; hyphens: auto; }
+/* phones: one tidy column per period instead of squeezed cells */
+@media (max-width: 640px) {
+  .seg { grid-template-columns: 1fr; gap: 6px; }
+  .seg .opt { min-height: 46px; justify-content: flex-start; text-align: left; font-size: 1rem; padding: 10px 14px; }
+}

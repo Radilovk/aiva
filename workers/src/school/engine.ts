@@ -136,6 +136,8 @@ export function isYoung(q: Questionnaire, role: string, grade: number): boolean 
 export interface Variant {
   id: string; text: string; options: string[] | null; score: Dict | null; type: string;
   dimension: string | null; weight: number; aspect: string | null; module: string; teacher_id?: string;
+  /** grid items: each row is answered on its own id (e.g. SC01_S / SC01_V) */
+  rows?: { id: string; label: string }[];
 }
 
 export function variant(q: Questionnaire, it: Dict, role: string, grade: number): Variant {
@@ -147,10 +149,12 @@ export function variant(q: Questionnaire, it: Dict, role: string, grade: number)
     options = it.options || (it.scale ? q.scales[it.scale] : null);
   }
   const score = y && 'score' in y ? y.score : it.score;
-  return {
+  const v: Variant = {
     id: it.id, text, options: options ?? null, score: score ?? null, type: y?.type ?? it.type,
     dimension: it.dimension ?? null, weight: it.weight ?? 1.0, aspect: it.aspect ?? null, module: it.module,
   };
+  if (it.rows) v.rows = it.rows;
+  return v;
 }
 
 export function applies(q: Questionnaire, it: Dict, role: string, grade: number): boolean {
@@ -306,7 +310,11 @@ export interface Scored {
   items: Dict<number | null>; dims: Dict<number>; teachers: Dict<{ score: number; aspects: Dict<number> }>;
   ctx: { gender: string | null; grade_band: number | null; tutoring: unknown; indicators: Dict<number | null> };
   flags: string[]; answers_vector: string; weight: number; excluded_reason: string | null; aspects?: Dict<number>;
+  /** same child, school weeks minus vacation (engine.ts only; not part of the Python reference) */
+  contrast: Contrast | null;
 }
+
+export interface Contrast { symptom_delta: number; pairs: number; sleep_lost_h: number | null }
 
 export function scoreRespondent(q: Questionnaire, resp: Response): Scored {
   const { role, grade } = resp;
@@ -378,7 +386,22 @@ export function scoreRespondent(q: Questionnaire, resp: Response): Scored {
     ctx: { gender: g === 0 ? 'boy' : g === 1 ? 'girl' : null, grade_band: gradeBand(q, role, grade, answers),
       tutoring: answers.PR04 ?? null, indicators: indicators(answers, role, grade, q) },
     flags: qualityFlags(q, resp, visible), answers_vector: answerVector(answers), weight: 1, excluded_reason: null,
+    contrast: contrastOf(q, answers),
   };
+}
+
+/** Symptom frequency (0..100, higher = more often) in school weeks minus the vacation, and sleep lost in school weeks. */
+function contrastOf(q: Questionnaire, a: Answers): Contrast | null {
+  const c = q.params.contrast;
+  const deltas: number[] = [];
+  for (const id of c.symptoms as string[]) {
+    const x = a[`${id}_S`], y = a[`${id}_V`];
+    if (isNum(x) && isNum(y)) deltas.push((100 * (x - y)) / (q.scales.hbsc5.length - 1));
+  }
+  const xs = a[`${c.sleep}_S`], ys = a[`${c.sleep}_V`];
+  const sleep = isNum(xs) && isNum(ys) ? c.sleep_midpoints[ys] - c.sleep_midpoints[xs] : null;
+  if (deltas.length < c.worse_min_symptoms && sleep === null) return null;
+  return { symptom_delta: deltas.length >= c.worse_min_symptoms ? sum(deltas) / deltas.length : NaN, pairs: deltas.length, sleep_lost_h: sleep };
 }
 
 function indicators(a: Answers, role: string, grade: number, q: Questionnaire): Dict<number | null> {
@@ -394,8 +417,54 @@ function indicators(a: Answers, role: string, grade: number, q: Questionnaire): 
     labelled_aggression_disputed: !has('CD06') || n('CD06') === 3 ? null : +in_('CD06', [1, 2]),
     recess_removed: !has('CD08') || n('CD08') === 3 ? null : +in_('CD08', [1, 2]),
     bullying_repeated: !has('SF01') ? null : +(n('SF01') >= 2),
-    psychosomatic_often: !has('WB01') ? null : +(n('WB01') >= (young ? 2 : 3)),
+    // weekly or more often in school weeks (SC01); the short grade-4 form asks WB01 instead
+    psychosomatic_often: isNum(a.SC01_S) ? +((a.SC01_S as number) >= 2) : !has('WB01') ? null : +(n('WB01') >= (young ? 2 : 3)),
+    shouting_weekly: atLeast(a, 'HP01', 2),
+    class_punishment: atLeast(a, 'HP02', 1),
+    threats_weekly: atLeast(a, 'HP03', 2),
+    sent_out: atLeast(a, 'HP04', 1),
+    physical_force: !has('HP05') || n('HP05') === 3 ? null : +in_('HP05', [1, 2]),
+    grade_as_punishment: !has('HP06') || n('HP06') === 2 ? null : +(n('HP06') === 1),
+    ...wellbeing(a, q),
+    school_worse: schoolWorse(a, q),
+    sleep_short: sleepShort(a, q, grade),
+    homework_over_norm: homeworkOver(a, q, role, grade),
   };
+}
+
+const atLeast = (a: Answers, id: string, k: number) => (isNum(a[id]) ? +((a[id] as number) >= k) : null);
+
+/** WHO-5 raw score 0..100 = 4 x sum of (5 - answer index); only when all five items are answered. */
+function wellbeing(a: Answers, q: Questionnaire): Dict<number | null> {
+  const vals = [1, 2, 3, 4, 5].map((i) => a[`WH0${i}`]);
+  if (!vals.every(isNum)) return { low_wellbeing: null, very_low_wellbeing: null };
+  const raw = 4 * sum((vals as number[]).map((v) => 5 - v));
+  const p = q.params.who5;
+  return { low_wellbeing: +(raw <= p.low), very_low_wellbeing: +(raw <= p.very_low) };
+}
+
+function schoolWorse(a: Answers, q: Questionnaire): number | null {
+  const c = q.params.contrast;
+  const pairs = (c.symptoms as string[]).map((id) => [a[`${id}_S`], a[`${id}_V`]]).filter(([x, y]) => isNum(x) && isNum(y)) as [number, number][];
+  if (pairs.length < c.worse_min_symptoms) return null;
+  return +(pairs.filter(([x, y]) => x - y >= c.worse_steps).length >= c.worse_min_symptoms);
+}
+
+function sleepShort(a: Answers, q: Questionnaire, grade: number): number | null {
+  const d = (q.derived as Dict[]).find((x) => x.kind === 'sleep_hours');
+  const b = a.SL01, w = a.SL02;
+  if (!d || !isNum(b) || !isNum(w)) return null;
+  const hours = 24 - d.bed_hours[b] + d.wake_hours[w];
+  return +(hours < q.params.norms.sleep.min_hours_by_grade[grade <= 6 ? '1-6' : '7-12']);
+}
+
+function homeworkOver(a: Answers, q: Questionnaire, role: string, grade: number): number | null {
+  const v = a.WL01;
+  if (!isNum(v)) return null;
+  const mins: (number | null)[] = variant(q, q._by_id.WL01, role, grade).score?.minutes || [];
+  if (v >= mins.length || mins[v] === null || mins[v] === undefined) return null;
+  const hw = q.params.norms.homework_weekday;
+  return +((mins[v] as number) > q.params.homework_over_multiple * Math.min(hw.minutes_per_grade * grade, hw.cap_minutes));
 }
 
 function answerVector(a: Answers): string {
@@ -553,8 +622,9 @@ function band(q: Questionnaire, x: number | null): string | null {
 
 // =============================================================================== aggregation
 export function aggregate(q: Questionnaire, scored: Scored[], level: string,
-  opts: { seed?: number; bootstrap?: boolean; classSizes?: Dict<number> | null } = {}): Dict<Dict> {
+  opts: { seed?: number; bootstrap?: boolean; classSizes?: Dict<number> | null; refs?: Refs } = {}): Dict<Dict> {
   const { seed = 1, bootstrap = true, classSizes = null } = opts;
+  const natRefs = opts.refs ?? references(q, scored);
   const P = q.params;
   const z = P.interval_z;
   let recs: Scored[], key: (r: Scored) => string, parentKey: ((r: Scored) => string) | null, parentLevelName: string | null;
@@ -629,12 +699,14 @@ export function aggregate(q: Questionnaire, scored: Scored[], level: string,
       dimensions: dimsOut, pillars: Object.fromEntries(Object.entries(pillars).map(([k, v]) => [k, pyRound(v, 1)])),
       index: index === null ? null : { score: pyRound(index, 1) }, _theta: theta, _B: Bs, _ref: refs,
     };
-    if (level === 'teacher') res.aspects = teacherAspects(rs, q);
-    else { res.indicators = unitIndicators(rs, q); res.equity = equityGaps(q, rs); }
+    if (level === 'teacher') { res.aspects = teacherAspects(rs, q); res.teacher_indicators = teacherIndicatorShares(q, rs); }
+    else { res.indicators = unitIndicators(rs, q); res.equity = equityGaps(q, rs); res.contrast = unitContrast(rs); }
     if (classSizes && ['class', 'school', 'region', 'system'].includes(level)) participation(res, rs, level, classSizes, submitted.get(u) || {});
     const total = res.n_respondents.parent + res.n_respondents.student;
     if (total < P.k_anonymity.unit_min || !Object.keys(dimsOut).length) {
       res = { unit_id: u, level, suppressed: true, reason: 'k_anonymity', stage: res.stage, n_respondents: res.n_respondents };
+    } else {
+      res.signals = signalsFor(q, rs, level, res.stage, natRefs);
     }
     results[u] = res;
   }
@@ -858,6 +930,131 @@ function tiers(q: Questionnaire, results: Dict<Dict>, byStage = false) {
   }
 }
 
+// =============================================================================== signals (engine.ts only)
+/**
+ * National reference rates from the same wave, per stage ('I' | 'II' | 'III') and over all stages ('all'), per role:
+ * what a class or a teacher is compared with. Classes and teachers use their stage, schools and regions 'all'.
+ */
+export interface Refs { rates: Dict<Dict<Dict<number>>>; contrast: Dict<number | null> }
+
+const teacherIndicator = (q: Questionnaire, r: Scored, key: string): number | null => {
+  const asp = q.teacher_indicators?.[key]?.aspect;
+  const s = asp ? r.aspects?.[asp] : undefined;
+  return s === undefined || s === null ? null : +(s <= 20);   // month4 map: ≤20 = almost every week or more often
+};
+
+function indicatorOf(q: Questionnaire, r: Scored, key: string): number | null {
+  if (q.teacher_indicators?.[key]) return teacherIndicator(q, r, key);
+  const v = r.ctx.indicators[key];
+  return v === undefined ? null : v;
+}
+
+export function references(q: Questionnaire, scored: Scored[]): Refs {
+  const inc = scored.filter((r) => r.weight > 0);
+  const trs = teacherRecords(inc);
+  const keys = [...new Set([...(q.params.signals as Dict[]).map((s) => s.indicator).filter(Boolean),
+    ...Object.keys(q.indicators || {}), ...Object.keys(q.teacher_indicators || {})])] as string[];
+  const rates: Refs['rates'] = {};
+  for (const stage of ['all', 'I', 'II', 'III']) {
+    rates[stage] = {};
+    for (const role of ['all', 'parent', 'student']) {
+      const pick = (pool: Scored[]) => pool.filter((r) => (stage === 'all' || r.stage === stage) && (role === 'all' || r.role === role));
+      const out: Dict<number> = {};
+      for (const k of keys) {
+        const pool = q.teacher_indicators?.[k] ? pick(trs) : pick(inc);
+        const vals = pool.map((r) => indicatorOf(q, r, k)).filter((v) => v !== null) as number[];
+        if (vals.length) out[k] = sum(vals) / vals.length;
+      }
+      rates[stage][role] = out;
+    }
+  }
+  const contrast: Dict<number | null> = {};
+  for (const stage of ['all', 'I', 'II', 'III']) {
+    const ds = inc.filter((r) => stage === 'all' || r.stage === stage).map((r) => r.contrast?.symptom_delta).filter((v): v is number => Number.isFinite(v));
+    contrast[stage] = ds.length ? sum(ds) / ds.length : null;
+  }
+  return { rates, contrast };
+}
+
+/** Wilson score interval for x of n. */
+export function wilson(x: number, n: number, z = 1.96): [number, number] {
+  if (!n) return [0, 1];
+  const p = x / n, d = 1 + (z * z) / n, c = p + (z * z) / (2 * n), m = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n));
+  return [Math.max(0, (c - m) / d), Math.min(1, (c + m) / d)];
+}
+
+function unitContrast(rs: Scored[]): Dict | null {
+  const ds = rs.map((r) => r.contrast?.symptom_delta).filter((v): v is number => Number.isFinite(v));
+  if (ds.length < 5) return null;
+  const n = ds.length, mean = sum(ds) / n;
+  const sd = n > 1 ? Math.sqrt(sum(ds.map((d) => (d - mean) ** 2)) / (n - 1)) : 0;
+  const se = sd / Math.sqrt(n);
+  const sl = rs.map((r) => r.contrast?.sleep_lost_h).filter((v): v is number => v !== null && v !== undefined);
+  const worse = rs.map((r) => r.ctx.indicators.school_worse).filter((v) => v !== null && v !== undefined) as number[];
+  return { n, symptom_delta: pyRound(mean, 1), lo: pyRound(mean - 1.96 * se, 1), hi: pyRound(mean + 1.96 * se, 1),
+    share_worse: worse.length ? pyRound(sum(worse) / worse.length, 3) : null,
+    sleep_lost_h: sl.length >= 5 ? pyRound(sum(sl) / sl.length, 2) : null };
+}
+
+function teacherIndicatorShares(q: Questionnaire, rs: Scored[]): Dict {
+  const out: Dict = {};
+  for (const k of Object.keys(q.teacher_indicators || {})) {
+    const vals = rs.map((r) => teacherIndicator(q, r, k)).filter((v) => v !== null) as number[];
+    if (vals.length >= q.params.k_anonymity.teacher_min_students) out[k] = { share: pyRound(sum(vals) / vals.length, 3), n: vals.length };
+  }
+  return out;
+}
+
+/**
+ * A signal = a unit clearly above the national rate: enough respondents, a meaningful share, and the Wilson 95%
+ * lower bound above the national rate. "high" when even the lower bound exceeds rr x national. confirmed_by lists
+ * the roles (parents / students) that independently show a rate above their own national rate.
+ */
+function signalsFor(q: Questionnaire, rs: Scored[], level: string, stage: string, refs: Refs): Dict[] {
+  const st = level === 'class' || level === 'teacher' ? stage : 'all';
+  const out: Dict[] = [];
+  for (const rule of q.params.signals as Dict[]) {
+    if (!rule.levels.includes(level)) continue;
+    const minN = rule.min_n ?? 10;
+    if (rule.kind === 'contrast') {
+      const c = unitContrast(rs), ref = refs.contrast[st];
+      // the school-weeks effect must be both large and clearly larger than the national one (same stage)
+      if (c && c.n >= minN && c.symptom_delta >= rule.min_delta && c.lo > Math.max(ref ?? 0, 0)) {
+        out.push({ id: rule.id, kind: 'contrast', severity: ref !== null && c.lo > ref + rule.min_delta ? 'high' : 'elevated', n: c.n,
+          delta: c.symptom_delta, ci: [c.lo, c.hi], ref: ref === null ? null : pyRound(ref, 1), share_worse: c.share_worse });
+      }
+      continue;
+    }
+    const key = rule.indicator as string;
+    const vals = rs.map((r) => [r.role, indicatorOf(q, r, key)] as const).filter(([, v]) => v !== null) as [string, number][];
+    const n = vals.length, x = sum(vals.map(([, v]) => v));
+    if (n < minN) continue;
+    const p = x / n, [lo, hi] = wilson(x, n);
+    const p0 = refs.rates[st]?.all?.[key] ?? 0;
+    let hit: boolean, severity: string;
+    if (rule.kind === 'count') {
+      hit = x >= rule.min_count && p >= rule.abs_min;
+      severity = rule.severity || 'high';
+    } else {
+      hit = p >= rule.abs_min && p >= p0 * rule.rr && lo > p0;
+      severity = lo >= p0 * rule.rr ? 'high' : 'elevated';
+    }
+    if (!hit) continue;
+    const roles: Dict = {};
+    const confirmed: string[] = [];
+    for (const role of ['parent', 'student']) {
+      const rv = vals.filter(([r0]) => r0 === role);
+      if (rv.length < q.params.k_anonymity.role_cell) continue;
+      const rp = sum(rv.map(([, v]) => v)) / rv.length, r0 = refs.rates[st]?.[role]?.[key] ?? 0;
+      roles[role] = { n: rv.length, rate: pyRound(rp, 3), ref: pyRound(r0, 3) };
+      if (rp > r0) confirmed.push(role);
+    }
+    out.push({ id: rule.id, indicator: key, kind: rule.kind, severity, n, count: x, rate: pyRound(p, 3), ci: [pyRound(lo, 3), pyRound(hi, 3)],
+      ref: pyRound(p0, 3), rr: p0 > 0 ? pyRound(p / p0, 2) : null, roles, confirmed_by: confirmed });
+  }
+  return out;
+}
+
 // =============================================================================== campaign detection
 /** Units where many responses share an identical answer vector (copy-paste / coordinated filling). */
 export function detectCampaigns(scored: Scored[], level = 'class', share = 0.2, minDupes = 5): Dict[] {
@@ -883,7 +1080,9 @@ export function runWave(q: Questionnaire, responses: Response[],
     meta: { responses: responses.length, included: scored.filter((s) => s.weight > 0).length, excluded, questionnaire_version: q.version },
     campaign_alerts: detectCampaigns(scored),
   };
-  for (const lv of levels) out[lv] = aggregate(q, scored, lv, { seed, classSizes, bootstrap });
+  const refs = references(q, scored);
+  out.references = refs;
+  for (const lv of levels) out[lv] = aggregate(q, scored, lv, { seed, classSizes, bootstrap, refs });
   return out;
 }
 
@@ -900,12 +1099,35 @@ function pick(q: Questionnaire, v: Variant, target: number, grade: number): numb
   return best;
 }
 
+/** School weeks vs vacation: the vacation level is the child's own; a weak school adds symptoms and cuts sleep. */
+function simGrid(ans: Answers, v: Variant, rng: Rng, latent: number, grade: number) {
+  const [s, w] = v.rows!.map((r) => r.id);
+  const n = (v.options || []).length;
+  const clamp = (x: number) => Math.min(n - 1, Math.max(0, Math.round(x)));
+  if (v.id === 'SC06') {
+    const vac = clamp(3 + rng.gauss(0, 0.7) - (grade - 6) / 6);
+    ans[w] = vac;
+    ans[s] = clamp(vac - Math.max(0, 0.6 + (grade - 4) / 5 - 0.6 * latent + rng.gauss(0, 0.6)));
+  } else {
+    const vac = clamp(0.8 + rng.gauss(0, 0.7));
+    ans[w] = vac;
+    ans[s] = clamp(vac + Math.max(0, 0.3 - 0.8 * latent + rng.gauss(0, 0.6)));
+  }
+}
+
+/** Harmful practices are rare events, more frequent where the school climate is poor. */
+function simRare(ans: Answers, v: Variant, rng: Rng, latent: number) {
+  if (v.id === 'HP05') ans[v.id] = rng.random() < 0.01 + (latent < -1.5 ? 0.08 : 0) ? 1 : 0;
+  else if (v.id === 'HP06') ans[v.id] = rng.random() < 0.04 + (latent < -1 ? 0.12 : 0) ? 1 : 0;
+  else ans[v.id] = Math.min(3, Math.max(0, Math.round(-0.8 - 0.9 * latent + rng.gauss(0, 0.8))));
+}
+
 function simAnswers(q: Questionnaire, rng: Rng, role: string, grade: number, latent: number, gender: number, token: string): Answers {
   const ans: Answers = {};
   const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(x)));
   for (let it = 0; it < 3; it++) {   // iterate so that conditional questions see their parents' answers
     for (const v of flow(q, { role, grade, token }, ans, [])) {
-      if (v.id in ans || v.type === 'notice' || v.type === 'text') continue;
+      if (v.id in ans || v.type === 'notice' || v.type === 'text' || (v.type === 'grid' && v.rows![0].id in ans)) continue;
       const n = (v.options || []).length;
       if (v.id === 'PR01') ans[v.id] = gender;
       else if (v.id.startsWith('PR02')) ans[v.id] = clamp(1.5 - latent + rng.gauss(0, 0.8), 0, n - 2);
@@ -913,6 +1135,8 @@ function simAnswers(q: Questionnaire, rng: Rng, role: string, grade: number, lat
       else if (v.id === 'PR05') ans[v.id] = latent < 0 ? [0] : [4];
       else if (v.id === 'QC01') ans[v.id] = rng.random() > 0.05 ? 1 : 3;
       else if (v.type === 'multi') ans[v.id] = [rng.randrange(n)];
+      else if (v.type === 'grid') simGrid(ans, v, rng, latent, grade);
+      else if (v.module === 'HP') simRare(ans, v, rng, latent);
       else if (v.score) ans[v.id] = pick(q, v, 62 + 14 * latent + rng.gauss(0, 12), grade);
       else if (v.options) {
         if (v.id === 'SL01') ans[v.id] = clamp(2 + (grade - 4) / 3 - latent * 0.8 + rng.gauss(0, 0.8), 0, 7);

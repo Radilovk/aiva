@@ -68,6 +68,8 @@ scored.forEach((s, i) => close(F.scored[i], { dims: s.dims, weight: s.weight, fl
 // 3. aggregates (rounded outputs; float summation order can flip a .x5 tie by one unit in the last digit)
 for (const lv of Object.keys(F.agg)) {
   const got = E.aggregate(q, scored, lv, { bootstrap: false, classSizes: F.class_sizes });
+  // signals, contrast and teacher_indicators exist only in engine.ts (v2 extensions on top of the shared core)
+  for (const u of Object.values(got)) { delete u.signals; delete u.contrast; delete u.teacher_indicators; }
   close(F.agg[lv], got, 0.1001, `agg.${lv}`);
 }
 close(F.campaigns, E.detectCampaigns(scored), 0, 'campaigns');

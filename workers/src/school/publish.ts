@@ -10,6 +10,10 @@ export const LEVELS = ['system', 'region', 'school', 'class', 'teacher'] as cons
 
 export interface UnitRow {
   level: string; unit_id: string; parent_id: string | null; suppressed: 0 | 1; score: number | null; tier: string | null;
+  /** for the inspectorate scope (РУО sees its region) */
+  region_id: string | null;
+  /** signals live in their own column: only inspectors, the school and the teacher concerned may read them */
+  n_signals: number; signals: string;
   /** what list endpoints return (without names, which the Worker joins in SQL) */
   summary: string;
   /** what the unit page returns (+ free-text themes for school, region, system) */
@@ -43,14 +47,24 @@ export function unitRows(res: Dict, refs: ThemeRef[]): UnitRow[] {
   const by: Dict<Map<string, ThemeRef[]>> = { school: new Map(), region: new Map(), system: new Map() };
   const add = (lv: string, u: string, r: ThemeRef) => { if (!by[lv].has(u)) by[lv].set(u, []); by[lv].get(u)!.push(r); };
   for (const r of refs) { add('school', r.school_id, r); add('region', r.region_id, r); add('system', 'BG', r); }
+  const regionOfSchool = new Map(refs.map((r) => [r.school_id, r.region_id]));
+  const schoolOfClass = new Map(Object.values((res.class || {}) as Dict<Dict>).map((u) => [u.unit_id, u.parent_id]));
+  const regionOf = (level: string, unit: Dict): string | null => {
+    if (level === 'region') return unit.unit_id;
+    if (level === 'school') return unit.parent_id ?? regionOfSchool.get(unit.unit_id) ?? null;
+    if (level === 'class' || level === 'teacher') return regionOfSchool.get(unit.parent_id ?? schoolOfClass.get(unit.unit_id)) ?? null;
+    return null;
+  };
   const out: UnitRow[] = [];
   for (const level of LEVELS) {
     for (const [uid, unit] of Object.entries((res[level] || {}) as Dict<Dict>)) {
       const rs = by[level]?.get(uid);
-      const data = rs ? { ...unit, themes: themeCounts(rs) } : unit;
+      const { signals = [], ...rest } = unit;
+      const data = rs ? { ...rest, themes: themeCounts(rs) } : rest;
       out.push({
         level, unit_id: uid, parent_id: unit.parent_id ?? null, suppressed: unit.suppressed ? 1 : 0,
         score: unit.index?.score ?? unit.dimensions?.TC?.score ?? null, tier: unit.index?.tier_code ?? null,
+        region_id: regionOf(level, unit), n_signals: signals.length, signals: JSON.stringify(signals),
         summary: JSON.stringify(summary(level, unit)), data: JSON.stringify(data),
       });
     }
