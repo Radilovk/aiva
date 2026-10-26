@@ -20,7 +20,17 @@ SCALES = {
     "kid3_agree": ["🙁 Не", "😐 Отчасти", "🙂 Да"],
     "yes_partly_no": ["Да", "Отчасти", "Не"],
     "one_to_five": ["1", "2", "3", "4", "5"],
+    # WHO-5 Well-Being Index (Topp et al. 2015), answer 0 = best ("all of the time")
+    "who5": ["През цялото време", "През повечето време", "Повече от половината време", "По-малко от половината време", "Понякога", "Никога"],
+    # concrete behaviour counts for the last month – facts, not opinions
+    "month4": ["Нито веднъж", "1–2 пъти", "Почти всяка седмица", "Почти всеки ден"],
+    # HBSC Symptom Checklist frequencies, from rare to daily
+    "hbsc5": ["Рядко или никога", "Почти всеки месец", "Почти всяка седмица", "Повече от веднъж седмично", "Почти всеки ден"],
+    "sleep_hours": ["Под 7 часа", "7–8 часа", "8–9 часа", "9–10 часа", "Над 10 часа"],
 }
+MONTH4 = {"kind": "map", "values": [100, 60, 20, 0]}
+# rows of a "grid" item share the scale; each row is answered on its own id
+SCHOOL_VS_VACATION = [{"suffix": "_S", "label": "В учебни седмици"}, {"suffix": "_V", "label": "През последната ваканция"}]
 
 ALL = [1, 12]
 LIKERT_POS = {"kind": "likert", "polarity": 1}
@@ -29,7 +39,7 @@ LIKERT_NEG = {"kind": "likert", "polarity": -1}
 
 def item(id, module, dim, text, *, roles=("parent", "student"), grades=ALL, scale=None, options=None,
          type="single", score=None, show_if=None, young=None, weight=1.0, core=True, aspect=None,
-         repeat=None, hint=None, optional=True, notice=None):
+         repeat=None, hint=None, optional=True, notice=None, rows=None):
     it = {"id": id, "module": module, "dimension": dim, "roles": list(roles), "grades": list(grades),
           "type": type, "text": text, "weight": weight, "core": core, "optional": optional}
     if scale: it["scale"] = scale
@@ -41,6 +51,7 @@ def item(id, module, dim, text, *, roles=("parent", "student"), grades=ALL, scal
     if repeat: it["repeat"] = repeat
     if hint: it["hint"] = hint
     if notice: it["notice"] = notice
+    if rows: it["rows"] = [{"id": id + r["suffix"], "label": r["label"]} for r in rows]
     return it
 
 
@@ -209,6 +220,11 @@ items += [
          young={"text": "Вика ли {teacher} на децата?", "scale": "kid3_freq", "score": LIKERT_NEG}),
     item("TC07", "TC", "TC", T("", "Домашните и изпитванията на {teacher} са в разумен обем."), roles=["student"], scale="agree5",
          score=LIKERT_POS, aspect="workload", repeat=TC_REPEAT, grades=[5, 12]),
+    # behaviour counts per teacher (last month): the basis for teacher-level signals
+    item("TC10", "TC", "TC", T("", "През последния месец {teacher} повишавал(а) ли е тон или крещял(а) на ученици?"), roles=["student"],
+         scale="month4", score=MONTH4, aspect="no_shouting", repeat=TC_REPEAT, grades=[5, 12]),
+    item("TC11", "TC", "TC", T("", "През последния месец {teacher} коментирал(а) ли е грешките или оценките на ученици пред класа по подигравателен начин?"),
+         roles=["student"], scale="month4", score=MONTH4, aspect="no_humiliation", repeat=TC_REPEAT, grades=[5, 12]),
     item("TC08", "TC", "TC", T("Класният ръководител отговаря навреме и по същество на въпросите ми."), roles=["parent"],
          scale="agree5", score=LIKERT_POS, aspect="parent_communication", repeat=TC_REPEAT),
     item("TC09", "TC", "TC", T("Съобщенията на класния ръководител за проблеми са конкретни и предлагат решение, а не само оплакване."),
@@ -217,6 +233,55 @@ items += [
 # Parent-version TC01 applies from grade 1 (rated teacher = класен ръководител / начален учител)
 for it in items:
     if it["id"] == "TC01":
+        it["grades_by_role"] = {"parent": [1, 12], "student": [4, 12]}
+
+# ---------------------------------------------------------------- WH: WHO-5 (валидиран индекс на благополучие, ученици 5–12 клас)
+WHO = "През последните две седмици "
+items += [
+    item("WH01", "WH", "WB", T("", WHO + "се чувствах весел/а и в добро настроение."), roles=["student"], grades=[5, 12], scale="who5", score=LIKERT_NEG),
+    item("WH02", "WH", "WB", T("", WHO + "се чувствах спокоен/спокойна и отпуснат/а."), roles=["student"], grades=[5, 12], scale="who5", score=LIKERT_NEG),
+    item("WH03", "WH", "WB", T("", WHO + "се чувствах активен/активна и енергичен/енергична."), roles=["student"], grades=[5, 12], scale="who5", score=LIKERT_NEG),
+    item("WH04", "WH", "WB", T("", WHO + "се събуждах свеж/а и отпочинал/а."), roles=["student"], grades=[5, 12], scale="who5", score=LIKERT_NEG),
+    item("WH05", "WH", "WB", T("", WHO + "ежедневието ми беше изпълнено с неща, които ме интересуват."), roles=["student"], grades=[5, 12], scale="who5", score=LIKERT_NEG),
+]
+
+# ---------------------------------------------------------------- SC: учебно време срещу ваканция (същото дете, два периода)
+# The within-child contrast separates what the school period does from what the family or the child brings:
+# a symptom that is frequent in school weeks and rare in the vacation is linked to school.
+items += [
+    item("SC01", "SC", None, T("Колко често детето се оплаква от главоболие?", "Колко често те боли глава?"), scale="hbsc5", type="grid", rows=SCHOOL_VS_VACATION),
+    item("SC02", "SC", None, T("Колко често детето се оплаква от болки в корема?", "Колко често те боли корем?"), scale="hbsc5", type="grid", rows=SCHOOL_VS_VACATION),
+    item("SC03", "SC", None, T("Колко често детето заспива трудно?", "Колко често заспиваш трудно?"), scale="hbsc5", type="grid", rows=SCHOOL_VS_VACATION),
+    item("SC04", "SC", None, T("Колко често детето е раздразнително или в лошо настроение?", "Колко често си раздразнителен/раздразнителна или в лошо настроение?"),
+         scale="hbsc5", type="grid", rows=SCHOOL_VS_VACATION),
+    item("SC05", "SC", None, T("Колко често детето е тъжно или потиснато?", "Колко често си тъжен/тъжна или потиснат/а?"), scale="hbsc5", type="grid", rows=SCHOOL_VS_VACATION),
+    item("SC06", "SC", None, T("Колко часа спи детето средно на нощ?", "Колко часа спиш средно на нощ?"), scale="sleep_hours", type="grid", rows=SCHOOL_VS_VACATION),
+]
+
+# ---------------------------------------------------------------- HP: практики с доказан вреден ефект (факти за последния месец)
+items += [
+    item("HP01", "HP", "CD", T("През последния месец детето разказвало ли е, че учител вика или крещи на ученици?",
+                               "През последния месец учител викал ли е или крещял на ученици в класа ти?"),
+         scale="month4", score=MONTH4, weight=1.5),
+    item("HP02", "HP", "CD", T("През последния месец целият клас наказван ли е заради постъпка на един или няколко ученици?",
+                               "През последния месец целият клас наказван ли е заради постъпка на един или няколко ученици?"),
+         scale="month4", score=MONTH4),
+    item("HP03", "HP", "CD", T("През последния месец учител заплашвал ли е с двойка или наказание, за да има тишина?",
+                               "През последния месец учител заплашвал ли е с двойка или наказание, за да има тишина?"),
+         scale="month4", score=MONTH4),
+    item("HP04", "HP", "CD", T("През последния месец детето изпращано ли е извън класната стая като наказание?",
+                               "През последния месец ученици изпращани ли са извън класната стая като наказание?"),
+         scale="month4", score=MONTH4),
+    item("HP05", "HP", "SF", T("През последния месец детето споделяло ли е, че възрастен в училище е ударил, дръпнал грубо или блъснал ученик?",
+                               "През последния месец възрастен в училище удрял ли е, дърпал ли е грубо или блъскал ученик?"),
+         options=["Не", "Да, веднъж", "Да, повече от веднъж", "Не знам"], score={"kind": "map", "values": [100, 0, 0, None]}, weight=2.0),
+    item("HP06", "HP", "CD", T("Случвало ли се е тази година на детето да бъде поставена по-ниска оценка като наказание за поведение?",
+                               "Случвало ли се е тази година да ти поставят по-ниска оценка като наказание за поведение, а не за знанията ти?"),
+         options=["Не", "Да", "Не знам"], score={"kind": "map", "values": [100, 0, None]}),
+]
+for it in items:
+    if it["module"] == "HP":
+        it.pop("grades_by_role", None)
         it["grades_by_role"] = {"parent": [1, 12], "student": [4, 12]}
 
 # ---------------------------------------------------------------- SU: подкрепа и справедливост
@@ -326,11 +391,14 @@ MODULES = [
     {"id": "WL", "title": "Натоварване", "scored": True},
     {"id": "SL", "title": "Сън и свободно време", "scored": True},
     {"id": "WB", "title": "Благополучие", "scored": True},
+    {"id": "WH", "title": "Последните две седмици", "scored": True},
+    {"id": "SC", "title": "Учебно време и ваканция", "scored": False},
     {"id": "TQ", "title": "Преподаване в класа", "scored": True},
     {"id": "TC", "title": "Учители", "scored": True, "repeat": "teacher"},
     {"id": "SU", "title": "Подкрепа и справедливост", "scored": True},
     {"id": "CD", "title": "Климат и дисциплина", "scored": True},
     {"id": "SF", "title": "Безопасност", "scored": True},
+    {"id": "HP", "title": "Какво се случва в час", "scored": True},
     {"id": "QC", "title": "Проверка", "scored": False},
     {"id": "CP", "title": "Комуникация", "scored": True},
     {"id": "SY", "title": "Образователната система", "scored": True, "sampling_rate": 0.5},
@@ -353,6 +421,72 @@ PILLARS = {
     "A": {"name": "Баланс и благополучие", "weight": 0.35},
     "B": {"name": "Учене и преподаване", "weight": 0.35},
     "C": {"name": "Среда и отношения", "weight": 0.30},
+}
+
+# Indicators: binary per respondent (engine._indicators). Each has the evidence for why it matters.
+INDICATORS = {
+    "low_wellbeing": {"label": "Ниско благополучие (WHO-5 ≤ 50)", "roles": ["student"],
+                      "evidence": "Валидиран скрининг; стойности ≤50 са свързани с риск от депресия и се препоръчва разговор със специалист.",
+                      "sources": ["Topp et al. 2015, Psychother Psychosom 84:167"]},
+    "very_low_wellbeing": {"label": "Много ниско благополучие (WHO-5 ≤ 28)", "roles": ["student"],
+                           "evidence": "Праг за вероятна депресия при скрининг.", "sources": ["Topp et al. 2015"]},
+    "school_worse": {"label": "Симптомите са по-чести в учебно време, отколкото във ваканция", "roles": ["parent", "student"],
+                     "evidence": "Сравнение при едно и също дете: ефектът е свързан с учебния период, а не със семейството или детето.",
+                     "sources": ["HBSC Symptom Checklist (Haugland et al. 2001)"]},
+    "psychosomatic_often": {"label": "Чести главоболия или болки в корема", "roles": ["parent", "student"],
+                            "evidence": "Соматичните оплаквания са ранен признак на стрес; следят се от СЗО в 50 страни.", "sources": ["HBSC, WHO Europe"]},
+    "sleep_short": {"label": "Сън под препоръката за възрастта", "roles": ["parent", "student"],
+                    "evidence": "Недоспиването при деца е свързано с внимание, настроение, наднормено тегло и травми.", "sources": ["AASM 2016 (Paruthi et al.)"]},
+    "homework_over_norm": {"label": "Домашни над 1,5 пъти ориентира за класа", "roles": ["parent", "student"],
+                           "evidence": "Над ориентира „10 мин × клас“ ползата за ученето спада, а стресът и конфликтите растат.", "sources": ["Cooper, Robinson, Patall 2006"]},
+    "bullying_repeated": {"label": "Повтарящ се тормоз", "roles": ["parent", "student"],
+                          "evidence": "Тормоз 2–3 пъти месечно или по-често удвоява риска от тревожност и депресия.", "sources": ["Olweus; HBSC; Moore et al. 2017"]},
+    "shouting_weekly": {"label": "Учители викат или крещят поне всяка седмица", "roles": ["parent", "student"],
+                        "evidence": "Вербалната агресия от учител предсказва поведенчески и емоционални проблеми при децата.",
+                        "sources": ["Brendgen, Wanner, Vitaro 2006, Pediatrics 117:1585"]},
+    "class_punishment": {"label": "Наказание на целия клас заради един или няколко", "roles": ["parent", "student"],
+                         "evidence": "Колективното наказание наказва и невинните и подкопава доверието и чувството за справедливост.", "sources": ["Принцип на лична отговорност"]},
+    "threats_weekly": {"label": "Заплахи с двойка или наказание поне всяка седмица", "roles": ["parent", "student"],
+                       "evidence": "Контрол чрез страх намалява вътрешната мотивация и увеличава тревожността.", "sources": ["Deci & Ryan; Reeve 2009"]},
+    "sent_out": {"label": "Изпращане извън класната стая като наказание", "roles": ["parent", "student"],
+                 "evidence": "Изключването от урока отнема учебно време и се свързва с по-лоши резултати и отчуждение.", "sources": ["AAP 2013 (Out-of-school suspension and expulsion)"]},
+    "physical_force": {"label": "Физическа сила от възрастен в училище", "roles": ["parent", "student"],
+                       "evidence": "Физическото насилие над дете е забранено; всяко съобщение изисква проверка.", "sources": ["Закон за закрила на детето"]},
+    "grade_as_punishment": {"label": "Оценка, снижена като наказание за поведение", "roles": ["parent", "student"],
+                            "evidence": "Оценката трябва да отразява знанията; използвана като наказание, изкривява и двете.", "sources": ["Принцип на оценяването"]},
+    "recess_removed": {"label": "Отнето междучасие като наказание", "roles": ["parent", "student"],
+                       "evidence": "Американската академия по педиатрия препоръчва междучасието да не се отнема като наказание.", "sources": ["AAP 2013, The Crucial Role of Recess in School"]},
+    "labelled_aggression_disputed": {"label": "„Агресия“, с която родителят не е съгласен", "roles": ["parent"],
+                                     "evidence": "Обичайната игра, наречена агресия, води до наказания без основание.", "sources": ["Veiga et al. 2025"]},
+}
+
+# Signals: when a unit's rate is clearly above the national rate (same wave, same stage). Two-sided protection:
+# enough respondents, a meaningful size, and statistical certainty (Wilson 95% lower bound above the reference).
+#   rate   : share of respondents with the indicator
+#   count  : at least min_count independent reports AND share >= abs_min (rare, serious events)
+#   contrast: school-weeks minus vacation symptom score, lower bound above min_delta points
+SIGNALS = [
+    {"id": "physical_force", "indicator": "physical_force", "kind": "count", "levels": ["class", "school"], "min_count": 3, "abs_min": 0.10, "severity": "high"},
+    {"id": "shouting", "indicator": "shouting_weekly", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.5, "abs_min": 0.20},
+    {"id": "teacher_shouting", "indicator": "teacher_shouting", "kind": "rate", "levels": ["teacher"], "min_n": 10, "rr": 1.5, "abs_min": 0.25},
+    {"id": "teacher_humiliation", "indicator": "teacher_humiliation", "kind": "rate", "levels": ["teacher"], "min_n": 10, "rr": 1.5, "abs_min": 0.20},
+    {"id": "bullying", "indicator": "bullying_repeated", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.5, "abs_min": 0.15},
+    {"id": "low_wellbeing", "indicator": "low_wellbeing", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.5, "abs_min": 0.30},
+    {"id": "school_effect", "kind": "contrast", "levels": ["class", "school"], "min_n": 10, "min_delta": 10.0},
+    {"id": "sleep", "indicator": "sleep_short", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.3, "abs_min": 0.40},
+    {"id": "homework", "indicator": "homework_over_norm", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.5, "abs_min": 0.30},
+    {"id": "class_punishment", "indicator": "class_punishment", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.5, "abs_min": 0.30},
+    {"id": "threats", "indicator": "threats_weekly", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.5, "abs_min": 0.20},
+    {"id": "sent_out", "indicator": "sent_out", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.5, "abs_min": 0.20},
+    {"id": "grade_as_punishment", "indicator": "grade_as_punishment", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.5, "abs_min": 0.15},
+    {"id": "recess", "indicator": "recess_removed", "kind": "rate", "levels": ["class", "school"], "min_n": 10, "rr": 1.5, "abs_min": 0.20},
+]
+TEACHER_INDICATORS = {
+    "teacher_shouting": {"label": "Учителят повишава тон или крещи поне всяка седмица", "aspect": "no_shouting",
+                         "evidence": INDICATORS["shouting_weekly"]["evidence"], "sources": INDICATORS["shouting_weekly"]["sources"]},
+    "teacher_humiliation": {"label": "Учителят коментира грешки подигравателно поне всяка седмица", "aspect": "no_humiliation",
+                            "evidence": "Публичното унижаване от учител е свързано с тревожност, отказ от училище и спад в постиженията.",
+                            "sources": ["Brendgen et al. 2006", "Hyman & Snook 1999"]},
 }
 
 # Policy parameters (calibrate after the pilot; published with every release)
@@ -384,10 +518,16 @@ PARAMS = {
     "teacher_assignment": {"always_class_teacher": True, "extra_teachers": 2},
     "equity": {"flag_gap": 10.0, "z": 1.96},
     "grade_bands": {"5": "силни", "4": "силни", "3": "средни", "2": "затрудняващи се", "1": "затрудняващи се"},
+    "who5": {"low": 50, "very_low": 28, "source": "Topp et al. 2015, Psychother Psychosom – WHO-5: ≤50 ниско благополучие, ≤28 вероятна депресия (скрининг, не диагноза)"},
+    "homework_over_multiple": 1.5,
+    "contrast": {"symptoms": ["SC01", "SC02", "SC03", "SC04", "SC05"], "sleep": "SC06",
+                 "sleep_midpoints": [6.5, 7.5, 8.5, 9.5, 10.5], "worse_steps": 1, "worse_min_symptoms": 2},
+    "signals": SIGNALS,
 }
 
-doc = {"version": "1.0.1", "language": "bg", "scales": SCALES, "modules": MODULES, "dimensions": DIMENSIONS,
-       "pillars": PILLARS, "params": PARAMS, "items": items, "derived": DERIVED}
+doc = {"version": "2.0.0", "language": "bg", "scales": SCALES, "modules": MODULES, "dimensions": DIMENSIONS,
+       "pillars": PILLARS, "params": PARAMS, "items": items, "derived": DERIVED,
+       "indicators": INDICATORS, "teacher_indicators": TEACHER_INDICATORS}
 
 if __name__ == "__main__":
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "questionnaire.json")

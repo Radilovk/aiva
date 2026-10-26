@@ -10,7 +10,10 @@
  *     researcher    + class (no teacher level)
  *     school_admin  + class and teacher units of ONE school
  *     teacher       ONLY own teacher unit
+ *     inspector     + class and teacher units of ONE region (or all, without region) and their signals (РУО)
  *     admin         everything + waves, classes, codes, keys, compute (SF_ADMIN_KEY secret or an admin key)
+ * - Signals (units clearly above the national rate of a harmful practice or of distress) are stored apart from
+ *   the results and are read only by the inspectorate, the school concerned and the teacher concerned.
  * - No names, e-mails, phones or IP addresses are stored. Failed code attempts are counted per hashed IP and
  *   day (sf_attempts) to stop guessing. Free text is redacted and reduced to themes when it is submitted.
  *
@@ -75,9 +78,21 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS sf_keys (hash TEXT PRIMARY KEY, scope TEXT NOT NULL, school_id TEXT, teacher_id TEXT, label TEXT,
      created_at TEXT DEFAULT (datetime('now')))`,
 ];
+// Columns added after the first release; ALTER fails harmlessly ("duplicate column") once they exist.
+const MIGRATIONS = [
+  'ALTER TABLE sf_units ADD COLUMN region_id TEXT',
+  'ALTER TABLE sf_units ADD COLUMN n_signals INTEGER NOT NULL DEFAULT 0',
+  "ALTER TABLE sf_units ADD COLUMN signals TEXT NOT NULL DEFAULT '[]'",
+  'ALTER TABLE sf_keys ADD COLUMN region_id TEXT',
+];
 let schemaReady: Promise<unknown> | null = null;
 function ensureSchema(db: D1Database) {
-  schemaReady ??= db.batch(SCHEMA.map((s) => db.prepare(s))).catch((e) => { schemaReady = null; throw e; });
+  schemaReady ??= (async () => {
+    await db.batch(SCHEMA.map((s) => db.prepare(s)));
+    for (const m of MIGRATIONS) {
+      try { await db.prepare(m).run(); } catch (e) { if (!/duplicate column/i.test(String(e))) throw e; }
+    }
+  })().catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
 
@@ -104,7 +119,7 @@ function safeEqual(a: string, b: string): boolean {
   return r === 0;
 }
 
-interface Key { scope: string; school_id?: string | null; teacher_id?: string | null; label?: string | null }
+interface Key { scope: string; school_id?: string | null; teacher_id?: string | null; region_id?: string | null; label?: string | null }
 
 async function callerKey(c: C): Promise<Key> {
   const m = /^Bearer\s+(.+)$/i.exec(c.req.header('Authorization') || '');
@@ -112,20 +127,40 @@ async function callerKey(c: C): Promise<Key> {
   const token = m[1].trim();
   if (c.env.SF_ADMIN_KEY && safeEqual(token, c.env.SF_ADMIN_KEY)) return { scope: 'admin', label: 'оператор' };
   if (c.env.SF_ADMIN_KEY_SHA256 && safeEqual(await sha256(token), c.env.SF_ADMIN_KEY_SHA256.toLowerCase())) return { scope: 'admin', label: 'оператор' };
-  const row = await c.env.DB.prepare('SELECT scope, school_id, teacher_id, label FROM sf_keys WHERE hash = ?')
+  const row = await c.env.DB.prepare('SELECT scope, school_id, teacher_id, region_id, label FROM sf_keys WHERE hash = ?')
     .bind(await sha256('sf-key|' + token)).first<Key>();
   return row || { scope: 'invalid' };
 }
 
 // =============================================================================== scope filtering
-function canSee(key: Key, level: string, unit: Dict): boolean {
+function canSee(key: Key, level: string, unit: Dict, region?: string | null): boolean {
   const sc = key.scope;
   if (sc === 'admin') return true;
   if (sc === 'teacher') return level === 'teacher' && unit.unit_id === key.teacher_id;
   if (level === 'system' || level === 'region' || level === 'school') return true;
   if (sc === 'researcher') return level === 'class';
   if (sc === 'school_admin') return (level === 'class' || level === 'teacher') && unit.parent_id === key.school_id;
+  if (sc === 'inspector') return (level === 'class' || level === 'teacher') && (!key.region_id || region === key.region_id);
   return false;
+}
+
+/** Signals: the inspectorate (its region), the school concerned (itself, its classes and teachers), the teacher concerned. */
+function canSeeSignals(key: Key, level: string, unit: Dict, region?: string | null): boolean {
+  const sc = key.scope;
+  if (sc === 'admin') return true;
+  if (sc === 'inspector') return !key.region_id || region === key.region_id || (level === 'region' && unit.unit_id === key.region_id);
+  if (sc === 'school_admin') return (level === 'school' && unit.unit_id === key.school_id) || ((level === 'class' || level === 'teacher') && unit.parent_id === key.school_id);
+  if (sc === 'teacher') return level === 'teacher' && unit.unit_id === key.teacher_id;
+  return false;
+}
+
+function signalsScopeSql(key: Key): { sql: string; args: unknown[] } | null {
+  const sc = key.scope;
+  if (sc === 'admin') return { sql: '', args: [] };
+  if (sc === 'inspector') return key.region_id ? { sql: ' AND u.region_id = ?', args: [key.region_id] } : { sql: '', args: [] };
+  if (sc === 'school_admin') return { sql: " AND ((u.level = 'school' AND u.unit_id = ?) OR (u.level IN ('class', 'teacher') AND u.parent_id = ?))", args: [key.school_id, key.school_id] };
+  if (sc === 'teacher') return { sql: " AND u.level = 'teacher' AND u.unit_id = ?", args: [key.teacher_id] };
+  return null;
 }
 
 /** What leaves the server: blocked units are withheld. */
@@ -351,16 +386,20 @@ const METHOD_NOTES = [
   'Оценките на децата са само контекст: училищата сами оценяват учениците си, затова не са сравними между училища.',
   'Резултатите за учител са поверителни – виждат ги само учителят и директорът.',
   'Връзка не е причина: връзка между натоварване и благополучие не показва кое на какво влияе.',
+  'Сигнал = честота, ясно над средната за страната (същата вълна, същият етап): поне 10 души, съществен дял и долна граница на 95% интервал над средното. Сигналът е повод за проверка, не доказателство за нарушение.',
+  'Ефект на училището = същото дете в учебни седмици срещу ваканция. Така влиянието на училището се отделя от семейството и самото дете.',
 ];
 
-sf.get('/methodology', (c) => c.json({ version: Q.version, dimensions: Q.dimensions, pillars: Q.pillars, params: Q.params, notes: METHOD_NOTES }));
+sf.get('/methodology', (c) => c.json({ version: Q.version, dimensions: Q.dimensions, pillars: Q.pillars, params: Q.params, notes: METHOD_NOTES,
+  indicators: Q.indicators, teacher_indicators: Q.teacher_indicators }));
 
 sf.get('/whoami', async (c) => {
   const k = await callerKey(c);
   if (k.scope === 'invalid') throw new HttpError(403, 'Невалиден ключ.');
-  const nm = await names(c.env.DB, [['school', k.school_id || ''], ['teacher', k.teacher_id || '']]);
+  const nm = await names(c.env.DB, [['school', k.school_id || ''], ['teacher', k.teacher_id || ''], ['region', k.region_id || '']]);
   return c.json({ scope: k.scope, label: k.label ?? null, school_id: k.school_id ?? null, teacher_id: k.teacher_id ?? null,
-    school_name: nm[`school|${k.school_id}`] ?? null, teacher_name: nm[`teacher|${k.teacher_id}`] ?? null });
+    region_id: k.region_id ?? null, school_name: nm[`school|${k.school_id}`] ?? null, teacher_name: nm[`teacher|${k.teacher_id}`] ?? null,
+    region_name: nm[`region|${k.region_id}`] ?? null });
 });
 
 async function waves(db: D1Database) {
@@ -371,7 +410,9 @@ async function waves(db: D1Database) {
 
 sf.get('/waves', async (c) => {
   const ws = (await waves(c.env.DB)).filter((w) => w.computed);
-  return c.json({ waves: ws.map(({ id, title, demo, computed_at, meta }) => ({ id, title, demo, computed_at, responses: meta?.included ?? null })) });
+  // references: national rates of the same wave (per stage and role), the yardstick every unit is compared with
+  return c.json({ waves: ws.map(({ id, title, demo, computed_at, meta }) => ({ id, title, demo, computed_at, responses: meta?.included ?? null,
+    references: meta?.references ?? null })) });
 });
 
 /** Requested wave, else the latest computed real wave, else the latest computed demo wave. */
@@ -400,6 +441,9 @@ function scopeSql(key: Key, level: string): { sql: string; args: unknown[] } | n
   if (level === 'system' || level === 'region' || level === 'school') return { sql: '', args: [] };
   if (sc === 'researcher' && level === 'class') return { sql: '', args: [] };
   if (sc === 'school_admin' && (level === 'class' || level === 'teacher')) return { sql: ' AND u.parent_id = ?', args: [key.school_id] };
+  if (sc === 'inspector' && (level === 'class' || level === 'teacher')) {
+    return key.region_id ? { sql: ' AND u.region_id = ?', args: [key.region_id] } : { sql: '', args: [] };
+  }
   return null;
 }
 
@@ -428,10 +472,15 @@ sf.get('/units', async (c) => {
     200, { 'Content-Type': 'application/json; charset=UTF-8' });
 });
 
+interface UnitMeta { region: string | null; signals: string }
+const META = new WeakMap<Dict, UnitMeta>();   // region and signals travel beside the unit, never inside its JSON
+
 async function unitRow(c: C, wave: string, level: string, uid: string, key: Key): Promise<Dict> {
-  const r = await c.env.DB.prepare('SELECT data FROM sf_units WHERE wave_id = ? AND level = ? AND unit_id = ?').bind(wave, level, uid).first<{ data: string }>();
+  const r = await c.env.DB.prepare('SELECT data, region_id, signals FROM sf_units WHERE wave_id = ? AND level = ? AND unit_id = ?')
+    .bind(wave, level, uid).first<{ data: string; region_id: string | null; signals: string | null }>();
   const unit = r ? JSON.parse(r.data) : null;
-  if (!unit || unit.suppressed || !canSee(key, level, unit)) throw new HttpError(404, 'not found or not permitted');
+  if (!unit || unit.suppressed || !canSee(key, level, unit, r!.region_id)) throw new HttpError(404, 'not found or not permitted');
+  META.set(unit, { region: r!.region_id, signals: r!.signals || '[]' });
   return unit;
 }
 
@@ -440,9 +489,11 @@ sf.get('/units/:level/:id', async (c) => {
   const { level, id } = c.req.param();
   const w = await resolveWave(c);
   const unit = await unitRow(c, w.id, level, id, key);
+  const meta = META.get(unit)!;
   const [named] = await withNames(c.env.DB, level, [publicView(level, unit)]);
   const { themes, ...rest } = named;
-  return c.json({ wave: w.id, demo: w.demo, ...rest });
+  const signals = !unit.publish_blocked && canSeeSignals(key, level, unit, meta.region) ? JSON.parse(meta.signals) : undefined;
+  return c.json({ wave: w.id, demo: w.demo, ...rest, ...(signals ? { signals } : {}) });
 });
 
 sf.get('/units/:level/:id/themes', async (c) => {
@@ -459,11 +510,11 @@ sf.get('/units/:level/:id/trend', async (c) => {
   const key = await callerKey(c);
   const { level, id } = c.req.param();
   const ws = new Map((await waves(c.env.DB)).map((w) => [w.id, w]));
-  const rows = await c.env.DB.prepare('SELECT wave_id, data FROM sf_units WHERE level = ? AND unit_id = ?').bind(level, id).all<{ wave_id: string; data: string }>();
+  const rows = await c.env.DB.prepare('SELECT wave_id, data, region_id FROM sf_units WHERE level = ? AND unit_id = ?').bind(level, id).all<{ wave_id: string; data: string; region_id: string | null }>();
   const cur = ws.get(c.req.query('wave') || '');
   const out = rows.results
-    .map((r) => ({ w: ws.get(r.wave_id), x: JSON.parse(r.data) }))
-    .filter(({ w, x }) => w && (!cur || w.demo === cur.demo) && !x.suppressed && !x.publish_blocked && canSee(key, level, x))
+    .map((r) => ({ w: ws.get(r.wave_id), x: JSON.parse(r.data), region: r.region_id }))
+    .filter(({ w, x, region }) => w && (!cur || w.demo === cur.demo) && !x.suppressed && !x.publish_blocked && canSee(key, level, x, region))
     .sort((a, b) => String(a.w!.created_at).localeCompare(String(b.w!.created_at)))
     .map(({ w, x }) => ({ wave: w!.id, title: w!.title, index: x.index,
       dimensions: Object.fromEntries(Object.entries(x.dimensions || {}).map(([d, v]: [string, any]) => [d, v.score])) }));
@@ -486,6 +537,32 @@ sf.get('/compare', async (c) => {
       clear_difference: va.lo > vb.hi || va.hi < vb.lo }];
   });
   return c.json({ a: ua.unit_id, b: ub?.unit_id ?? 'system', rows, index: { a: ua.index, b: ref?.index ?? null } });
+});
+
+/** Units with signals in a wave, for the inspectorate, the school or the teacher concerned. One query, stitched JSON. */
+sf.get('/signals', async (c) => {
+  const key = await callerKey(c);
+  const scope = signalsScopeSql(key);
+  if (!scope) throw new HttpError(403, 'Сигналите са достъпни за инспектората, училището и съответния учител.');
+  const w = await resolveWave(c);
+  const level = c.req.query('level');
+  if (level && !(LEVELS as readonly string[]).includes(level)) throw new HttpError(400, 'bad level');
+  const rows = await c.env.DB.prepare(
+    `SELECT u.level, u.unit_id, u.signals, u.summary,
+            COALESCE(n.name, u.unit_id) AS name, COALESCE(pn.name, u.parent_id) AS pname, COALESCE(rn.name, u.region_id) AS rname
+       FROM sf_units u
+       LEFT JOIN sf_names n ON n.level = u.level AND n.unit_id = u.unit_id
+       LEFT JOIN sf_names pn ON pn.level = CASE u.level WHEN 'class' THEN 'school' WHEN 'teacher' THEN 'school' WHEN 'school' THEN 'region' ELSE '' END
+                             AND pn.unit_id = u.parent_id
+       LEFT JOIN sf_names rn ON rn.level = 'region' AND rn.unit_id = u.region_id
+      WHERE u.wave_id = ? AND u.n_signals > 0 AND u.suppressed = 0${level ? ' AND u.level = ?' : ''}${scope.sql}
+      ORDER BY u.n_signals DESC, u.level, name`)
+    .bind(w.id, ...(level ? [level] : []), ...scope.args)
+    .all<{ level: string; unit_id: string; signals: string; summary: string; name: string; pname: string | null; rname: string | null }>();
+  const items = rows.results.map((r) => `{"level":${JSON.stringify(r.level)},"unit_id":${JSON.stringify(r.unit_id)},"name":${JSON.stringify(r.name)},`
+    + `"parent_name":${JSON.stringify(r.pname)},"region_name":${JSON.stringify(r.rname)},"signals":${r.signals},"summary":${r.summary}}`);
+  return c.body(`{"wave":${JSON.stringify(w.id)},"demo":${w.demo},"count":${items.length},"units":[${items.join(',')}]}`, 200,
+    { 'Content-Type': 'application/json; charset=UTF-8' });
 });
 
 // ------------------------------------------------------------------ admin
@@ -580,18 +657,19 @@ sf.post('/admin/keys', async (c) => {
   await requireAdmin(c);
   const b = await body(c);
   const scope = String(b.scope);
-  if (!['researcher', 'school_admin', 'teacher', 'admin'].includes(scope)) throw new HttpError(400, 'Невалиден обхват.');
+  if (!['researcher', 'school_admin', 'teacher', 'inspector', 'admin'].includes(scope)) throw new HttpError(400, 'Невалиден обхват.');
   if (scope === 'school_admin' && !b.school_id) throw new HttpError(400, 'Нужно е училище.');
   if (scope === 'teacher' && !b.teacher_id) throw new HttpError(400, 'Нужен е учител.');
   const key = newKey();
-  await c.env.DB.prepare('INSERT INTO sf_keys (hash, scope, school_id, teacher_id, label) VALUES (?, ?, ?, ?, ?)')
-    .bind(await sha256('sf-key|' + key), scope, b.school_id || null, b.teacher_id || null, String(b.label || '').slice(0, 100) || null).run();
+  await c.env.DB.prepare('INSERT INTO sf_keys (hash, scope, school_id, teacher_id, region_id, label) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(await sha256('sf-key|' + key), scope, b.school_id || null, b.teacher_id || null, scope === 'inspector' ? b.region_id || null : null,
+      String(b.label || '').slice(0, 100) || null).run();
   return c.json({ key, scope }, 201);
 });
 
 sf.get('/admin/keys', async (c) => {
   await requireAdmin(c);
-  const rows = await c.env.DB.prepare('SELECT substr(hash, 1, 12) AS id, scope, school_id, teacher_id, label, created_at FROM sf_keys ORDER BY created_at DESC').all();
+  const rows = await c.env.DB.prepare('SELECT substr(hash, 1, 12) AS id, scope, school_id, teacher_id, region_id, label, created_at FROM sf_keys ORDER BY created_at DESC').all();
   return c.json({ keys: rows.results });
 });
 
@@ -645,9 +723,11 @@ sf.post('/admin/waves/:id/units', async (c) => {
   if (b.reset) stmts.push(db.prepare('DELETE FROM sf_units WHERE wave_id = ?').bind(wid));
   for (const u of units) {
     if (!(LEVELS as readonly string[]).includes(u.level) || typeof u.summary !== 'string' || typeof u.data !== 'string') throw new HttpError(400, 'Невалиден ред.');
-    stmts.push(db.prepare(`INSERT OR REPLACE INTO sf_units (wave_id, level, unit_id, parent_id, suppressed, score, tier, summary, data)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(wid, u.level, id(u.unit_id, 'единица'), u.parent_id ?? null, u.suppressed ? 1 : 0,
-      typeof u.score === 'number' ? u.score : null, u.tier ?? null, u.summary, u.data));
+    if (u.signals !== undefined && typeof u.signals !== 'string') throw new HttpError(400, 'Невалиден ред.');
+    stmts.push(db.prepare(`INSERT OR REPLACE INTO sf_units (wave_id, level, unit_id, parent_id, suppressed, score, tier, summary, data, region_id, n_signals, signals)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(wid, u.level, id(u.unit_id, 'единица'), u.parent_id ?? null, u.suppressed ? 1 : 0,
+      typeof u.score === 'number' ? u.score : null, u.tier ?? null, u.summary, u.data, u.region_id ?? null,
+      Number.isInteger(u.n_signals) ? u.n_signals : 0, u.signals ?? '[]'));
   }
   for (const [lv, uid, name] of nm) {
     if (typeof lv === 'string' && typeof uid === 'string' && typeof name === 'string') {
@@ -655,7 +735,9 @@ sf.post('/admin/waves/:id/units', async (c) => {
         .bind(lv, uid, name.slice(0, 120)));
     }
   }
-  if (b.meta) stmts.push(db.prepare(`UPDATE sf_waves SET computed_at = datetime('now'), meta = ? WHERE id = ?`).bind(JSON.stringify(b.meta).slice(0, 20000), wid));
+  const meta = b.meta ? JSON.stringify(b.meta) : null;
+  if (meta && meta.length > 60000) throw new HttpError(400, 'Мета данните са твърде големи.');
+  if (meta) stmts.push(db.prepare(`UPDATE sf_waves SET computed_at = datetime('now'), meta = ? WHERE id = ?`).bind(meta, wid));
   if (stmts.length) await db.batch(stmts);
   return c.json({ wave: wid, stored: units.length });
 });

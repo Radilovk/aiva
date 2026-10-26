@@ -115,3 +115,45 @@ details.explain.card { margin-top: 26px; }
   .card table.t th { font-size: .7rem; letter-spacing: .02em; }
 }
 table.t th.num, table.t td.num { text-align: right; }
+
+/* signals */
+.count { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 99px; background: var(--bad); color: #fff; font-size: .85rem; vertical-align: middle; }
+.signals { display: grid; gap: 10px; margin-top: 10px; }
+.signal { border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); border-left: 4px solid var(--warn); background: var(--card); border-radius: 12px; padding: 14px 16px; }
+.signal.high { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); border-left-color: var(--bad); }
+.signal h3 { margin: 0; font-size: 1.02rem; }
+.signal p { margin: 8px 0 0; }
+.sig-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.sev { font-size: .75rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
+.sev-high { background: var(--bad-soft); color: var(--bad); }
+.sev-el { background: var(--warn-soft); color: var(--warn); }
+.ev { color: var(--ink-2); font-size: .9rem; }
+.src { color: var(--muted); font-size: .8rem; margin-top: 6px; }
+.sig-unit .nm { font-weight: 700; font-size: 1.08rem; color: var(--ink); text-decoration: none; }
+.sig-unit .nm:hover { text-decoration: underline; }
+
+/* indicators against the national rate */
+h3.grp { font-size: .82rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 2px; }
+h3.grp:first-of-type { margin-top: 6px; }
+.ind .meter { position: relative; overflow: visible; }
+.ind .meter s { position: absolute; top: -4px; height: 14px; border-left: 2px dashed var(--ink); opacity: .55; }
+.ind.above .meter > i { background: var(--bad); }
+.ind .ref-note { grid-column: 1 / -1; margin-top: -2px; }
+.up-bad { color: var(--bad); }
+.legend .l-bar { width: 22px; height: 6px; border-radius: 4px; background: var(--ink-2); }
+.stat b { display: block; font-size: 2.1rem; font-weight: 800; font-variant-numeric: tabular-nums; margin: 4px 0; }
+.stat .ev { margin: 10px 0 0; }
+
+@media print {
+  .site-head, .banner, .site-foot, .no-print, .tabs, .toolbar, .back-link, dialog { display: none !important; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  main { padding: 0; }
+  .card, .signal { box-shadow: none; break-inside: avoid; }
+  a { color: #000; text-decoration: none; }
+}
+
+.sig-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.sig-tags .sev { white-space: normal; }
+.sig-more { margin-top: 10px; }
+.sig-more summary { cursor: pointer; color: var(--ink-2); font-weight: 600; font-size: .92rem; }
+@media print { .sig-more > summary { display: none; } }

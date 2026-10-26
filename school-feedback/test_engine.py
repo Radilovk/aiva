@@ -69,7 +69,7 @@ class Flow(unittest.TestCase):
         self.assertEqual([t["teacher_id"] for t in young], ["T1"])
         f = E.flow(Q, {"role": "student", "grade": 8, "token": "tokX"}, {}, st)
         tc = [v for v in f if v["id"].startswith("TC")]
-        self.assertEqual(len(tc), 3 * 7)
+        self.assertEqual(len(tc), 3 * 9)   # 7 teaching aspects + 2 behaviour counts (TC10, TC11)
         self.assertTrue(any("г-жа А" in v["text"] for v in tc))
 
     def test_balanced_assignment_spreads_ratings(self):

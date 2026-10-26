@@ -55,6 +55,25 @@
       </details>
     </section>
 
+    <!-- signals: inspectorate, school, teacher -->
+    <section id="v-signals" hidden>
+      <button class="btn quiet small back-link no-print" type="button" onclick="location.hash='#/school'"><span data-icon="back"></span>Всички резултати</button>
+      <div class="page-head">
+        <div>
+          <h1>Сигнали за проверка</h1>
+          <p class="ink2 lead" id="sig-meta"></p>
+        </div>
+        <div class="row no-print" style="align-items:flex-end">
+          <label class="field wave-pick"><span>Вълна</span><select id="sig-wave"></select></label>
+          <button class="btn secondary" type="button" onclick="window.print()">Печат / PDF доклад</button>
+        </div>
+      </div>
+      <p class="small muted" style="max-width:760px">Сигнал = честота на вредна практика или на неблагополучие, ясно над средната за страната в същата вълна:
+        поне 10 отговорили, съществен дял и долна граница на 95% интервал над средното. Сигналът е повод за проверка, а не доказателство за нарушение.</p>
+      <div class="filters no-print" id="sig-filters" role="group" aria-label="Ниво" style="margin:14px 0"></div>
+      <div id="sig-list" class="stack"></div>
+    </section>
+
     <!-- unit -->
     <section id="v-unit" hidden>
       <button class="btn quiet small back-link" id="back" type="button"><span data-icon="back"></span>Всички</button>

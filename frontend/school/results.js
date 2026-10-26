@@ -34,13 +34,23 @@
   const STAGE = { I: "начален етап (I–IV)", II: "прогимназия (V–VII)", III: "гимназия (VIII–XII)" };
   const TABS = [
     { level: "school", label: "Училища" }, { level: "region", label: "Региони" }, { level: "system", label: "Страната" },
-    { level: "class", label: "Класове", lock: ["researcher", "school_admin", "admin"] },
-    { level: "teacher", label: "Учители", lock: ["school_admin", "teacher", "admin"] },
+    { level: "class", label: "Класове", lock: ["researcher", "school_admin", "inspector", "admin"] },
+    { level: "teacher", label: "Учители", lock: ["school_admin", "teacher", "inspector", "admin"] },
+    { level: "signals", label: "Сигнали", lock: ["inspector", "school_admin", "teacher", "admin"] },
+  ];
+  // indicator groups, in the order a reader looks for harm
+  const IND_GROUPS = [
+    ["Психоемоционално и физическо състояние", ["low_wellbeing", "very_low_wellbeing", "psychosomatic_often", "sleep_short", "school_worse"]],
+    ["Поведение на възрастните и дисциплина", ["shouting_weekly", "threats_weekly", "class_punishment", "sent_out", "grade_as_punishment", "recess_removed",
+      "physical_force", "labelled_aggression_disputed", "behaviour_note"]],
+    ["Отношения между децата", ["bullying_repeated"]],
+    ["Натоварване", ["homework_over_norm", "vacation_tasks", "tutoring_regular", "tutoring_keep_up"]],
   ];
   const TIER_FILTERS = [["", "Всички"], ["2", "Значително над"], ["1", "Над средното"], ["0", "Около"], ["-1", "Под средното"], ["-2", "Значително под"]];
   const LEVEL_WORD = { school: ["училищата", "училище"], region: ["регионите", "регион"], class: ["класовете от същия етап", "клас"], teacher: ["учителите", "учител"], system: ["", "страна"] };
 
-  const st = { key: keyStore.get("sf-key") || "", who: { scope: "public" }, waves: [], wave: "", level: "school", q: "", tier: "", units: [], demo: false };
+  const st = { key: keyStore.get("sf-key") || "", who: { scope: "public" }, waves: [], wave: "", level: "school", q: "", tier: "", units: [], demo: false,
+    meta: null, sigLevel: "" };
 
   // ------------------------------------------------------------------ helpers
   const clamp = (x) => Math.max(0, Math.min(100, x));
@@ -58,6 +68,51 @@
   const tierBadge = (ix) => (ix && ix.tier ? `<span class="tier tier-${esc(ix.tier_code)}">${esc(ix.tier)}</span>` : "");
   const bandWord = (b) => (b ? `<span class="band-${esc(b)}">${esc(b)}</span>` : "");
   const respondents = (n) => (n ? (n.parent || 0) + (n.student || 0) : 0);
+
+  /** Wilson 95% interval, the same test the engine uses for signals. */
+  function wilson(x, n, z = 1.96) {
+    if (!n) return [0, 1];
+    const p = x / n, d = 1 + (z * z) / n, c = p + (z * z) / (2 * n), m = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n));
+    return [Math.max(0, (c - m) / d), Math.min(1, (c + m) / d)];
+  }
+  const indMeta = (k) => st.meta?.indicators?.[k] || st.meta?.teacher_indicators?.[k] || { label: IND[k] || k };
+  /** National rate of the same wave: classes and teachers against their stage, everything else against all. */
+  function nationalRate(key, level, stage) {
+    const refs = st.waves.find((w) => w.id === st.wave)?.references;
+    const sg = level === "class" || level === "teacher" ? stage : "all";
+    return refs?.rates?.[sg]?.all?.[key] ?? null;
+  }
+  const nationalContrast = (level, stage) => st.waves.find((w) => w.id === st.wave)?.references?.contrast?.[level === "class" ? stage : "all"] ?? null;
+  const sources = (m) => (m.sources?.length ? `<div class="src">Източници: ${m.sources.map(esc).join(" · ")}</div>` : "");
+
+  function signalHtml(sg) {
+    const high = sg.severity === "high";
+    const chip = `<span class="sev ${high ? "sev-high" : "sev-el"}">${high ? "Висок приоритет" : "Повишено"}</span>`;
+    if (sg.kind === "contrast") {
+      return `<div class="signal ${high ? "high" : ""}"><div class="sig-head">${chip}<h3>Симптомите са по-чести в учебно време, отколкото във ваканция</h3></div>
+        <p>При едни и същи деца главоболията, болките в корема, трудното заспиване, раздразнителността и тъгата са с <b>${fmt(sg.delta)} точки</b>
+        по-чести в учебни седмици (95% интервал ${fmt(sg.ci[0])}–${fmt(sg.ci[1])})${sg.ref !== null ? `, при ${fmt(sg.ref)} средно за страната` : ""}.
+        ${sg.share_worse !== null ? `${pct(sg.share_worse)} от децата са по-зле в учебно време.` : ""} Отговорили: ${sg.n}.</p>
+        <p class="ev">Сравнението е при същото дете, затова отделя влиянието на учебния период от семейството и детето.</p></div>`;
+    }
+    const m = indMeta(sg.indicator);
+    const who = sg.confirmed_by?.length === 2 ? "Потвърдено независимо от родители и ученици."
+      : sg.confirmed_by?.length === 1 ? `Съобщено основно от ${sg.confirmed_by[0] === "parent" ? "родители" : "ученици"}.` : "";
+    const facts = sg.kind === "count"
+      ? `<b>${sg.count} отделни съобщения</b> от ${sg.n} отговорили (${pct(sg.rate)}).`
+      : `<b>${pct(sg.rate)}</b> (${sg.count} от ${sg.n}) при <b>${pct(sg.ref)}</b> средно за страната${sg.rr ? ` – ${fmt(sg.rr, 1)} пъти по-често` : ""}. 95% интервал: ${pct(sg.ci[0])}–${pct(sg.ci[1])}.`;
+    return `<div class="signal ${high ? "high" : ""}"><div class="sig-head">${chip}<h3>${esc(m.label)}</h3></div>
+      <p>${facts} ${who}</p>${m.evidence ? `<p class="ev">${esc(m.evidence)}</p>` : ""}${sources(m)}</div>`;
+  }
+
+  function signalsBlock(u) {
+    if (!Array.isArray(u.signals)) return "";
+    if (!u.signals.length) return `<div class="note" style="margin-top:18px"><div class="priv">${ICON.shield}<span>Няма сигнали за проверка: нито един показател не е ясно над средното за страната.</span></div></div>`;
+    return `<h2>Сигнали за проверка <span class="count">${u.signals.length}</span></h2>
+      <div class="signals">${u.signals.map(signalHtml).join("")}</div>
+      <p class="section-note">Сигналът е повод за проверка, а не доказателство за нарушение: честота, ясно над средната за страната (поне 10 души,
+      долна граница на 95% интервал над средното). Виждат го инспекторатът, училището и съответният учител.</p>`;
+  }
   function fill() { for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = ICON[el.dataset.icon] || ""; }
 
   // ------------------------------------------------------------------ access
@@ -71,6 +126,7 @@
     if (w.scope === "school_admin") return w.school_name || "Училище";
     if (w.scope === "teacher") return w.teacher_name || "Учител";
     if (w.scope === "researcher") return "Изследовател";
+    if (w.scope === "inspector") return "РУО · " + (w.region_name || w.region_id || "цялата страна");
     if (w.scope === "admin") return "Оператор";
     return "Вход";
   }
@@ -83,7 +139,8 @@
     for (const b of $("tabs").children) {
       b.addEventListener("click", () => {
         const t = TABS.find((x) => x.level === b.dataset.level);
-        if (!allowed(t)) return openLogin(`${t.label} се виждат само с ключ – ${t.level === "teacher" ? "на директора или самия учител" : "на директора или изследовател"}.`);
+        if (!allowed(t)) return openLogin(`${t.label} се виждат само с ключ – ${t.level === "teacher" ? "на директора, инспектората или самия учител"
+          : t.level === "signals" ? "на инспектората, директора или учителя" : "на директора, инспектората или изследовател"}.`);
         if (t.level === "system") return go(`#/system/BG`);
         go(`#/${t.level}`);
       });
@@ -196,7 +253,9 @@
       <div class="kpi"><span>Ученици</span><b>${n.student || 0}</b>${part.student != null ? `<em>участие ${pct(part.student)}</em>` : ""}</div>
       ${u.representativeness === "low" ? `<div class="kpi"><span>Внимание</span><b style="font-size:1rem">Ниско участие</b><em>под 30% – недоволните отговарят по-често</em></div>` : ""}
     </div>`;
-    if (level === "teacher") h += `<div class="note" style="margin-top:18px"><div class="priv">${ICON.lock}<span>Поверително. Този резултат виждат само учителят и директорът. Не се публикува.</span></div></div>`;
+    if (level === "teacher") h += `<div class="note" style="margin-top:18px"><div class="priv">${ICON.lock}<span>Поверително. Този резултат виждат само учителят, директорът и инспекторатът. Не се публикува.</span></div></div>`;
+    h += signalsBlock(u);
+    h += wellbeingBlock(level, u);
 
     if (u.pillars && Object.keys(u.pillars).length && level !== "teacher") {
       h += `<h2>Три стълба</h2><div class="pillars">${Object.entries(u.pillars).map(([p, v]) => `<div class="pillar"><div class="pn">${esc(PILLAR[p][0])}</div>
@@ -221,9 +280,9 @@
         <div class="meter"><i style="width:${clamp(v.mean)}%"></i></div></div>`).join("")}<p class="section-note">Показват се аспекти с поне 10 оценки.</p></div>`;
     }
 
-    if (u.indicators && Object.keys(u.indicators).length) {
-      h += `<h2>Колко често се случва</h2><div class="card">${Object.entries(u.indicators).map(([k, v]) => `<div class="ind"><span>${esc(IND[k] || k)} <span class="muted small">· от ${v.n}</span></span><b>${pct(v.share)}</b>
-        <div class="meter"><i style="width:${clamp(v.share * 100)}%"></i></div></div>`).join("")}<p class="section-note">Дял от отговорилите. Тези показатели не влизат в индекса.</p></div>`;
+    if (u.indicators && Object.keys(u.indicators).length) h += indicatorsBlock(level, u.stage, u.indicators, IND_GROUPS);
+    if (u.teacher_indicators && Object.keys(u.teacher_indicators).length) {
+      h += indicatorsBlock(level, u.stage, u.teacher_indicators, [["Поведение на учителя (по думите на учениците)", Object.keys(u.teacher_indicators)]]);
     }
 
     if (u.equity && u.equity.length) {
@@ -253,6 +312,93 @@
     return h;
   }
 
+  /** Each indicator against the national rate, with the same 95% test as the signals. */
+  function indicatorsBlock(level, stage, inds, groups) {
+    let out = `<h2>Колко често се случва</h2><div class="card"><div class="legend"><span><i class="l-bar"></i>тук</span>
+      ${level !== "system" ? `<span><i class="l-ref"></i>средно за страната</span><span><b class="up-bad">▲</b> ясно над средното</span>` : ""}</div>`;
+    for (const [title, keys] of groups) {
+      const rows = keys.filter((k) => inds[k]);
+      if (!rows.length) continue;
+      out += `<h3 class="grp">${esc(title)}</h3>`;
+      for (const k of rows) {
+        const v = inds[k], m = indMeta(k);
+        const ref = level === "system" ? null : nationalRate(k, level, stage);
+        const [lo] = wilson(Math.round(v.share * v.n), v.n);
+        const above = ref !== null && v.n >= 10 && lo > ref;
+        out += `<div class="ind${above ? " above" : ""}" title="${esc(m.evidence || "")}"><span>${esc(m.label)} <span class="muted small">· от ${v.n}</span></span>
+          <b>${above ? '<span class="up-bad">▲</span> ' : ""}${pct(v.share)}</b>
+          <div class="meter"><i style="width:${clamp(v.share * 100)}%"></i>${ref !== null ? `<s style="left:${clamp(ref * 100)}%"></s>` : ""}</div>
+          ${ref !== null ? `<span class="small muted ref-note">средно ${pct(ref)}</span>` : ""}</div>`;
+      }
+    }
+    return out + `<p class="section-note">Дял от отговорилите. Тези показатели не влизат в индекса – те са фактите зад него.</p></div>`;
+  }
+
+  function wellbeingBlock(level, u) {
+    const lw = u.indicators?.low_wellbeing, c = u.contrast;
+    if (!lw && !c) return "";
+    const refLw = level === "system" ? null : nationalRate("low_wellbeing", level, u.stage);
+    const refC = level === "system" ? null : nationalContrast(level, u.stage);
+    let out = `<h2>Състояние на децата</h2><div class="grid grid-2">`;
+    if (lw) {
+      out += `<div class="card flat stat"><span class="small muted">Ниско благополучие (WHO-5 ≤ 50)</span><b>${pct(lw.share)}</b>
+        <span class="small">${refLw !== null ? `при ${pct(refLw)} средно за страната · ` : ""}ученици 5–12 клас, ${lw.n} отговора</span>
+        <p class="ev">Валидиран скрининг на СЗО. Не е диагноза, но под 50 се препоръчва разговор със специалист.</p></div>`;
+    }
+    if (c) {
+      out += `<div class="card flat stat"><span class="small muted">Ефект на учебното време</span><b>${c.symptom_delta > 0 ? "+" : ""}${fmt(c.symptom_delta)}</b>
+        <span class="small">точки по-чести симптоми в учебни седмици спрямо ваканция (95% интервал ${fmt(c.lo)}–${fmt(c.hi)})${refC !== null ? ` · средно ${fmt(refC)}` : ""}</span>
+        <p class="ev">${c.share_worse !== null ? `${pct(c.share_worse)} от децата са по-зле в учебно време. ` : ""}${c.sleep_lost_h !== null ? `Сън: ${fmt(c.sleep_lost_h, 1)} ч по-малко на нощ в учебни дни.` : ""}</p></div>`;
+    }
+    return out + `</div>`;
+  }
+
+  // ------------------------------------------------------------------ signals view (inspectorate, school, teacher)
+  async function loadSignals() {
+    const my = ++seq;
+    show("v-signals");
+    document.title = "Сигнали · Глас за училището";
+    const lvl = st.sigLevel;
+    $("sig-wave").innerHTML = $("wave").innerHTML;
+    $("sig-wave").value = st.wave;
+    $("sig-filters").innerHTML = [["", "Всички"], ["school", "Училища"], ["class", "Класове"], ["teacher", "Учители"]]
+      .map(([v, l]) => `<button type="button" data-l="${v}" aria-pressed="${lvl === v}">${l}</button>`).join("");
+    for (const b of $("sig-filters").children) b.addEventListener("click", () => { st.sigLevel = b.dataset.l; loadSignals(); });
+    $("sig-list").innerHTML = `<div class="skeleton" style="height:140px"></div>`;
+    try {
+      const d = await api(`/signals?wave=${encodeURIComponent(st.wave)}${lvl ? "&level=" + lvl : ""}`, { key: st.key });
+      if (my !== seq) return;
+      setDemo(d.demo);
+      $("sig-meta").textContent = `${waveTitle()} · ${d.count} ${d.count === 1 ? "единица" : "единици"} със сигнали · ${whoLabel()}`;
+      const LV = { school: "Училище", class: "Клас", teacher: "Учител", region: "Регион" };
+      const title = (g) => (g.kind === "contrast" ? "Ефект на учебното време" : indMeta(g.indicator).label);
+      // overview: how many units carry each signal, highest priority first
+      const tally = new Map();
+      for (const u of d.units) for (const g of u.signals) {
+        const k = g.id, t = tally.get(k) || { title: title(g), n: 0, high: 0 };
+        t.n++; if (g.severity === "high") t.high++; tally.set(k, t);
+      }
+      const over = [...tally.values()].sort((x, y) => y.high - x.high || y.n - x.n);
+      const order = d.units.slice().sort((x, y) => y.signals.filter((g) => g.severity === "high").length - x.signals.filter((g) => g.severity === "high").length
+        || y.signals.length - x.signals.length);
+      $("sig-list").innerHTML = d.units.length ? `<div class="card flat sig-over"><h3 style="margin-top:0">Обобщение</h3><div class="table-wrap"><table class="t">
+          <thead><tr><th>Сигнал</th><th class="num">Единици</th><th class="num">Висок приоритет</th></tr></thead>
+          <tbody>${over.map((t) => `<tr><td>${esc(t.title)}</td><td class="num">${t.n}</td><td class="num">${t.high ? `<b class="up-bad">${t.high}</b>` : "–"}</td></tr>`).join("")}</tbody></table></div></div>`
+        + order.map((u) => {
+        const high = u.signals.filter((g) => g.severity === "high").length;
+        return `<article class="card sig-unit">
+          <div class="row"><div><span class="chip">${LV[u.level] || u.level}</span> <a class="nm" href="#/${u.level}/${encodeURIComponent(u.unit_id)}">${esc(u.name)}</a>
+            <div class="small muted">${[...new Set([u.parent_name, u.region_name].filter(Boolean))].map(esc).join(" · ")} · ${respondents(u.summary?.n_respondents)} отговора</div></div>
+            <span class="spacer"></span>${high ? `<span class="sev sev-high">${high} висок приоритет</span>` : ""}</div>
+          <div class="sig-tags">${u.signals.map((g) => `<span class="sev ${g.severity === "high" ? "sev-high" : "sev-el"}">${esc(title(g))}${g.kind === "rate" ? ` · ${pct(g.rate)}` : ""}</span>`).join("")}</div>
+          <details class="sig-more"><summary>Доказателства (${u.signals.length})</summary><div class="signals">${u.signals.map(signalHtml).join("")}</div></details></article>`;
+      }).join("") : `<div class="card"><h3>Няма сигнали</h3><p class="ink2" style="margin:0">В тази вълна нито едно училище, клас или учител с вашия достъп не е ясно над средното за страната по някой от показателите.</p></div>`;
+    } catch (e) {
+      if (my !== seq) return;
+      $("sig-list").innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
   function trendSvg(pts) {
     const W = Math.round(Math.min(720, Math.max(320, window.innerWidth - 72))), H = 190, P = { l: 30, r: 24, t: 22, b: 30 };
     const xs = pts.map((_, i) => P.l + (i * (W - P.l - P.r)) / Math.max(1, pts.length - 1));
@@ -271,13 +417,14 @@
   }
 
   // ------------------------------------------------------------------ shell
-  function show(id) { for (const s of ["v-list", "v-unit"]) $(s).hidden = s !== id; }
+  function show(id) { for (const s of ["v-list", "v-unit", "v-signals"]) $(s).hidden = s !== id; }
   function setDemo(d) { st.demo = !!d; $("demo-banner").hidden = !d; }
   const waveTitle = () => st.waves.find((w) => w.id === st.wave)?.title || st.wave;
   function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
 
   function route() {
     const [, level, id] = (location.hash.match(/^#\/([a-z]+)(?:\/(.+))?$/) || []);
+    if (level === "signals") return allowed(TABS.at(-1)) ? loadSignals() : (openLogin("Сигналите се виждат само с ключ на инспектората, директора или учителя."), go("#/school"));
     if (level && id) return loadUnit(level, decodeURIComponent(id));
     st.level = TABS.some((t) => t.level === level && level !== "system") ? level : st.who.scope === "teacher" ? "teacher" : "school";
     document.title = "Резултати · Глас за училището";
@@ -295,7 +442,8 @@
 
   async function init() {
     fill();
-    await loadWho();
+    // labels, evidence and sources of the indicators come from the question bank itself
+    [st.meta] = await Promise.all([api("/methodology").catch(() => null), loadWho()]);
     $("login-label").textContent = whoLabel();
     try {
       const w = await api("/waves");
@@ -318,7 +466,11 @@
   }
 
   window.addEventListener("hashchange", route);
+  // the printed report carries every piece of evidence: open the collapsed blocks while printing
+  window.addEventListener("beforeprint", () => { for (const d of document.querySelectorAll("details.sig-more:not([open])")) { d.open = true; d.dataset.printOpened = "1"; } });
+  window.addEventListener("afterprint", () => { for (const d of document.querySelectorAll("details[data-print-opened]")) { d.open = false; delete d.dataset.printOpened; } });
   $("wave").addEventListener("change", () => { st.wave = $("wave").value; route(); });
+  $("sig-wave").addEventListener("change", () => { st.wave = $("sig-wave").value; $("wave").value = st.wave; loadSignals(); });
   $("q").addEventListener("input", () => { st.q = $("q").value; renderUnits(); });
   $("back").addEventListener("click", () => go(`#/${st.level}`));
   $("login-btn").addEventListener("click", () => openLogin(""));
@@ -334,7 +486,7 @@
       $("login-dlg").close();
       $("login-label").textContent = whoLabel();
       toast(`Влязохте като: ${whoLabel()}`);
-      if (st.who.scope === "teacher") go("#/teacher"); else route();
+      if (st.who.scope === "teacher") go("#/teacher"); else if (st.who.scope === "inspector") go("#/signals"); else route();
     } catch (err) {
       $("login-err").className = "err";
       $("login-err").textContent = "Ключът не е валиден.";

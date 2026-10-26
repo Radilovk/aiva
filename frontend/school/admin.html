@@ -92,9 +92,11 @@
         <form class="form-grid" id="key-form">
           <label class="field"><span>Роля</span><select id="k-scope">
             <option value="school_admin">Директор (едно училище)</option><option value="teacher">Учител (само своите резултати)</option>
+            <option value="inspector">Инспекторат – РУО (сигнали, класове и учители в региона)</option>
             <option value="researcher">Изследовател (класове, без учители)</option><option value="admin">Администратор</option></select></label>
           <label class="field" id="k-school-f"><span>Училище (идентификатор)</span><input type="text" id="k-school" placeholder="от списъка по-долу"></label>
           <label class="field" id="k-teacher-f" hidden><span>Учител (идентификатор)</span><input type="text" id="k-teacher"></label>
+          <label class="field" id="k-region-f" hidden><span>Регион (идентификатор; празно = цялата страна)</span><input type="text" id="k-region" placeholder="напр. софия-град"></label>
           <label class="field"><span>Етикет</span><input type="text" id="k-label" placeholder="напр. Директор 125 СУ"></label>
           <div class="field" style="align-self:end"><button class="btn small">Създай ключ</button></div>
         </form>
