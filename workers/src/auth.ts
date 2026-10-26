@@ -86,6 +86,8 @@ function isPublicApiPath(pathname: string, method: string): boolean {
   if (pathname === '/api/calendar.ics' && method === 'GET') return true;
   if (pathname === '/api/calendar/google-credential-check' && method === 'GET') return true;
   if (pathname === '/api/brand-config' && method === 'GET') return true;
+  // School feedback platform: anonymous codes and its own scoped keys (workers/src/school/routes.ts)
+  if (pathname.startsWith('/api/sf/')) return true;
   return false;
 }
 

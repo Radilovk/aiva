@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12151a" media="(prefers-color-scheme: dark)">
+<meta name="referrer" content="no-referrer">
+<title>Резултати · Глас за училището</title>
+<meta name="description" content="Анонимна обратна връзка от родители и ученици: индекс на училищата и регионите с интервали на несигурност.">
+<link rel="stylesheet" href="sf.css">
+<link rel="stylesheet" href="results.css">
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="./"><span class="brand-mark" data-icon="mark"></span><span class="brand-name">Глас за училището</span></a>
+    <nav class="site-nav"><a href="survey.html">Анкета</a><a href="results.html" aria-current="page">Резултати</a></nav>
+    <button class="btn small secondary" id="login-btn" type="button"><span data-icon="lock"></span><span id="login-label">Вход</span></button>
+  </div>
+</header>
+<div class="banner" id="demo-banner" hidden><div class="wrap"><strong>Демо данни.</strong><span>Резултатите са симулирани, за да се види как работи порталът. Не са за истински училища.</span></div></div>
+
+<main>
+  <div class="wrap">
+    <!-- list -->
+    <section id="v-list">
+      <div class="page-head">
+        <div>
+          <h1>Как е в училищата</h1>
+          <p class="ink2 lead">Индекс 0–100 от анонимните отговори на родители и ученици. По-високо е по-добре за децата и семействата.</p>
+        </div>
+        <label class="field wave-pick"><span>Вълна</span><select id="wave"></select></label>
+      </div>
+
+      <div class="tabs" role="tablist" id="tabs"></div>
+
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="Търсене по име" aria-label="Търсене по име" autocomplete="off">
+        <div class="filters" id="filters" role="group" aria-label="Филтър по категория"></div>
+      </div>
+
+      <div id="list-msg" class="muted" role="status"></div>
+      <div class="units" id="units"></div>
+
+      <details class="explain card flat" id="how">
+        <summary>Как да чета резултатите</summary>
+        <div class="how-grid">
+          <div><div class="ci big demo-ci"><div class="rng" style="left:52%;width:14%"></div><div class="ref" style="left:48%"></div><div class="dot" style="left:59%"></div></div>
+            <p class="small">Точката е оценката, лентата – 90% интервал (къде вероятно е истинската стойност), пунктирът – средното за страната.</p></div>
+          <div><p class="small"><b>Категорията</b> сравнява интервала със средното: „над средното“ значи, че целият интервал е над него. Разлика от 2–3 точки между две училища обикновено е шум.</p></div>
+          <div><p class="small"><b>Мястото</b> се показва като диапазон (например „4–6 от 15“), защото точно място би внушило точност, която данните нямат.</p></div>
+          <div><p class="small"><b>Малки групи</b> не се показват: нужни са поне 5 отговора на роля, за учител – 10 ученици. Малките единици се „дърпат“ към средното.</p></div>
+        </div>
+      </details>
+    </section>
+
+    <!-- unit -->
+    <section id="v-unit" hidden>
+      <button class="btn quiet small back-link" id="back" type="button"><span data-icon="back"></span>Всички</button>
+      <div id="unit"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-foot"><div class="wrap" id="foot">Отговорите са анонимни. Показват се само обобщени резултати при достатъчно отговори.</div></footer>
+
+<dialog id="login-dlg">
+  <form class="dlg" method="dialog" id="login-form">
+    <h2 style="margin-top:0">Вход за училища</h2>
+    <p class="ink2 small">Директори, учители и изследователи получават ключ от оператора на платформата. С ключа виждате и поверителните резултати, до които имате достъп.</p>
+    <label class="field"><span>Ключ за достъп</span><input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="sfk_…"></label>
+    <div id="login-err" class="err" role="alert" hidden></div>
+    <div class="row" style="margin-top:18px">
+      <button class="btn" value="ok" id="login-ok">Влез</button>
+      <button class="btn quiet" value="cancel" formnovalidate>Отказ</button>
+      <span class="spacer"></span>
+      <button class="link-btn" type="button" id="logout" hidden>Изход</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="sf.js"></script>
+<script src="results.js"></script>
+</body>
+</html>

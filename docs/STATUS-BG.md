@@ -28,6 +28,7 @@
 | A4 | CORS whitelist | ✅ | Код | |
 | A5 | `TOKEN_ENCRYPTION_KEY` в Cloudflare | 👤 ⏳ | Ти | `wrangler secret put TOKEN_ENCRYPTION_KEY` |
 | A6 | Worker deploy (Workers Builds CI) | ✅ | Auto | Merge в `main` → Cloudflare deploy; fix sep. 2026 (PR #146 + stub) |
+| A7 | Админ ключ за „Глас за училището“ | ✅ | Код | Хеш в `wrangler.jsonc` (`SF_ADMIN_KEY_SHA256`); вход в `/school/admin.html` |
 
 ---
 

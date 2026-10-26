@@ -49,6 +49,7 @@ import {
   type StripeEnv,
 } from './stripe';
 import { getDailyCount, incrementDailyLimit } from './kvDaily';
+import { sf } from './school/routes';
 
 interface Env extends StripeEnv {
   DB: D1Database;
@@ -66,6 +67,8 @@ interface Env extends StripeEnv {
   MICROSOFT_REDIRECT_URI?: string;
   MICROSOFT_TENANT_ID?: string;
   TOKEN_ENCRYPTION_KEY?: string;
+  SF_ADMIN_KEY?: string;
+  SF_ADMIN_KEY_SHA256?: string;
 }
 
 // --- Cost protection: daily limits (overridable via wrangler vars) ---
@@ -121,6 +124,9 @@ app.use(
 );
 
 app.use('/api/*', authMiddleware());
+
+// --- School feedback platform (anonymous survey + results portal), see workers/src/school ---
+app.route('/api/sf', sf);
 
 // --- REST API ---
 
