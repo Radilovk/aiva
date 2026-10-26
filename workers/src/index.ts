@@ -68,7 +68,6 @@ interface Env extends StripeEnv {
   MICROSOFT_TENANT_ID?: string;
   TOKEN_ENCRYPTION_KEY?: string;
   SF_ADMIN_KEY?: string;
-  SF_BOOTSTRAP_REPS?: string;
 }
 
 // --- Cost protection: daily limits (overridable via wrangler vars) ---

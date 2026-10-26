@@ -4,27 +4,30 @@
  * Design rules
  * - Respondents never authenticate as persons. A one-time anonymous code fixes wave, school, class, grade and
  *   role; only its SHA-256 hash is stored, and it is marked used on submit.
- * - Raw responses never leave the server. Read endpoints return aggregates from engine.ts, already filtered
- *   by k-anonymity and further by the caller's scope (Authorization: Bearer <key>):
+ * - Read endpoints return only aggregates, already filtered by k-anonymity and further by the caller's scope
+ *   (Authorization: Bearer <key>):
  *     public        system, region, school
  *     researcher    + class (no teacher level)
  *     school_admin  + class and teacher units of ONE school
  *     teacher       ONLY own teacher unit
  *     admin         everything + waves, classes, codes, keys, compute (SF_ADMIN_KEY secret or an admin key)
  * - No names, e-mails, phones or IP addresses are stored. Failed code attempts are counted per hashed IP and
- *   day in KV (expires after a day) to stop guessing.
+ *   day (sf_attempts) to stop guessing. Free text is redacted and reduced to themes when it is submitted.
+ *
+ * Fits the Workers free plan (10 ms CPU per request): no request computes a wave. The operator console exports
+ * the wave's numeric answers page by page, runs the same engine in the browser (frontend/school/lib/sf-engine.js)
+ * and uploads ready-made unit rows; list endpoints are a single SQL query whose JSON is assembled from stored
+ * strings, never parsed.
  */
 import { Hono, type Context } from 'hono';
 import {
-  assignTeachers, flow, isYoung, loadQuestionnaire, runWave, scoreRespondent, simulate, stageOf,
+  assignTeachers, flow, isYoung, loadQuestionnaire, scoreRespondent, stageOf,
   type Answers, type Response as SfResponse, type Teacher,
 } from './engine';
 
 export interface SfEnv {
   DB: D1Database;
-  SESSIONS: KVNamespace;
   SF_ADMIN_KEY?: string;
-  SF_BOOTSTRAP_REPS?: string;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -57,10 +60,14 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS sf_names (level TEXT NOT NULL, unit_id TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY (level, unit_id))`,
   `CREATE TABLE IF NOT EXISTS sf_codes (hash TEXT PRIMARY KEY, wave_id TEXT NOT NULL, class_id TEXT NOT NULL, role TEXT NOT NULL,
      used INTEGER DEFAULT 0, teachers TEXT)`,
-  `CREATE TABLE IF NOT EXISTS sf_responses (id TEXT PRIMARY KEY, wave_id TEXT NOT NULL, payload TEXT NOT NULL, day TEXT)`,
+  // payload: numeric answers only (engine input); themes: JSON array from the redacted free text; texts: redacted
+  // free text, kept on the server for a human review of themes and never exported
+  `CREATE TABLE IF NOT EXISTS sf_responses (id TEXT PRIMARY KEY, wave_id TEXT NOT NULL, payload TEXT NOT NULL, themes TEXT, texts TEXT, day TEXT)`,
   `CREATE INDEX IF NOT EXISTS idx_sf_responses_wave ON sf_responses (wave_id)`,
   `CREATE TABLE IF NOT EXISTS sf_units (wave_id TEXT NOT NULL, level TEXT NOT NULL, unit_id TEXT NOT NULL, parent_id TEXT,
-     data TEXT NOT NULL, PRIMARY KEY (wave_id, level, unit_id))`,
+     suppressed INTEGER NOT NULL DEFAULT 0, score REAL, tier TEXT, summary TEXT NOT NULL, data TEXT NOT NULL,
+     PRIMARY KEY (wave_id, level, unit_id))`,
+  `CREATE TABLE IF NOT EXISTS sf_attempts (key TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, day TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS idx_sf_units_unit ON sf_units (level, unit_id)`,
   `CREATE TABLE IF NOT EXISTS sf_rating_counts (teacher_id TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS sf_keys (hash TEXT PRIMARY KEY, scope TEXT NOT NULL, school_id TEXT, teacher_id TEXT, label TEXT,
@@ -124,13 +131,6 @@ function publicView(level: string, unit: Dict): Dict {
   return unit;
 }
 
-function summary(x: Dict): Dict {
-  if (x.withheld) return x;
-  return { unit_id: x.unit_id, name: x.name, parent_id: x.parent_id, parent_name: x.parent_name, stage: x.stage,
-    n_respondents: x.n_respondents, index: x.index, pillars: x.pillars, representativeness: x.representativeness ?? 'ok',
-    tc: x.dimensions?.TC ? { score: x.dimensions.TC.score, lo: x.dimensions.TC.lo, hi: x.dimensions.TC.hi } : undefined };
-}
-
 // =============================================================================== free-text themes (redacted)
 const EMAIL = /\S+@\S+/g;
 const PHONE = /\+?\d[\d\s-]{6,}\d/g;
@@ -153,17 +153,16 @@ export function redact(text: string): string {
     .replace(HONORIFIC, (_m, pre, hon) => `${pre}${hon} [име]`).replace(CAPWORD, '[име]');
 }
 
-function themesFor(responses: SfResponse[]): Dict {
-  const counts: Dict<number> = {};
-  let n = 0;
-  for (const r of responses) {
-    const texts = ['OT01', 'OT02', 'OT03'].map((k) => r.answers[k]).filter((x): x is string => typeof x === 'string' && !!x.trim());
-    if (!texts.length) continue;
-    n += 1;
-    const low = redact(texts.join(' ')).toLowerCase();
-    for (const [theme, stems] of Object.entries(THEMES)) if (stems.some((s) => low.includes(s))) counts[theme] = (counts[theme] || 0) + 1;
+/** Redacted free text and the themes it mentions; computed once, when the response is submitted. */
+function textThemes(answers: Answers): { texts: Dict<string>; themes: string[] } | null {
+  const texts: Dict<string> = {};
+  for (const k of ['OT01', 'OT02', 'OT03']) {
+    const v = answers[k];
+    if (typeof v === 'string' && v.trim()) texts[k] = redact(v);
   }
-  return { respondents_with_text: n, themes: Object.fromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1])) };
+  if (!Object.keys(texts).length) return null;
+  const low = Object.values(texts).join(' ').toLowerCase();
+  return { texts, themes: Object.entries(THEMES).filter(([, stems]) => stems.some((st) => low.includes(st))).map(([t]) => t) };
 }
 
 // =============================================================================== app
@@ -186,9 +185,9 @@ class HttpError extends Error {
   constructor(public status: 400 | 403 | 404 | 409 | 410 | 429, message: string) { super(message); }
 }
 
-async function body(c: C): Promise<Dict> {
+async function body(c: C, limit = 256 * 1024): Promise<Dict> {
   const len = Number(c.req.header('Content-Length') || 0);
-  if (len > 256 * 1024) throw new HttpError(400, 'Заявката е твърде голяма.');
+  if (len > limit) throw new HttpError(400, 'Заявката е твърде голяма.');
   try { return (await c.req.json()) || {}; } catch { throw new HttpError(400, 'Невалиден JSON.'); }
 }
 
@@ -218,16 +217,19 @@ async function codeCtx(c: C, code: unknown): Promise<CodeCtx> {
   if (demo) return demo;
   if (normCode(code).length < 8) throw new HttpError(404, 'unknown code');
   const ipHash = await sha256('sf-ip|' + (c.req.header('cf-connecting-ip') || 'unknown') + '|' + new Date().toISOString().slice(0, 10));
-  const failKey = `sf-fail:${ipHash}`;
-  const fails = Number((await c.env.SESSIONS.get(failKey)) || 0);
-  if (fails >= MAX_FAILED_CODES_PER_DAY) throw new HttpError(429, 'Твърде много грешни опити. Опитайте утре.');
+  const att = await c.env.DB.prepare('SELECT n FROM sf_attempts WHERE key = ?').bind(ipHash).first<{ n: number }>();
+  if ((att?.n || 0) >= MAX_FAILED_CODES_PER_DAY) throw new HttpError(429, 'Твърде много грешни опити. Опитайте утре.');
   const hash = await codeHash(String(code));
   const row = await c.env.DB.prepare(
     `SELECT k.hash, k.wave_id, k.class_id, k.role, k.used, k.teachers, c.grade, c.school_id, c.region_id, c.class_size, c.roster,
             w.open FROM sf_codes k JOIN sf_classes c ON c.wave_id = k.wave_id AND c.class_id = k.class_id
             JOIN sf_waves w ON w.id = k.wave_id WHERE k.hash = ?`).bind(hash).first<Dict>();
   if (!row) {
-    await c.env.SESSIONS.put(failKey, String(fails + 1), { expirationTtl: 86400 });
+    const day = new Date().toISOString().slice(0, 10);
+    await c.env.DB.batch([
+      c.env.DB.prepare('INSERT INTO sf_attempts (key, n, day) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET n = n + 1').bind(ipHash, day),
+      c.env.DB.prepare('DELETE FROM sf_attempts WHERE day < ?').bind(day),   // yesterday's counters are useless
+    ]);
     throw new HttpError(404, 'unknown code');
   }
   if (row.used) throw new HttpError(409, 'code already used');
@@ -304,7 +306,9 @@ sf.post('/responses', async (c) => {
   const allowed = new Map(teachers.map((t) => [t.teacher_id, t]));
   const tans = Object.entries((b.teacher_answers || {}) as Dict<Answers>)
     .filter(([tid]) => allowed.has(tid)).map(([tid, a]) => ({ teacher_id: tid, name: allowed.get(tid)!.name || '', answers: a }));
-  const answers = sanitizeAnswers(b.answers);
+  const all = sanitizeAnswers(b.answers);
+  const tt = textThemes(all);
+  const answers = Object.fromEntries(Object.entries(all).filter(([, v]) => typeof v !== 'string')) as Answers;
   const duration = Number.isFinite(Number(b.duration_s)) ? Math.max(0, Math.round(Number(b.duration_s))) : null;
   const resp: SfResponse = { id: crypto.randomUUID(), token_hash: x.hash, mode: 'closed', role: x.role, grade: x.grade,
     region_id: x.region_id, school_id: x.school_id, class_id: x.class_id, duration_s: duration, answers,
@@ -315,8 +319,9 @@ sf.post('/responses', async (c) => {
   const upd = await c.env.DB.prepare('UPDATE sf_codes SET used = 1 WHERE hash = ? AND used = 0').bind(x.hash).run();
   if (!upd.meta.changes) throw new HttpError(409, 'code already used');
   await c.env.DB.batch([
-    c.env.DB.prepare('INSERT INTO sf_responses (id, wave_id, payload, day) VALUES (?, ?, ?, ?)')
-      .bind(resp.id, x.wave_id, JSON.stringify(resp), new Date().toISOString().slice(0, 10)),
+    c.env.DB.prepare('INSERT INTO sf_responses (id, wave_id, payload, themes, texts, day) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(resp.id, x.wave_id, JSON.stringify(resp), tt ? JSON.stringify(tt.themes) : null, tt ? JSON.stringify(tt.texts) : null,
+        new Date().toISOString().slice(0, 10)),
     ...tans.map((t) => c.env.DB.prepare('INSERT INTO sf_rating_counts (teacher_id, n) VALUES (?, 1) ON CONFLICT(teacher_id) DO UPDATE SET n = n + 1').bind(t.teacher_id)),
   ]);
   return c.json({ status: 'recorded' }, 201);
@@ -382,18 +387,42 @@ async function withNames(db: D1Database, level: string, units: Dict[]): Promise<
     parent_name: pl ? nm[`${pl}|${u.parent_id}`] || u.parent_id : null }));
 }
 
+const PARENT_OF: Dict<string | null> = { class: 'school', school: 'region', region: 'system', teacher: 'school', system: null };
+
+/** The key's scope as SQL over sf_units (alias u); mirrors canSee(). */
+function scopeSql(key: Key, level: string): { sql: string; args: unknown[] } | null {
+  const sc = key.scope;
+  if (sc === 'admin') return { sql: '', args: [] };
+  if (sc === 'teacher') return level === 'teacher' ? { sql: ' AND u.unit_id = ?', args: [key.teacher_id] } : null;
+  if (level === 'system' || level === 'region' || level === 'school') return { sql: '', args: [] };
+  if (sc === 'researcher' && level === 'class') return { sql: '', args: [] };
+  if (sc === 'school_admin' && (level === 'class' || level === 'teacher')) return { sql: ' AND u.parent_id = ?', args: [key.school_id] };
+  return null;
+}
+
+/** One query; the response JSON is stitched from the stored summary strings, so nothing is parsed per unit. */
 sf.get('/units', async (c) => {
   const key = await callerKey(c);
   const level = c.req.query('level') || 'school';
   if (!(LEVELS as readonly string[]).includes(level)) throw new HttpError(400, 'bad level');
   const w = await resolveWave(c);
-  const rows = await c.env.DB.prepare('SELECT data FROM sf_units WHERE wave_id = ? AND level = ?').bind(w.id, level).all<{ data: string }>();
+  const scope = scopeSql(key, level);
   const tier = c.req.query('tier');
-  let items = rows.results.map((r) => JSON.parse(r.data)).filter((x) => !x.suppressed && canSee(key, level, x)).map((x) => publicView(level, x));
-  if (tier) items = items.filter((x) => x.index?.tier_code === tier);
-  items.sort((a, b) => (b.index?.score ?? b.dimensions?.TC?.score ?? 0) - (a.index?.score ?? a.dimensions?.TC?.score ?? 0));
-  items = await withNames(c.env.DB, level, items);
-  return c.json({ wave: w.id, demo: w.demo, level, count: items.length, units: items.map(summary) });
+  let parts: string[] = [];
+  if (scope) {
+    const rows = await c.env.DB.prepare(
+      `SELECT u.summary, COALESCE(n.name, CASE WHEN u.level = 'system' THEN 'България' ELSE u.unit_id END) AS name,
+              COALESCE(pn.name, u.parent_id) AS pname
+         FROM sf_units u
+         LEFT JOIN sf_names n ON n.level = u.level AND n.unit_id = u.unit_id
+         LEFT JOIN sf_names pn ON pn.level = ? AND pn.unit_id = u.parent_id
+        WHERE u.wave_id = ? AND u.level = ? AND u.suppressed = 0${scope.sql}${tier ? ' AND u.tier = ?' : ''}
+        ORDER BY u.score IS NULL, u.score DESC`)
+      .bind(PARENT_OF[level] ?? '', w.id, level, ...scope.args, ...(tier ? [tier] : [])).all<{ summary: string; name: string; pname: string | null }>();
+    parts = rows.results.map((r) => `{"name":${JSON.stringify(r.name)},"parent_name":${JSON.stringify(r.pname)},${r.summary.slice(1)}`);
+  }
+  return c.body(`{"wave":${JSON.stringify(w.id)},"demo":${w.demo},"level":${JSON.stringify(level)},"count":${parts.length},"units":[${parts.join(',')}]}`,
+    200, { 'Content-Type': 'application/json; charset=UTF-8' });
 });
 
 async function unitRow(c: C, wave: string, level: string, uid: string, key: Key): Promise<Dict> {
@@ -569,67 +598,61 @@ sf.delete('/admin/keys/:id', async (c) => {
   return c.json({ deleted: c.req.param('id') });
 });
 
-function bootstrapReps(env: SfEnv, fallback = 400): number {
-  const n = parseInt(env.SF_BOOTSTRAP_REPS || '', 10);
-  return Number.isFinite(n) && n >= 50 ? Math.min(n, 1000) : fallback;
-}
-
-/** Store one computed wave: unit rows (+ redacted text themes) and the wave meta. */
-async function storeWave(db: D1Database, waveId: string, res: Dict, responses: SfResponse[]) {
-  const by: Dict<Map<string, SfResponse[]>> = { school: new Map(), region: new Map(), system: new Map() };
-  const add = (lv: string, u: string, r: SfResponse) => { if (!by[lv].has(u)) by[lv].set(u, []); by[lv].get(u)!.push(r); };
-  for (const r of responses) { add('school', r.school_id, r); add('region', r.region_id, r); add('system', 'BG', r); }
-  const stmts: D1PreparedStatement[] = [db.prepare('DELETE FROM sf_units WHERE wave_id = ?').bind(waveId)];
-  for (const level of LEVELS) {
-    for (const [uid, unit] of Object.entries(res[level] as Dict<Dict>)) {
-      const rs = by[level]?.get(uid);
-      const data = rs ? { ...unit, themes: themesFor(rs) } : unit;
-      stmts.push(db.prepare('INSERT INTO sf_units (wave_id, level, unit_id, parent_id, data) VALUES (?, ?, ?, ?, ?)')
-        .bind(waveId, level, uid, unit.parent_id ?? null, JSON.stringify(data)));
-    }
-  }
-  stmts.push(db.prepare(`UPDATE sf_waves SET computed_at = datetime('now'), meta = ? WHERE id = ?`)
-    .bind(JSON.stringify({ ...res.meta, campaign_alerts: res.campaign_alerts }), waveId));
-  for (let i = 0; i < stmts.length; i += 80) await db.batch(stmts.slice(i, i + 80));
-}
-
-sf.post('/admin/waves/:id/compute', async (c) => {
+/**
+ * Wave export for the operator console, page by page (keeps each request small): numeric answers + the themes
+ * recorded at submit. Free text itself never leaves the server. Strings are concatenated, not parsed.
+ */
+sf.get('/admin/waves/:id/export', async (c) => {
   await requireAdmin(c);
   const wid = c.req.param('id');
-  const rows = await c.env.DB.prepare('SELECT payload FROM sf_responses WHERE wave_id = ?').bind(wid).all<{ payload: string }>();
-  const responses = rows.results.map((r) => JSON.parse(r.payload) as SfResponse);
-  if (!responses.length) throw new HttpError(400, 'Няма отговори за тази вълна.');
-  const sizes = await c.env.DB.prepare('SELECT class_id, class_size FROM sf_classes WHERE wave_id = ? AND class_size > 0').bind(wid).all<Dict>();
-  const q = structuredClone(Q);
-  q.params.bootstrap_reps = bootstrapReps(c.env);
-  const classSizes = Object.fromEntries(sizes.results.map((r) => [r.class_id, r.class_size]));
-  const res = runWave(q, responses, { classSizes: Object.keys(classSizes).length ? classSizes : null });
-  await storeWave(c.env.DB, wid, res, responses);
-  return c.json({ wave: wid, meta: res.meta, campaign_alerts: res.campaign_alerts });
+  const after = Number(c.req.query('after') || 0);
+  const PAGE = 250;
+  const rows = await c.env.DB.prepare('SELECT rowid, payload, themes FROM sf_responses WHERE wave_id = ? AND rowid > ? ORDER BY rowid LIMIT ?')
+    .bind(wid, after, PAGE).all<{ rowid: number; payload: string; themes: string | null }>();
+  const last = rows.results.at(-1)?.rowid ?? null;
+  let sizes = '';
+  if (!after) {
+    const cs = await c.env.DB.prepare('SELECT class_id, class_size FROM sf_classes WHERE wave_id = ? AND class_size > 0').bind(wid).all<Dict>();
+    sizes = `"class_sizes":${JSON.stringify(Object.fromEntries(cs.results.map((r) => [r.class_id, r.class_size])))},`;
+  }
+  const items = rows.results.map((r) => `{"r":${r.payload},"t":${r.themes || 'null'}}`).join(',');
+  return c.body(`{${sizes}"next":${rows.results.length === PAGE ? last : 'null'},"items":[${items}]}`, 200,
+    { 'Content-Type': 'application/json; charset=UTF-8' });
 });
 
-const DEMO_REGIONS = ['Северозападен', 'Южен централен', 'Югоизточен'];
-
-/** Two simulated waves for trying the portal before real data exists. Clearly marked as demo; raw answers are not kept. */
-sf.post('/admin/demo', async (c) => {
+/**
+ * Upload of a wave computed in the console, in chunks: unit rows (publish.ts), optional names, and on the last
+ * chunk the wave meta. reset=true on the first chunk replaces earlier results. Demo waves are created here too.
+ */
+sf.post('/admin/waves/:id/units', async (c) => {
   await requireAdmin(c);
-  const q = structuredClone(Q);
-  q.params.bootstrap_reps = Math.min(200, bootstrapReps(c.env, 200));
-  const defs = [['demo-2026-spring', 'Демо · пролет 2026', 7, false], ['demo-2026-autumn', 'Демо · есен 2026', 8, true]] as const;
-  for (const [wid, title, seed, campaign] of defs) {
-    const s = simulate(q, { regions: 3, schoolsPerRegion: 5, seed, campaignClass: campaign });
-    const res = runWave(q, s.responses, { classSizes: s.truth.class_sizes });
-    await c.env.DB.prepare(`INSERT INTO sf_waves (id, title, demo, open, created_at) VALUES (?, ?, 1, 0, datetime('now', ?))
-      ON CONFLICT(id) DO UPDATE SET title = excluded.title, demo = 1, open = 0`).bind(wid, title, seed === 7 ? '-1 minute' : '+0 minute').run();
-    await storeWave(c.env.DB, wid, res, s.responses);
-    const nameStmts: D1PreparedStatement[] = [];
-    const put = (lv: string, uid: string, name: string) => nameStmts.push(
-      c.env.DB.prepare('INSERT INTO sf_names (level, unit_id, name) VALUES (?, ?, ?) ON CONFLICT(level, unit_id) DO NOTHING').bind(lv, uid, name));
-    DEMO_REGIONS.forEach((r, i) => put('region', `R${i + 1}`, `${r} (демо)`));
-    for (const sid of Object.keys(res.school)) put('school', sid, `Демо училище ${sid.replace(/^R(\d+)-S(\d+)$/, '$1.$2')}`);
-    for (const [cid, g] of Object.entries(s.classGrades)) put('class', cid, `${g} клас`);
-    for (const tid of Object.keys(res.teacher)) put('teacher', tid, `Учител ${tid.split('-T')[1]} (демо)`);
-    for (let i = 0; i < nameStmts.length; i += 80) await c.env.DB.batch(nameStmts.slice(i, i + 80));
+  const wid = id(c.req.param('id'), 'вълна');
+  const b = await body(c, 1024 * 1024);
+  const units: Dict[] = Array.isArray(b.units) ? b.units : [];
+  const nm: unknown[][] = Array.isArray(b.names) ? b.names : [];
+  if (units.length > 200 || nm.length > 500) throw new HttpError(400, 'Твърде много редове в една част.');
+  const db = c.env.DB;
+  const stmts: D1PreparedStatement[] = [];
+  if (b.demo) {
+    stmts.push(db.prepare(`INSERT INTO sf_waves (id, title, demo, open, created_at) VALUES (?, ?, 1, 0, COALESCE(?, datetime('now')))
+      ON CONFLICT(id) DO UPDATE SET title = excluded.title, demo = 1, open = 0`).bind(wid, String(b.title || wid).slice(0, 100), b.created_at || null));
+  } else if (!(await db.prepare('SELECT 1 FROM sf_waves WHERE id = ?').bind(wid).first())) {
+    throw new HttpError(404, 'Няма такава вълна.');
   }
-  return c.json({ waves: defs.map(([w]) => w) });
+  if (b.reset) stmts.push(db.prepare('DELETE FROM sf_units WHERE wave_id = ?').bind(wid));
+  for (const u of units) {
+    if (!(LEVELS as readonly string[]).includes(u.level) || typeof u.summary !== 'string' || typeof u.data !== 'string') throw new HttpError(400, 'Невалиден ред.');
+    stmts.push(db.prepare(`INSERT OR REPLACE INTO sf_units (wave_id, level, unit_id, parent_id, suppressed, score, tier, summary, data)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(wid, u.level, id(u.unit_id, 'единица'), u.parent_id ?? null, u.suppressed ? 1 : 0,
+      typeof u.score === 'number' ? u.score : null, u.tier ?? null, u.summary, u.data));
+  }
+  for (const [lv, uid, name] of nm) {
+    if (typeof lv === 'string' && typeof uid === 'string' && typeof name === 'string') {
+      stmts.push(db.prepare(`INSERT INTO sf_names (level, unit_id, name) VALUES (?, ?, ?) ON CONFLICT(level, unit_id) DO ${b.demo ? 'NOTHING' : 'UPDATE SET name = excluded.name'}`)
+        .bind(lv, uid, name.slice(0, 120)));
+    }
+  }
+  if (b.meta) stmts.push(db.prepare(`UPDATE sf_waves SET computed_at = datetime('now'), meta = ? WHERE id = ?`).bind(JSON.stringify(b.meta).slice(0, 20000), wid));
+  if (stmts.length) await db.batch(stmts);
+  return c.json({ wave: wid, stored: units.length });
 });

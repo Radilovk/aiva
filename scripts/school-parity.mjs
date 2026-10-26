@@ -5,7 +5,8 @@
  *   node scripts/school-parity.mjs
  *
  * Python simulates a wave and dumps flows, respondent scores and aggregates (bootstrap off: it uses a
- * different PRNG). The TS engine recomputes everything from the same responses and must match.
+ * different PRNG). The TS engine recomputes everything from the same responses and must match. Also checks that
+ * the committed browser bundle (frontend/school/lib/sf-engine.js) is built from the current source.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -79,4 +80,5 @@ for (const u of Object.values(wave.school)) {
 }
 
 console.log(`${checks} checks, ${fails} failures (${F.responses.length} simulated responses)`);
+try { execFileSync(process.execPath, [join(root, 'scripts/build-school-engine.mjs'), '--check'], { stdio: 'inherit' }); } catch { fails++; }
 process.exit(fails ? 1 : 0);

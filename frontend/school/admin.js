@@ -47,8 +47,9 @@
     for (const row of $("waves").querySelectorAll(".w")) {
       const id = row.dataset.id, w = waves.find((x) => x.id === id);
       row.querySelector('[data-act="compute"]')?.addEventListener("click", async (e) => {
-        e.target.disabled = true; e.target.textContent = "Изчисляване…";
-        try { const r = await call(`/admin/waves/${encodeURIComponent(id)}/compute`, { method: "POST" }); toast(`Изчислено: ${r.meta.included} от ${r.meta.responses} отговора.`); }
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        try { const meta = await computeWave(id, (t) => { btn.textContent = t; }); toast(`Изчислено: ${meta.included} от ${meta.responses} отговора.`); }
         catch (err) { toast(err.message); }
         loadWaves();
       });
@@ -160,12 +161,96 @@
     });
   }
 
-  // ------------------------------------------------------------------ demo
+  // ------------------------------------------------------------------ computing in the browser
+  // The Worker stays within the free plan's 10 ms CPU per request: it only exports answers and stores results.
+  // The statistics (bootstrap intervals, ranks, shrinkage) run here, with the engine the parity test checks.
+  let enginePromise = null;
+  function engine() {
+    enginePromise ??= new Promise((ok, fail) => {
+      const sc = document.createElement("script");
+      sc.src = "lib/sf-engine.js";
+      sc.onload = () => ok(window.SFEngine);
+      sc.onerror = () => { enginePromise = null; fail(new Error("Модулът за изчисление не се зареди.")); };
+      document.head.appendChild(sc);
+    });
+    return enginePromise;
+  }
+  const paint = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+
+  /** Unit rows in chunks of ~500 KB (the Worker accepts up to 1 MB per request). */
+  async function upload(waveId, rows, extra, progress) {
+    const chunks = [];
+    let cur = [], size = 0;
+    for (const r of rows) {
+      const n = r.data.length + r.summary.length + 200;
+      if (cur.length && (size + n > 500000 || cur.length >= 150)) { chunks.push(cur); cur = []; size = 0; }
+      cur.push(r); size += n;
+    }
+    chunks.push(cur);
+    const names = extra.names || [];
+    for (let i = 0; i < chunks.length; i++) {
+      progress(`Качване ${i + 1}/${chunks.length}…`);
+      const last = i === chunks.length - 1;
+      await call(`/admin/waves/${encodeURIComponent(waveId)}/units`, { method: "POST", body: {
+        reset: i === 0, units: chunks[i], demo: extra.demo || undefined, title: extra.title, created_at: extra.created_at,
+        names: i === 0 ? names.slice(0, 500) : [], meta: last ? extra.meta : undefined } });
+    }
+    for (let i = 500; i < names.length; i += 500) {
+      await call(`/admin/waves/${encodeURIComponent(waveId)}/units`, { method: "POST", body: { demo: extra.demo || undefined, title: extra.title, names: names.slice(i, i + 500) } });
+    }
+  }
+
+  async function computeWave(waveId, progress) {
+    const E = await engine();
+    const items = [];
+    let classSizes = null, after = 0;
+    do {
+      progress(`Изтегляне… ${items.length}`);
+      const page = await call(`/admin/waves/${encodeURIComponent(waveId)}/export?after=${after}`);
+      if (page.class_sizes) classSizes = page.class_sizes;
+      items.push(...page.items);
+      after = page.next;
+    } while (after);
+    if (!items.length) throw new Error("Няма отговори за тази вълна.");
+    progress(`Изчисляване на ${items.length} отговора…`);
+    await paint();
+    const q = E.loadQuestionnaire();
+    const res = E.runWave(q, items.map((x) => x.r), { classSizes: classSizes && Object.keys(classSizes).length ? classSizes : null });
+    const rows = E.unitRows(res, items.map((x) => ({ region_id: x.r.region_id, school_id: x.r.school_id, themes: x.t })));
+    const meta = { ...res.meta, campaign_alerts: res.campaign_alerts };
+    await upload(waveId, rows, { meta }, progress);
+    return meta;
+  }
+
+  const DEMO_REGIONS = ["Северозападен", "Южен централен", "Югоизточен"];
+  const sqlTime = (ms) => new Date(ms).toISOString().replace("T", " ").slice(0, 19);
+
   $("demo-btn").addEventListener("click", async (e) => {
-    e.target.disabled = true; e.target.textContent = "Генериране… (около 10 секунди)";
-    try { await call("/admin/demo", { method: "POST" }); toast("Демо данните са готови."); loadWaves(); }
-    catch (err) { toast(err.message); }
-    e.target.disabled = false; e.target.textContent = "Генерирай демо данни";
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const E = await engine();
+      const defs = [["demo-2026-spring", "Демо · пролет 2026", 7, false, Date.now() - 60000], ["demo-2026-autumn", "Демо · есен 2026", 8, true, Date.now()]];
+      for (const [wid, title, seed, campaign, at] of defs) {
+        btn.textContent = `Симулиране: ${title}…`;
+        await paint();
+        const q = E.loadQuestionnaire();
+        q.params.bootstrap_reps = 200;
+        const s = E.simulate(q, { regions: 3, schoolsPerRegion: 5, seed, campaignClass: campaign });
+        const res = E.runWave(q, s.responses, { classSizes: s.truth.class_sizes });
+        const rows = E.unitRows(res, s.responses.map((r) => ({ region_id: r.region_id, school_id: r.school_id, themes: null })));
+        const names = [
+          ...DEMO_REGIONS.map((r, i) => ["region", `R${i + 1}`, `${r} (демо)`]),
+          ...Object.keys(res.school).map((sid) => ["school", sid, `Демо училище ${sid.replace(/^R(\d+)-S(\d+)$/, "$1.$2")}`]),
+          ...Object.entries(s.classGrades).map(([cid, g]) => ["class", cid, `${g} клас`]),
+          ...Object.keys(res.teacher).map((tid) => ["teacher", tid, `Учител ${tid.split("-T")[1]} (демо)`]),
+        ];
+        await upload(wid, rows, { demo: true, title, created_at: sqlTime(at), names, meta: { ...res.meta, campaign_alerts: res.campaign_alerts } }, (t) => { btn.textContent = t; });
+      }
+      toast("Демо данните са готови.");
+      loadWaves();
+    } catch (err) { toast(err.message); }
+    btn.disabled = false; btn.textContent = "Генерирай демо данни";
   });
 
   if (KEY) enter().catch(() => { ses.del("sf-admin"); KEY = ""; });
