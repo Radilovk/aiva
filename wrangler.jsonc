@@ -37,6 +37,9 @@
     "APP_URL": "https://ai-kasy.online/frontend",
     "STRIPE_PRICE_PLUS_MONTHLY": "",
     "STRIPE_PRICE_PLUS_YEARLY": "",
-    "STRIPE_PRICE_PRO_LIFETIME": ""
+    "STRIPE_PRICE_PRO_LIFETIME": "",
+    // Глас за училището: SHA-256 of the operator key (the key itself is never in the repo).
+    // Rotate: printf '%s' "$NEW_KEY" | sha256sum. A SF_ADMIN_KEY secret, if set, also works.
+    "SF_ADMIN_KEY_SHA256": "a46454a6e4c40f4223143775291538d1cbd4a32f8f81d59746967189ab46bfe5"
   }
 }

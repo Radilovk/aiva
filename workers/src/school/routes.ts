@@ -28,6 +28,8 @@ import {
 export interface SfEnv {
   DB: D1Database;
   SF_ADMIN_KEY?: string;
+  /** hex SHA-256 of the operator key; safe to keep as a public var in wrangler.jsonc */
+  SF_ADMIN_KEY_SHA256?: string;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -109,6 +111,7 @@ async function callerKey(c: C): Promise<Key> {
   if (!m) return { scope: 'public' };
   const token = m[1].trim();
   if (c.env.SF_ADMIN_KEY && safeEqual(token, c.env.SF_ADMIN_KEY)) return { scope: 'admin', label: 'оператор' };
+  if (c.env.SF_ADMIN_KEY_SHA256 && safeEqual(await sha256(token), c.env.SF_ADMIN_KEY_SHA256.toLowerCase())) return { scope: 'admin', label: 'оператор' };
   const row = await c.env.DB.prepare('SELECT scope, school_id, teacher_id, label FROM sf_keys WHERE hash = ?')
     .bind(await sha256('sf-key|' + token)).first<Key>();
   return row || { scope: 'invalid' };
@@ -488,7 +491,7 @@ sf.get('/compare', async (c) => {
 // ------------------------------------------------------------------ admin
 async function requireAdmin(c: C) {
   if ((await callerKey(c)).scope !== 'admin') {
-    throw new HttpError(403, c.env.SF_ADMIN_KEY ? 'Нужен е администраторски ключ.' : 'Администрирането не е настроено: задайте SF_ADMIN_KEY (wrangler secret put SF_ADMIN_KEY).');
+    throw new HttpError(403, c.env.SF_ADMIN_KEY || c.env.SF_ADMIN_KEY_SHA256 ? 'Нужен е администраторски ключ.' : 'Администрирането не е настроено: задайте SF_ADMIN_KEY_SHA256 в wrangler.jsonc.');
   }
 }
 
