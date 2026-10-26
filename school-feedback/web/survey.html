@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Анкета · Глас за училището</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="./">Глас за училището</a>
+  <nav><a href="survey.html">Анкета</a><a href="portal.html">Резултати</a></nav>
+</div></header>
+<main>
+  <!-- 1. code -->
+  <section id="step-code">
+    <h1>Анкета</h1>
+    <p class="lead">Въведи кода от листчето, което получи от училището. Кодът показва само класа и дали си
+      родител или ученик – никой не знае кой какво е отговорил.</p>
+    <div class="card">
+      <label for="code" class="muted small">Код за достъп</label>
+      <form id="code-form" class="row" style="margin-top:6px">
+        <input id="code" class="code" type="text" placeholder="ABCD-1234-EF56" autocomplete="off" required>
+        <button type="submit">Започни</button>
+      </form>
+      <div id="code-err" class="err" hidden></div>
+    </div>
+  </section>
+
+  <!-- 2. intro -->
+  <section id="step-intro" hidden>
+    <h1 id="intro-title"></h1>
+    <div class="card">
+      <p id="intro-text"></p>
+      <ul class="small muted">
+        <li>Няма верни и грешни отговори. Отговаряй за последния месец.</li>
+        <li>Ако не знаеш – избери „Не знам“ или пропусни въпроса. Той просто не се брои.</li>
+        <li>Отговорите са анонимни. Кодът се използва само веднъж.</li>
+      </ul>
+      <div id="consent-box" class="note small" hidden>
+        <label><input type="checkbox" id="consent"> Аз съм родител на детето и съм съгласен то да попълни
+          анкетата. (Родителят не вижда отговорите на детето.)</label>
+      </div>
+      <div class="nav"><span></span><button id="start-btn">Напред</button></div>
+    </div>
+  </section>
+
+  <!-- 3. questions -->
+  <section id="step-q" hidden>
+    <div class="row small muted"><span id="page-label"></span><span style="margin-left:auto" id="count-label"></span></div>
+    <div class="progress"><div id="progress"></div></div>
+    <form id="q-form" class="card" novalidate></form>
+    <div class="nav">
+      <button class="ghost" id="prev-btn" type="button">Назад</button>
+      <button id="next-btn" type="button">Напред</button>
+    </div>
+    <div id="submit-err" class="err" hidden></div>
+  </section>
+
+  <!-- 4. done -->
+  <section id="step-done" hidden>
+    <h1>Благодарим!</h1>
+    <div class="card">
+      <p>Отговорите са записани. Резултатите ще бъдат публикувани обобщено, след като се съберат достатъчно отговори.</p>
+      <p class="small muted">Ако някой те тормози или ти е много тежко, обади се безплатно на <b>116 111</b>.</p>
+      <a class="btn" href="portal.html">Виж резултатите</a>
+    </div>
+  </section>
+</main>
+<script src="survey.js"></script>
+</body>
+</html>

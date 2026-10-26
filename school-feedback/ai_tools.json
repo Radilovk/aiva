@@ -1,0 +1,107 @@
+{
+  "description": "Read-only analysis tools over the platform API. Same definitions are served by mcp_server.py (MCP) and used by ai_report.py (Anthropic Messages API tool use). The model only ever sees aggregates that already passed k-anonymity and the caller's scope.",
+  "tools": [
+    {
+      "name": "get_methodology",
+      "description": "Returns the scoring model: dimensions, pillars, weights, norms, thresholds and interpretation notes. Call this first so every number you report is interpreted correctly.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "http": {"method": "GET", "path": "/v1/methodology"}
+    },
+    {
+      "name": "list_waves",
+      "description": "Lists survey waves (rounds) with response counts and exclusions.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "http": {"method": "GET", "path": "/v1/waves"}
+    },
+    {
+      "name": "list_units",
+      "description": "Lists units of one level (system, region, school, class, teacher) visible to the API key, sorted by index, with index, interval, tier and pillars. Optional tier filter: 2, 1, 0, -1, -2, na.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "level": {"type": "string", "enum": ["system", "region", "school", "class", "teacher"]},
+          "wave": {"type": "string", "description": "Wave id; omit for the latest"},
+          "tier": {"type": "string", "enum": ["2", "1", "0", "-1", "-2", "na"]}
+        },
+        "required": ["level"],
+        "additionalProperties": false
+      },
+      "http": {"method": "GET", "path": "/v1/units", "query": ["level", "wave", "tier"]}
+    },
+    {
+      "name": "get_unit",
+      "description": "Full result for one unit: every dimension with raw mean, shrunk score, 90% interval, role breakdown, absolute band; pillars; index with tier and rank range; indicators (shares of tutoring to keep up, vacation tasks, behaviour notes, bullying, recess removal); participation.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "level": {"type": "string", "enum": ["system", "region", "school", "class", "teacher"]},
+          "unit_id": {"type": "string"},
+          "wave": {"type": "string"}
+        },
+        "required": ["level", "unit_id"],
+        "additionalProperties": false
+      },
+      "http": {"method": "GET", "path": "/v1/units/{level}/{unit_id}", "query": ["wave"]}
+    },
+    {
+      "name": "get_equity",
+      "description": "Gaps between boys and girls and between strong and struggling pupils (by reported grades) for each dimension, only where every group has at least 5 respondents. 'flagged' means the gap is at least 10 points and unlikely to be chance.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "level": {"type": "string", "enum": ["region", "school", "class"]},
+          "unit_id": {"type": "string"},
+          "wave": {"type": "string"}
+        },
+        "required": ["level", "unit_id"],
+        "additionalProperties": false
+      },
+      "http": {"method": "GET", "path": "/v1/units/{level}/{unit_id}/equity", "query": ["wave"]}
+    },
+    {
+      "name": "get_trend",
+      "description": "Index and dimension scores of one unit across all waves.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "level": {"type": "string", "enum": ["system", "region", "school", "class", "teacher"]},
+          "unit_id": {"type": "string"}
+        },
+        "required": ["level", "unit_id"],
+        "additionalProperties": false
+      },
+      "http": {"method": "GET", "path": "/v1/units/{level}/{unit_id}/trend"}
+    },
+    {
+      "name": "compare_units",
+      "description": "Dimension-by-dimension difference between unit a and unit b (or the system average when b is omitted). clear_difference = the 90% intervals do not overlap.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "level": {"type": "string", "enum": ["region", "school", "class", "teacher"]},
+          "a": {"type": "string"},
+          "b": {"type": "string", "description": "Omit to compare with the system average"},
+          "wave": {"type": "string"}
+        },
+        "required": ["level", "a"],
+        "additionalProperties": false
+      },
+      "http": {"method": "GET", "path": "/v1/compare", "query": ["level", "a", "b", "wave"]}
+    },
+    {
+      "name": "get_text_themes",
+      "description": "Counts of themes mentioned in redacted free-text answers for a school, region or the system (never the texts themselves). Empty below 10 respondents with text.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "level": {"type": "string", "enum": ["system", "region", "school"]},
+          "unit_id": {"type": "string"},
+          "wave": {"type": "string"}
+        },
+        "required": ["level", "unit_id"],
+        "additionalProperties": false
+      },
+      "http": {"method": "GET", "path": "/v1/units/{level}/{unit_id}/themes", "query": ["wave"]}
+    }
+  ]
+}

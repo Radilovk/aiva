@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Резултати · Глас за училището</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="./">Глас за училището</a>
+  <nav><a href="survey.html">Анкета</a><a href="portal.html">Резултати</a></nav>
+</div></header>
+<main>
+  <h1>Резултати</h1>
+  <p class="lead">Индекс 0–100 (по-високо е по-добре за децата и семействата) с 90% интервал. Категорията сравнява
+    с другите единици от същото ниво; разлика от 2–3 точки обикновено е шум.</p>
+
+  <div class="card">
+    <div class="grid2">
+      <div><label class="small muted" for="level">Ниво</label>
+        <select id="level">
+          <option value="system">Система</option><option value="region">Региони</option>
+          <option value="school" selected>Училища</option><option value="class">Класове</option>
+          <option value="teacher">Учители (поверително)</option>
+        </select></div>
+      <div><label class="small muted" for="wave">Вълна</label><select id="wave"></select></div>
+      <div><label class="small muted" for="key">Ключ за достъп (за директор, учител, изследовател)</label>
+        <input id="key" type="password" placeholder="без ключ – публичен изглед" autocomplete="off"></div>
+    </div>
+  </div>
+
+  <section id="list-view">
+    <div id="list-msg" class="muted"></div>
+    <div class="card table-wrap" id="list-card" hidden>
+      <table>
+        <thead><tr><th>Единица</th><th class="num">Индекс</th><th class="hide-sm">Интервал</th><th>Категория</th><th class="hide-sm">Място</th><th class="hide-sm num">Отговори</th></tr></thead>
+        <tbody id="list"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="unit-view" hidden>
+    <p><button class="ghost" id="back">← Към списъка</button></p>
+    <div id="unit"></div>
+  </section>
+</main>
+<script src="portal.js"></script>
+</body>
+</html>

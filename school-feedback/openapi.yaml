@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: School Feedback Platform API
+  version: 1.0.0
+  description: |
+    Anonymous feedback from parents and students, scored into dimensions and indices.
+    Read endpoints return aggregates only, filtered by k-anonymity and by the scope of the X-API-Key.
+    Scopes: public (system/region/school), researcher (+class), school_admin (+class/teacher of one school),
+    teacher (own unit only), admin (everything + codes + compute). Reference implementation: api.py.
+servers:
+  - url: http://127.0.0.1:8080
+security:
+  - ApiKey: []
+  - {}
+components:
+  securitySchemes:
+    ApiKey: {type: apiKey, in: header, name: X-API-Key}
+  parameters:
+    Wave: {name: wave, in: query, schema: {type: string}, description: Wave id; latest computed when omitted}
+    Level: {name: level, in: path, required: true, schema: {$ref: '#/components/schemas/Level'}}
+    UnitId: {name: unit_id, in: path, required: true, schema: {type: string}}
+  schemas:
+    Level: {type: string, enum: [system, region, school, class, teacher]}
+    Interval:
+      type: object
+      properties:
+        raw: {type: number, description: Role-combined raw mean}
+        score: {type: number, description: Empirical-Bayes estimate 0-100}
+        se: {type: number}
+        lo: {type: number, description: 90% lower bound}
+        hi: {type: number, description: 90% upper bound}
+        n: {type: integer}
+        roles: {type: object, additionalProperties: {type: object, properties: {n: {type: integer}, mean: {type: number}}}}
+        shrink_B: {type: number, description: Weight of the unit's own data (1 = no shrinkage)}
+        band: {type: string, enum: [Добро, Приемливо, Тревожно, Критично]}
+    Index:
+      type: object
+      properties:
+        score: {type: number}
+        lo: {type: number}
+        hi: {type: number}
+        rank_range: {type: array, items: {type: integer}, minItems: 2, maxItems: 2}
+        of: {type: integer}
+        tier: {type: string}
+        tier_code: {type: string, enum: ['2', '1', '0', '-1', '-2', na]}
+        reference_mean: {type: number}
+        band: {type: string}
+    Unit:
+      type: object
+      properties:
+        unit_id: {type: string}
+        level: {$ref: '#/components/schemas/Level'}
+        parent_id: {type: string}
+        stage: {type: string, enum: [I, II, III]}
+        n_respondents: {type: object, properties: {parent: {type: integer}, student: {type: integer}}}
+        dimensions: {type: object, additionalProperties: {$ref: '#/components/schemas/Interval'}}
+        pillars: {type: object, additionalProperties: {type: number}}
+        index: {$ref: '#/components/schemas/Index'}
+        indicators: {type: object, additionalProperties: {type: object, properties: {share: {type: number}, n: {type: integer}}}}
+        aspects: {type: object, description: Teacher level only, additionalProperties: {type: object}}
+        participation: {type: object, additionalProperties: {type: number}}
+        representativeness: {type: string, enum: [ok, low]}
+        withheld: {type: string, description: Present instead of results when publication is blocked}
+    EquityGap:
+      type: object
+      properties:
+        split: {type: string, enum: [gender, grades]}
+        dimension: {type: string}
+        group_a: {type: string}
+        group_b: {type: string}
+        mean_a: {type: number}
+        mean_b: {type: number}
+        gap: {type: number}
+        se: {type: number}
+        n_a: {type: integer}
+        n_b: {type: integer}
+        flagged: {type: boolean}
+    Question:
+      type: object
+      properties:
+        id: {type: string, description: 'Item id; teacher items are "TC01@<teacher_id>"'}
+        text: {type: string}
+        options: {type: array, items: {type: string}}
+        type: {type: string, enum: [single, multi, text, notice]}
+        module: {type: string}
+        dimension: {type: [string, 'null']}
+        teacher_id: {type: string}
+paths:
+  /v1/questionnaire:
+    get:
+      summary: Full question bank with scales, dimensions and parameters
+      responses: {'200': {description: questionnaire.json}}
+  /v1/methodology:
+    get:
+      summary: Scoring model and interpretation notes (for people and AI models)
+      responses: {'200': {description: OK}}
+  /v1/codes:
+    post:
+      summary: Issue one-time anonymous codes for a class (admin). Plain codes are returned once; only hashes are stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [class_id, school_id, region_id, grade]
+              properties:
+                wave: {type: string}
+                class_id: {type: string}
+                school_id: {type: string}
+                region_id: {type: string}
+                grade: {type: integer, minimum: 1, maximum: 12}
+                n_parent: {type: integer}
+                n_student: {type: integer, description: Ignored below grade 4}
+                class_size: {type: integer}
+                roster:
+                  type: array
+                  items: {type: object, properties: {teacher_id: {type: string}, name: {type: string}, subject: {type: string}, is_class_teacher: {type: boolean}}}
+      responses:
+        '201': {description: Codes, content: {application/json: {schema: {type: object, properties: {parent: {type: array, items: {type: string}}, student: {type: array, items: {type: string}}}}}}}
+        '403': {description: Not admin}
+  /v1/session:
+    post:
+      summary: Start a questionnaire with a code; returns role, grade, assigned teachers and the first question set
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [code], properties: {code: {type: string}}}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {type: object, properties: {role: {type: string}, grade: {type: integer}, stage: {type: string}, young_form: {type: boolean}, teachers: {type: array, items: {type: object}}, questions: {type: array, items: {$ref: '#/components/schemas/Question'}}}}}}}
+        '404': {description: Unknown code}
+        '409': {description: Code already used}
+  /v1/flow:
+    post:
+      summary: Recompute the visible questions after answers change (branching)
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [code], properties: {code: {type: string}, answers: {type: object}}}}}}
+      responses: {'200': {description: OK}}
+  /v1/responses:
+    post:
+      summary: Submit a completed questionnaire; the code becomes used
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, answers]
+              properties:
+                code: {type: string}
+                duration_s: {type: integer, description: Active time measured by the client}
+                answers: {type: object, description: 'item id -> option index, list of indices, or text'}
+                teacher_answers: {type: object, description: 'teacher_id -> {item id -> option index}; only assigned teachers are accepted'}
+      responses:
+        '201': {description: Recorded}
+        '409': {description: Code already used}
+  /v1/waves:
+    get:
+      summary: Computed waves with response counts and exclusions
+      responses: {'200': {description: OK}}
+  /v1/waves/{wave}/compute:
+    post:
+      summary: Run scoring and aggregation for a wave (admin)
+      parameters: [{name: wave, in: path, required: true, schema: {type: string}}]
+      responses: {'200': {description: Meta and campaign alerts}, '403': {description: Not admin}}
+  /v1/units:
+    get:
+      summary: Units of a level visible to the key, sorted by index
+      parameters:
+        - {name: level, in: query, required: true, schema: {$ref: '#/components/schemas/Level'}}
+        - {$ref: '#/components/parameters/Wave'}
+        - {name: tier, in: query, schema: {type: string, enum: ['2', '1', '0', '-1', '-2', na]}}
+      responses: {'200': {description: OK}}
+  /v1/units/{level}/{unit_id}:
+    get:
+      summary: Full result for one unit
+      parameters: [{$ref: '#/components/parameters/Level'}, {$ref: '#/components/parameters/UnitId'}, {$ref: '#/components/parameters/Wave'}]
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Unit'}}}}
+        '404': {description: Not found or not permitted}
+  /v1/units/{level}/{unit_id}/equity:
+    get:
+      summary: Gender and grade-band gaps per dimension (k-anonymity applied)
+      parameters: [{$ref: '#/components/parameters/Level'}, {$ref: '#/components/parameters/UnitId'}, {$ref: '#/components/parameters/Wave'}]
+      responses: {'200': {description: OK, content: {application/json: {schema: {type: object, properties: {equity: {type: array, items: {$ref: '#/components/schemas/EquityGap'}}}}}}}}
+  /v1/units/{level}/{unit_id}/trend:
+    get:
+      summary: Index and dimension scores across waves
+      parameters: [{$ref: '#/components/parameters/Level'}, {$ref: '#/components/parameters/UnitId'}]
+      responses: {'200': {description: OK}}
+  /v1/units/{level}/{unit_id}/themes:
+    get:
+      summary: Theme counts from redacted free text (school, region, system; at least 10 respondents with text)
+      parameters: [{$ref: '#/components/parameters/Level'}, {$ref: '#/components/parameters/UnitId'}, {$ref: '#/components/parameters/Wave'}]
+      responses: {'200': {description: OK}}
+  /v1/compare:
+    get:
+      summary: Dimension-by-dimension comparison of unit a with unit b or the system average
+      parameters:
+        - {name: level, in: query, required: true, schema: {$ref: '#/components/schemas/Level'}}
+        - {name: a, in: query, required: true, schema: {type: string}}
+        - {name: b, in: query, schema: {type: string}}
+        - {$ref: '#/components/parameters/Wave'}
+      responses: {'200': {description: OK}}

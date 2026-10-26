@@ -1,0 +1,2861 @@
+{
+ "version": "1.0.0",
+ "language": "bg",
+ "scales": {
+  "freq5": [
+   "Никога",
+   "Рядко",
+   "Понякога",
+   "Често",
+   "Почти всеки ден"
+  ],
+  "agree5": [
+   "Изобщо не",
+   "По-скоро не",
+   "Отчасти",
+   "По-скоро да",
+   "Напълно"
+  ],
+  "kid3_freq": [
+   "🙂 Никога",
+   "😐 Понякога",
+   "🙁 Често"
+  ],
+  "kid3_agree": [
+   "🙁 Не",
+   "😐 Отчасти",
+   "🙂 Да"
+  ],
+  "yes_partly_no": [
+   "Да",
+   "Отчасти",
+   "Не"
+  ],
+  "one_to_five": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "5"
+  ]
+ },
+ "modules": [
+  {
+   "id": "PR",
+   "title": "Профил",
+   "scored": false
+  },
+  {
+   "id": "WL",
+   "title": "Натоварване",
+   "scored": true
+  },
+  {
+   "id": "SL",
+   "title": "Сън и свободно време",
+   "scored": true
+  },
+  {
+   "id": "WB",
+   "title": "Благополучие",
+   "scored": true
+  },
+  {
+   "id": "TQ",
+   "title": "Преподаване в класа",
+   "scored": true
+  },
+  {
+   "id": "TC",
+   "title": "Учители",
+   "scored": true,
+   "repeat": "teacher"
+  },
+  {
+   "id": "SU",
+   "title": "Подкрепа и справедливост",
+   "scored": true
+  },
+  {
+   "id": "CD",
+   "title": "Климат и дисциплина",
+   "scored": true
+  },
+  {
+   "id": "SF",
+   "title": "Безопасност",
+   "scored": true
+  },
+  {
+   "id": "QC",
+   "title": "Проверка",
+   "scored": false
+  },
+  {
+   "id": "CP",
+   "title": "Комуникация",
+   "scored": true
+  },
+  {
+   "id": "SY",
+   "title": "Образователната система",
+   "scored": true,
+   "sampling_rate": 0.5
+  },
+  {
+   "id": "OT",
+   "title": "Вашите думи",
+   "scored": false
+  }
+ ],
+ "dimensions": {
+  "WL": {
+   "name": "Натоварване",
+   "pillar": "A",
+   "role_weights": {
+    "parent": 0.5,
+    "student": 0.5
+   }
+  },
+  "SL": {
+   "name": "Сън и свободно време",
+   "pillar": "A",
+   "role_weights": {
+    "parent": 0.5,
+    "student": 0.5
+   }
+  },
+  "WB": {
+   "name": "Благополучие",
+   "pillar": "A",
+   "role_weights": {
+    "parent": 0.5,
+    "student": 0.5
+   }
+  },
+  "TQ": {
+   "name": "Качество на преподаването",
+   "pillar": "B",
+   "role_weights": {
+    "parent": 0.3,
+    "student": 0.7
+   }
+  },
+  "TC": {
+   "name": "Учители",
+   "pillar": "B",
+   "role_weights": {
+    "parent": 0.2,
+    "student": 0.8
+   }
+  },
+  "SU": {
+   "name": "Подкрепа и справедливост",
+   "pillar": "B",
+   "role_weights": {
+    "parent": 0.5,
+    "student": 0.5
+   }
+  },
+  "CD": {
+   "name": "Климат и дисциплина",
+   "pillar": "C",
+   "role_weights": {
+    "parent": 0.5,
+    "student": 0.5
+   }
+  },
+  "SF": {
+   "name": "Безопасност",
+   "pillar": "C",
+   "role_weights": {
+    "parent": 0.4,
+    "student": 0.6
+   }
+  },
+  "CP": {
+   "name": "Комуникация и партньорство",
+   "pillar": "C",
+   "role_weights": {
+    "parent": 0.8,
+    "student": 0.2
+   }
+  },
+  "SY": {
+   "name": "Образователна система",
+   "pillar": "SYS",
+   "role_weights": {
+    "parent": 0.5,
+    "student": 0.5
+   }
+  }
+ },
+ "pillars": {
+  "A": {
+   "name": "Баланс и благополучие",
+   "weight": 0.35
+  },
+  "B": {
+   "name": "Учене и преподаване",
+   "weight": 0.35
+  },
+  "C": {
+   "name": "Среда и отношения",
+   "weight": 0.3
+  }
+ },
+ "params": {
+  "stages": {
+   "I": [
+    1,
+    4
+   ],
+   "II": [
+    5,
+    7
+   ],
+   "III": [
+    8,
+    12
+   ]
+  },
+  "student_min_grade": 4,
+  "young_student_grades": [
+   4,
+   4
+  ],
+  "young_student_weight_factor": 0.5,
+  "norms": {
+   "homework_weekday": {
+    "minutes_per_grade": 10,
+    "cap_minutes": 120,
+    "zero_at_multiple": 3.0,
+    "source": "Ориентир „10 минути на клас“ (Cooper; NEA/PTA) – препоръка, не норма"
+   },
+   "homework_weekend": {
+    "multiple_of_weekday_norm": 1.0,
+    "zero_at_multiple": 4.0,
+    "source": "Параметър на модела – подлежи на калибриране"
+   },
+   "sleep": {
+    "min_hours_by_grade": {
+     "1-6": 9,
+     "7-12": 8
+    },
+    "points_lost_per_hour": 40,
+    "source": "AASM 2016: 6–12 г. 9–12 ч; 13–18 г. 8–10 ч"
+   }
+  },
+  "coverage": {
+   "min_share": 0.5,
+   "min_items": 1
+  },
+  "k_anonymity": {
+   "role_cell": 5,
+   "unit_min": 5,
+   "teacher_min_students": 10,
+   "subgroup_cell": 5,
+   "subgroup_unit_min": 20,
+   "free_text_min": 10
+  },
+  "quality": {
+   "min_seconds": 90,
+   "exclude_below_median_share": 0.3,
+   "flag_below_median_share": 0.5,
+   "straightline_min_items": 8,
+   "flag_weight": 0.5,
+   "open_mode_weight": 0.5
+  },
+  "shrinkage": {
+   "default_tau2": 64.0,
+   "min_units_for_tau2": 10,
+   "tau2_floor": 4.0
+  },
+  "interval_z": 1.645,
+  "bootstrap_reps": 400,
+  "tiers": {
+   "delta_share_of_sd": 0.25,
+   "delta_min": 3.0,
+   "max_ci_width": 20.0,
+   "labels": {
+    "2": "Значително над средното",
+    "1": "Над средното",
+    "0": "Около средното",
+    "-1": "Под средното",
+    "-2": "Значително под средното",
+    "na": "Недостатъчно данни"
+   }
+  },
+  "absolute_bands": [
+   [
+    80,
+    "Добро"
+   ],
+   [
+    60,
+    "Приемливо"
+   ],
+   [
+    40,
+    "Тревожно"
+   ],
+   [
+    0,
+    "Критично"
+   ]
+  ],
+  "teacher_assignment": {
+   "always_class_teacher": true,
+   "extra_teachers": 2
+  },
+  "equity": {
+   "flag_gap": 10.0,
+   "z": 1.96
+  },
+  "grade_bands": {
+   "5": "силни",
+   "4": "силни",
+   "3": "средни",
+   "2": "затрудняващи се",
+   "1": "затрудняващи се"
+  }
+ },
+ "items": [
+  {
+   "id": "PR01",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето е:",
+    "student": "Ти си:"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Момче",
+    "Момиче",
+    "Предпочитам да не посоча"
+   ],
+   "young": {
+    "text": "Ти си:",
+    "options": [
+     "Момче",
+     "Момиче",
+     "Не искам да кажа"
+    ]
+   }
+  },
+  {
+   "id": "PR02A",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    1
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Каква е обичайната оценка на детето в I клас?",
+    "student": "Каква е обичайната оценка на детето в I клас?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Отличен (звезда)",
+    "Много добър (сърце)",
+    "Добър (усмивка)",
+    "Задоволителен",
+    "Незадоволителен",
+    "Не знам"
+   ],
+   "hint": "derived:grade_band=[5,4,3,2,1,null]"
+  },
+  {
+   "id": "PR02B_BEL",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    2,
+    3
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Обичайна оценка по български език и литература:",
+    "student": "Обичайна оценка по български език и литература:"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Отличен",
+    "Много добър",
+    "Добър",
+    "Задоволителен",
+    "Незадоволителен",
+    "Не знам"
+   ],
+   "hint": "derived:grade_band=[5,4,3,2,1,null]"
+  },
+  {
+   "id": "PR02B_MAT",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    2,
+    3
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Обичайна оценка по математика:",
+    "student": "Обичайна оценка по математика:"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Отличен",
+    "Много добър",
+    "Добър",
+    "Задоволителен",
+    "Незадоволителен",
+    "Не знам"
+   ],
+   "hint": "derived:grade_band=[5,4,3,2,1,null]"
+  },
+  {
+   "id": "PR02C_BEL",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    4,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Обичайни оценки по български език и литература:",
+    "student": "Обичайните ти оценки по български език и литература:"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Предимно 6",
+    "Предимно 5 и 6",
+    "Предимно 4 и 5",
+    "Предимно 3 и 4",
+    "Има и слаби (2)",
+    "Не знам / не искам да кажа"
+   ],
+   "young": {
+    "text": "Какви оценки получаваш обикновено по български език?",
+    "options": [
+     "Предимно 6",
+     "Предимно 5 и 6",
+     "Предимно 4 и 5",
+     "По-ниски",
+     "Не знам"
+    ]
+   },
+   "hint": "derived:grade_band=[5,4,3,2,1,null]"
+  },
+  {
+   "id": "PR02C_MAT",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    4,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Обичайни оценки по математика:",
+    "student": "Обичайните ти оценки по математика:"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Предимно 6",
+    "Предимно 5 и 6",
+    "Предимно 4 и 5",
+    "Предимно 3 и 4",
+    "Има и слаби (2)",
+    "Не знам / не искам да кажа"
+   ],
+   "young": {
+    "text": "Какви оценки получаваш обикновено по математика?",
+    "options": [
+     "Предимно 6",
+     "Предимно 5 и 6",
+     "Предимно 4 и 5",
+     "По-ниски",
+     "Не знам"
+    ]
+   },
+   "hint": "derived:grade_band=[5,4,3,2,1,null]"
+  },
+  {
+   "id": "PR03",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    7
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето посещава ли целодневна организация (ЦОУД)?",
+    "student": "Оставаш ли в училище следобед на занималня (ЦОУД)?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Да",
+    "Не",
+    "Понякога"
+   ]
+  },
+  {
+   "id": "PR04",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Ползва ли детето частни уроци по предмети от училищната програма?",
+    "student": "Ходиш ли на частни уроци по училищни предмети?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Не",
+    "Да, понякога",
+    "Да, редовно (поне веднъж седмично)"
+   ]
+  },
+  {
+   "id": "PR05",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "multi",
+   "text": {
+    "parent": "Основна причина за частните уроци:",
+    "student": "Защо ходиш на частни уроци?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "За да се справя с текущия материал или домашните",
+    "За да навакса изоставане",
+    "За подготовка за контролни и изпитвания",
+    "За подготовка за изпит за прием (НВО, кандидатстване)",
+    "За развитие извън програмата (състезания, интереси)",
+    "Друго"
+   ],
+   "show_if": {
+    "q": "PR04",
+    "op": "in",
+    "v": [
+     1,
+     2
+    ]
+   }
+  },
+  {
+   "id": "PR06",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "multi",
+   "text": {
+    "parent": "По кои предмети?",
+    "student": "По кои предмети?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Български език и литература",
+    "Математика",
+    "Чужд език",
+    "Природни науки",
+    "Друг"
+   ],
+   "show_if": {
+    "q": "PR04",
+    "op": "in",
+    "v": [
+     1,
+     2
+    ]
+   }
+  },
+  {
+   "id": "PR07",
+   "module": "PR",
+   "dimension": null,
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето получава ли допълнителна подкрепа в училище (ресурсен учител, логопед, психолог)?",
+    "student": "Детето получава ли допълнителна подкрепа в училище (ресурсен учител, логопед, психолог)?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Да",
+    "Не",
+    "Не знам",
+    "Предпочитам да не посоча"
+   ]
+  },
+  {
+   "id": "WL01",
+   "module": "WL",
+   "dimension": "WL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Колко време средно отделя детето за домашни в делничен ден (след училище/ЦОУД)?",
+    "student": "Колко време средно учиш и пишеш домашни в делничен ден?"
+   },
+   "weight": 2.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Под 15 мин",
+    "15–30 мин",
+    "30–45 мин",
+    "45–60 мин",
+    "60–90 мин",
+    "90–120 мин",
+    "2–3 часа",
+    "Над 3 часа"
+   ],
+   "score": {
+    "kind": "norm",
+    "norm": "homework_weekday",
+    "minutes": [
+     10,
+     22.5,
+     37.5,
+     52.5,
+     75,
+     105,
+     150,
+     200
+    ]
+   },
+   "young": {
+    "text": "Колко време пишеш домашни след училище?",
+    "options": [
+     "Малко (под половин час)",
+     "Около час",
+     "Много (над час)"
+    ],
+    "score": {
+     "kind": "norm",
+     "norm": "homework_weekday",
+     "minutes": [
+      20,
+      60,
+      100
+     ]
+    }
+   }
+  },
+  {
+   "id": "WL02",
+   "module": "WL",
+   "dimension": "WL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Колко време общо отделя детето за училищни задачи през събота и неделя?",
+    "student": "Колко време общо учиш за училище през събота и неделя?"
+   },
+   "weight": 1.5,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Нищо",
+    "До 30 мин",
+    "30–60 мин",
+    "1–2 часа",
+    "2–3 часа",
+    "3–5 часа",
+    "Над 5 часа"
+   ],
+   "score": {
+    "kind": "norm",
+    "norm": "homework_weekend",
+    "minutes": [
+     0,
+     15,
+     45,
+     90,
+     150,
+     240,
+     330
+    ]
+   }
+  },
+  {
+   "id": "WL03",
+   "module": "WL",
+   "dimension": "WL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "През последната ваканция имаше ли детето писмени задачи?",
+    "student": "През последната ваканция имаше ли писмени задачи?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Не",
+    "Да, малко",
+    "Да, много",
+    "Не помня"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     50,
+     0,
+     null
+    ]
+   }
+  },
+  {
+   "id": "WL04",
+   "module": "WL",
+   "dimension": "WL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    9
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Колко често е нужно родител да обяснява материала или да седи до детето, за да довърши домашните?",
+    "student": "Колко често ти трябва помощ от възрастен, за да довършиш домашните?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   }
+  },
+  {
+   "id": "WL05",
+   "module": "WL",
+   "dimension": "WL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Как оценявате общия обем на домашните за възрастта на детето?",
+    "student": "Обемът на домашните е:"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Твърде малък",
+    "Подходящ",
+    "Малко голям",
+    "Твърде голям"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     75,
+     100,
+     50,
+     0
+    ]
+   }
+  },
+  {
+   "id": "WL06",
+   "module": "WL",
+   "dimension": "WL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    5,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Колко контролни, класни и тестове има детето най-много в една седмица?",
+    "student": "Колко контролни, класни и тестове имаш най-много в една седмица?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "0–1",
+    "2",
+    "3",
+    "4 или повече"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     75,
+     35,
+     0
+    ]
+   }
+  },
+  {
+   "id": "WL07",
+   "module": "WL",
+   "dimension": "WL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Колко често домашните водят до напрежение или конфликт вкъщи?",
+    "student": "Колко често се чувстваш напрегнат/а заради домашните?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   },
+   "young": {
+    "text": "Ядосваш ли се или плачеш заради домашните?",
+    "scale": "kid3_freq",
+    "score": {
+     "kind": "likert",
+     "polarity": -1
+    }
+   }
+  },
+  {
+   "id": "SL01",
+   "module": "SL",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "В делничен ден в колко часа обикновено заспива детето?",
+    "student": "В делничен ден в колко часа обикновено заспиваш?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Преди 20:30",
+    "20:30–21:00",
+    "21:00–21:30",
+    "21:30–22:00",
+    "22:00–22:30",
+    "22:30–23:00",
+    "23:00–24:00",
+    "След 24:00"
+   ],
+   "hint": "hours=[20.25, 20.75, 21.25, 21.75, 22.25, 22.75, 23.5, 24.5]"
+  },
+  {
+   "id": "SL02",
+   "module": "SL",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "В колко часа обикновено става детето в учебен ден?",
+    "student": "В колко часа ставаш в учебен ден?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Преди 6:00",
+    "6:00–6:30",
+    "6:30–7:00",
+    "7:00–7:30",
+    "След 7:30"
+   ],
+   "hint": "hours=[5.75, 6.25, 6.75, 7.25, 7.75]"
+  },
+  {
+   "id": "SL03",
+   "module": "SL",
+   "dimension": "SL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Случва ли се лягането да се отлага заради домашни?",
+    "student": "Случва ли се да лягаш по-късно заради домашни?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Никога",
+    "Рядко",
+    "Понякога",
+    "Често"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     70,
+     35,
+     0
+    ]
+   }
+  },
+  {
+   "id": "SL04",
+   "module": "SL",
+   "dimension": "SL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Колко свободно време има детето в делничен ден (игра или занимания по свой избор, без екрани и без уроци)?",
+    "student": "Колко свободно време имаш в делничен ден за неща по твой избор (без екрани и уроци)?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Под 30 мин",
+    "30–60 мин",
+    "1–2 часа",
+    "Над 2 часа"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     0,
+     40,
+     80,
+     100
+    ]
+   },
+   "young": {
+    "text": "Имаш ли време да играеш след училище?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   }
+  },
+  {
+   "id": "SL05",
+   "module": "SL",
+   "dimension": "SL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "В колко дни от седмицата детето се движи активно поне 1 час (спорт, игри навън)?",
+    "student": "В колко дни от седмицата се движиш активно поне 1 час?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "0–1",
+    "2–3",
+    "4–5",
+    "6–7"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     0,
+     40,
+     75,
+     100
+    ]
+   }
+  },
+  {
+   "id": "SL06",
+   "module": "SL",
+   "dimension": "SL",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Отказали ли сте занимание (спорт, изкуство, приятели, семейно време) заради училищни задачи?",
+    "student": "Отказвал/а ли си занимание (спорт, приятели, хоби) заради училищни задачи?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Не",
+    "Да, понякога",
+    "Да, редовно"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     50,
+     0
+    ]
+   }
+  },
+  {
+   "id": "WB01",
+   "module": "WB",
+   "dimension": "WB",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето се оплаква от главоболие или коремна болка в учебни дни.",
+    "student": "Боли ме глава или корем в учебни дни."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   },
+   "young": {
+    "text": "Боли ли те глава или корем, когато имаш училище?",
+    "scale": "kid3_freq",
+    "score": {
+     "kind": "likert",
+     "polarity": -1
+    }
+   }
+  },
+  {
+   "id": "WB02",
+   "module": "WB",
+   "dimension": "WB",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето не иска да ходи на училище или е тревожно сутрин.",
+    "student": "Не ми се ходи на училище или сутрин съм тревожен/тревожна."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   },
+   "young": {
+    "text": "Тъжен/тъжна или притеснен/а ли си сутрин преди училище?",
+    "scale": "kid3_freq",
+    "score": {
+     "kind": "likert",
+     "polarity": -1
+    }
+   }
+  },
+  {
+   "id": "WB03",
+   "module": "WB",
+   "dimension": "WB",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето изглежда уморено, раздразнително или безразлично след училище.",
+    "student": "След училище съм изтощен/а или раздразнен/а."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   }
+  },
+  {
+   "id": "WB04",
+   "module": "WB",
+   "dimension": "WB",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето говори с радост за нещо, научено или преживяно в училище.",
+    "student": "Научавам в училище неща, които ми харесват."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "Харесва ли ти да учиш нови неща в училище?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   }
+  },
+  {
+   "id": "WB05",
+   "module": "WB",
+   "dimension": "WB",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Отношението на детето към ученето в момента е:",
+    "student": "Отношението ми към ученето в момента е:"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "С желание",
+    "Неутрално",
+    "С нежелание",
+    "С отказ"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     66,
+     33,
+     0
+    ]
+   }
+  },
+  {
+   "id": "WB06",
+   "module": "WB",
+   "dimension": "WB",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "Чувствам се част от класа и училището."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "Имаш ли приятели в класа?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   }
+  },
+  {
+   "id": "WB07",
+   "module": "WB",
+   "dimension": "WB",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    3,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето е под силен натиск заради оценките.",
+    "student": "Чувствам се под силен натиск заради оценките."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   }
+  },
+  {
+   "id": "TQ01",
+   "module": "TQ",
+   "dimension": "TQ",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето разбира повечето обяснения в час, без да се налага да го учим наново вкъщи.",
+    "student": "Повечето учители обясняват така, че да разбера."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "Разбираш ли какво обяснява учителката?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   }
+  },
+  {
+   "id": "TQ02",
+   "module": "TQ",
+   "dimension": "TQ",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето разказва за интересни неща от часовете.",
+    "student": "В часовете е интересно и участвам активно."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "Интересно ли ти е в час?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   }
+  },
+  {
+   "id": "TQ03",
+   "module": "TQ",
+   "dimension": "TQ",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Получавам ясна информация какво детето знае и какво да подобри.",
+    "student": "Когато сгреша, учителите ми показват как да се поправя."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "TQ04",
+   "module": "TQ",
+   "dimension": "TQ",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Изискванията са съобразени с възрастта на детето.",
+    "student": "Задачите в час са по силите ми – нито прекалено лесни, нито невъзможни."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "TQ05",
+   "module": "TQ",
+   "dimension": "TQ",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Налага се вкъщи да преподаваме материал, който не е обяснен в час.",
+    "student": "Голяма част от новия материал реално го уча вкъщи, а не в час."
+   },
+   "weight": 1.5,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   }
+  },
+  {
+   "id": "TC01",
+   "module": "TC",
+   "dimension": "TC",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    4,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Класният ръководител се отнася с уважение към детето и към мен.",
+    "student": "{teacher} се отнася с уважение към всички ученици."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "{teacher} държи ли се мило с децата?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   },
+   "aspect": "respect",
+   "repeat": "teacher",
+   "grades_by_role": {
+    "parent": [
+     1,
+     12
+    ],
+    "student": [
+     4,
+     12
+    ]
+   }
+  },
+  {
+   "id": "TC02",
+   "module": "TC",
+   "dimension": "TC",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    4,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "{teacher} обяснява ясно; ако не разбера, обяснява по друг начин."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "{teacher} обяснява ли така, че да разбереш?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   },
+   "aspect": "clarity",
+   "repeat": "teacher"
+  },
+  {
+   "id": "TC03",
+   "module": "TC",
+   "dimension": "TC",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    5,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "Часовете на {teacher} са интересни."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "aspect": "engagement",
+   "repeat": "teacher"
+  },
+  {
+   "id": "TC04",
+   "module": "TC",
+   "dimension": "TC",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    5,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "{teacher} ми казва какво правя добре и какво да подобря."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "aspect": "feedback",
+   "repeat": "teacher"
+  },
+  {
+   "id": "TC05",
+   "module": "TC",
+   "dimension": "TC",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    5,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "{teacher} оценява справедливо и предварително е ясно какво се изисква."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "aspect": "fair_assessment",
+   "repeat": "teacher"
+  },
+  {
+   "id": "TC06",
+   "module": "TC",
+   "dimension": "TC",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    4,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "В часа на {teacher} има ред, без да се крещи или унижава."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "Вика ли {teacher} на децата?",
+    "scale": "kid3_freq",
+    "score": {
+     "kind": "likert",
+     "polarity": -1
+    }
+   },
+   "aspect": "climate",
+   "repeat": "teacher"
+  },
+  {
+   "id": "TC07",
+   "module": "TC",
+   "dimension": "TC",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    5,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "Домашните и изпитванията на {teacher} са в разумен обем."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "aspect": "workload",
+   "repeat": "teacher"
+  },
+  {
+   "id": "TC08",
+   "module": "TC",
+   "dimension": "TC",
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Класният ръководител отговаря навреме и по същество на въпросите ми.",
+    "student": "Класният ръководител отговаря навреме и по същество на въпросите ми."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "aspect": "parent_communication",
+   "repeat": "teacher"
+  },
+  {
+   "id": "TC09",
+   "module": "TC",
+   "dimension": "TC",
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Съобщенията на класния ръководител за проблеми са конкретни и предлагат решение, а не само оплакване.",
+    "student": "Съобщенията на класния ръководител за проблеми са конкретни и предлагат решение, а не само оплакване."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "aspect": "parent_communication",
+   "repeat": "teacher"
+  },
+  {
+   "id": "SU01",
+   "module": "SU",
+   "dimension": "SU",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Когато детето изостане, училището предлага помощ (консултации, допълнителни часове).",
+    "student": "Когато не разбирам нещо, мога да получа помощ в училище."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "Ако не разбереш нещо, помагат ли ти в училище?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   }
+  },
+  {
+   "id": "SU02",
+   "module": "SU",
+   "dimension": "SU",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Към всички деца в класа се отнасят еднакво справедливо.",
+    "student": "Учителите се отнасят еднакво справедливо към всички ученици."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "SU03",
+   "module": "SU",
+   "dimension": "SU",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Без допълнителна помощ (от родител или частен учител) детето би се справило с изискванията на училището.",
+    "student": "Мога да се справя с изискванията на училището без частни уроци."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "yes_partly_no",
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     50,
+     0
+    ]
+   }
+  },
+  {
+   "id": "CD01",
+   "module": "CD",
+   "dimension": "CD",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Правилата в класа са ясни и се прилагат еднакво към всички.",
+    "student": "Правилата в класа са ясни и важат еднакво за всички."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "Ясно ли ти е какви са правилата в класа?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   }
+  },
+  {
+   "id": "CD02",
+   "module": "CD",
+   "dimension": null,
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "През последните 4 седмици колко пъти сте получили бележка или съобщение за поведението на детето?",
+    "student": "През последните 4 седмици колко пъти сте получили бележка или съобщение за поведението на детето?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Нито веднъж",
+    "1",
+    "2–3",
+    "4 или повече"
+   ]
+  },
+  {
+   "id": "CD03",
+   "module": "CD",
+   "dimension": null,
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "multi",
+   "text": {
+    "parent": "Какво е описвало съобщението?",
+    "student": "Какво е описвало съобщението?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Игра или гонене",
+    "Бутане или закачки по време на игра",
+    "Разговор или смях в час",
+    "Нежелание или бавно изпълнение на задача",
+    "Спор с дете",
+    "Удар или нараняване с намерение",
+    "Друго"
+   ],
+   "show_if": {
+    "q": "CD02",
+    "op": "in",
+    "v": [
+     1,
+     2,
+     3
+    ]
+   }
+  },
+  {
+   "id": "CD04",
+   "module": "CD",
+   "dimension": "CD",
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Съобщението съдържаше ли конкретно описание (кога, какво точно, кой е видял)?",
+    "student": "Съобщението съдържаше ли конкретно описание (кога, какво точно, кой е видял)?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Да",
+    "Отчасти",
+    "Не"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     50,
+     0
+    ]
+   },
+   "show_if": {
+    "q": "CD02",
+    "op": "in",
+    "v": [
+     1,
+     2,
+     3
+    ]
+   }
+  },
+  {
+   "id": "CD05",
+   "module": "CD",
+   "dimension": null,
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Поведението беше ли наречено „агресия“, „насилие“ или „тормоз“?",
+    "student": "Поведението беше ли наречено „агресия“, „насилие“ или „тормоз“?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Да",
+    "Не"
+   ],
+   "show_if": {
+    "q": "CD02",
+    "op": "in",
+    "v": [
+     1,
+     2,
+     3
+    ]
+   }
+  },
+  {
+   "id": "CD06",
+   "module": "CD",
+   "dimension": "CD",
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Според Вас това определение отговаряше ли на случилото се?",
+    "student": "Според Вас това определение отговаряше ли на случилото се?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Напълно",
+    "Отчасти",
+    "Не",
+    "Не знам"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     50,
+     0,
+     null
+    ]
+   },
+   "show_if": {
+    "q": "CD05",
+    "op": "in",
+    "v": [
+     0
+    ]
+   }
+  },
+  {
+   "id": "CD07",
+   "module": "CD",
+   "dimension": "CD",
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Поискано ли Ви е да „коригирате“ поведението вкъщи, без училището да предложи своя мярка?",
+    "student": "Поискано ли Ви е да „коригирате“ поведението вкъщи, без училището да предложи своя мярка?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Да",
+    "Не"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     0,
+     100
+    ]
+   },
+   "show_if": {
+    "q": "CD02",
+    "op": "in",
+    "v": [
+     1,
+     2,
+     3
+    ]
+   }
+  },
+  {
+   "id": "CD08",
+   "module": "CD",
+   "dimension": "CD",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    7
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето лишавано ли е от междучасие, игра навън или занимание като наказание?",
+    "student": "Случвало ли се е да те лишат от междучасие или игра навън като наказание?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Никога",
+    "Веднъж",
+    "Повече от веднъж",
+    "Не знам"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     40,
+     0,
+     null
+    ]
+   }
+  },
+  {
+   "id": "CD09",
+   "module": "CD",
+   "dimension": "CD",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето споделя, че е било засрамено пред класа от учител.",
+    "student": "Учители коментират пред класа оценките или грешките на ученици по унизителен начин."
+   },
+   "weight": 1.5,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   },
+   "young": {
+    "text": "Срамува ли те учител пред другите деца?",
+    "scale": "kid3_freq",
+    "score": {
+     "kind": "likert",
+     "polarity": -1
+    }
+   }
+  },
+  {
+   "id": "CD10",
+   "module": "CD",
+   "dimension": "CD",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    4,
+    9
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "Нормалната игра през междучасието (гонене, закачки) се наказва като агресия."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   },
+   "young": {
+    "text": "Наказват ли децата, когато просто играят и се гонят?",
+    "scale": "kid3_freq",
+    "score": {
+     "kind": "likert",
+     "polarity": -1
+    }
+   }
+  },
+  {
+   "id": "CD11",
+   "module": "CD",
+   "dimension": "CD",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "Мога да кажа мнението си на учител, без да се страхувам."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "Можеш ли да кажеш на учителката, когато не си съгласен/съгласна?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   }
+  },
+  {
+   "id": "SF01",
+   "module": "SF",
+   "dimension": "SF",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "През последния месец детето споделяло ли е, че други деца многократно го обиждат, удрят или изключват нарочно?",
+    "student": "През последния месец случвало ли се е някой в училище многократно да те обижда, удря или изключва нарочно?"
+   },
+   "weight": 1.5,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Не",
+    "Веднъж-два пъти",
+    "Няколко пъти",
+    "Почти всяка седмица"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     60,
+     20,
+     0
+    ]
+   },
+   "young": {
+    "text": "Случва ли се други деца да те обиждат или удрят?",
+    "scale": "kid3_freq",
+    "score": {
+     "kind": "likert",
+     "polarity": -1
+    }
+   }
+  },
+  {
+   "id": "SF02",
+   "module": "SF",
+   "dimension": "SF",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Когато сте сигнализирали училището, реагира ли адекватно?",
+    "student": "Когато си казал/а на възрастен в училище, той помогна ли?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "options": [
+    "Не сме казвали / не съм казвал(а)",
+    "Да",
+    "Отчасти",
+    "Не"
+   ],
+   "score": {
+    "kind": "map",
+    "values": [
+     null,
+     100,
+     50,
+     0
+    ]
+   },
+   "show_if": {
+    "q": "SF01",
+    "op": "in",
+    "v": [
+     1,
+     2,
+     3
+    ]
+   }
+  },
+  {
+   "id": "SF03",
+   "module": "SF",
+   "dimension": "SF",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Детето се чувства в безопасност в училище.",
+    "student": "Чувствам се в безопасност в училище."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   },
+   "young": {
+    "text": "Чувстваш ли се спокойно и в безопасност в училище?",
+    "scale": "kid3_agree",
+    "score": {
+     "kind": "likert",
+     "polarity": 1
+    }
+   }
+  },
+  {
+   "id": "SF90",
+   "module": "SF",
+   "dimension": null,
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "notice",
+   "text": {
+    "parent": "",
+    "student": "Ако някой те наранява или ти е тежко, можеш да говориш с възрастен, на когото имаш доверие, или да се обадиш безплатно на Националната телефонна линия за деца 116 111."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "show_if": {
+    "any": [
+     {
+      "q": "SF01",
+      "op": "in",
+      "v": [
+       2,
+       3
+      ]
+     },
+     {
+      "q": "WB02",
+      "op": "in",
+      "v": [
+       4
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "CP01",
+   "module": "CP",
+   "dimension": "CP",
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Получавам навреме информацията, която ми е нужна (оценки, събития, промени).",
+    "student": "Получавам навреме информацията, която ми е нужна (оценки, събития, промени)."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "CP02",
+   "module": "CP",
+   "dimension": "CP",
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Мога да изразя несъгласие с учител или ръководството без последици за детето.",
+    "student": "Мога да изразя несъгласие с учител или ръководството без последици за детето."
+   },
+   "weight": 1.5,
+   "core": true,
+   "optional": true,
+   "scale": "yes_partly_no",
+   "score": {
+    "kind": "map",
+    "values": [
+     100,
+     50,
+     0
+    ]
+   }
+  },
+  {
+   "id": "CP03",
+   "module": "CP",
+   "dimension": "CP",
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Съобщенията от училището са с уважителен тон и са конкретни.",
+    "student": "Съобщенията от училището са с уважителен тон и са конкретни."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "CP04",
+   "module": "CP",
+   "dimension": "CP",
+   "roles": [
+    "parent"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Мнението на родителите се взема предвид при решения, които засягат децата.",
+    "student": "Мнението на родителите се взема предвид при решения, които засягат децата."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "CP05",
+   "module": "CP",
+   "dimension": "CP",
+   "roles": [
+    "student"
+   ],
+   "grades": [
+    5,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "",
+    "student": "Учителите ни питат за мнението ни (например за начина на работа или за обема на задачите)."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "SY01",
+   "module": "SY",
+   "dimension": "SY",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Учебните програми са с обем, съобразен с възрастта на детето.",
+    "student": "Учебният материал е с обем, който може да се научи в рамките на училището."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "SY02",
+   "module": "SY",
+   "dimension": "SY",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Учебниците са разбираеми за детето без допълнителна помощ.",
+    "student": "Учебниците са разбираеми без допълнителна помощ."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "SY03",
+   "module": "SY",
+   "dimension": "SY",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    4,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Подготовката за националното външно оценяване (НВО) създава прекомерен стрес.",
+    "student": "Подготовката за НВО / матурите създава прекомерен стрес."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": -1
+   }
+  },
+  {
+   "id": "SY04",
+   "module": "SY",
+   "dimension": "SY",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Учебният ден (продължителност, смени, разписание) е подходящ за възрастта.",
+    "student": "Учебният ден (продължителност, смени, разписание) е разумен."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "SY05",
+   "module": "SY",
+   "dimension": "SY",
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "Училищната система подготвя децата за реалния живот.",
+    "student": "Това, което уча, ще ми бъде полезно в живота."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "agree5",
+   "score": {
+    "kind": "likert",
+    "polarity": 1
+   }
+  },
+  {
+   "id": "QC01",
+   "module": "QC",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    8,
+    12
+   ],
+   "type": "single",
+   "text": {
+    "parent": "За да покажете, че четете внимателно, изберете „Рядко“.",
+    "student": "За да покажеш, че четеш внимателно, избери „Рядко“."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "scale": "freq5",
+   "hint": "attention_check:expected=1",
+   "grades_by_role": {
+    "parent": [
+     1,
+     12
+    ],
+    "student": [
+     8,
+     12
+    ]
+   }
+  },
+  {
+   "id": "OT01",
+   "module": "OT",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "text",
+   "text": {
+    "parent": "Кое цените най-много в училището?",
+    "student": "Какво ти харесва най-много в училището?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true
+  },
+  {
+   "id": "OT02",
+   "module": "OT",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "text",
+   "text": {
+    "parent": "Какво бихте променили, за да е по-добър балансът между учене, почивка и семейство?",
+    "student": "Какво би променил/а в училище?"
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true,
+   "young": {
+    "text": "Какво би искал/а да е различно в училище?",
+    "type": "text"
+   }
+  },
+  {
+   "id": "OT03",
+   "module": "OT",
+   "dimension": null,
+   "roles": [
+    "parent",
+    "student"
+   ],
+   "grades": [
+    1,
+    12
+   ],
+   "type": "text",
+   "text": {
+    "parent": "Искате ли да опишете конкретна ситуация? Моля, без имена на деца и учители.",
+    "student": "Искаш ли да разкажеш за конкретна ситуация? Моля, без имена."
+   },
+   "weight": 1.0,
+   "core": true,
+   "optional": true
+  }
+ ],
+ "derived": [
+  {
+   "id": "SL_SLEEP",
+   "dimension": "SL",
+   "kind": "sleep_hours",
+   "from": [
+    "SL01",
+    "SL02"
+   ],
+   "bed_hours": [
+    20.25,
+    20.75,
+    21.25,
+    21.75,
+    22.25,
+    22.75,
+    23.5,
+    24.5
+   ],
+   "wake_hours": [
+    5.75,
+    6.25,
+    6.75,
+    7.25,
+    7.75
+   ],
+   "score": {
+    "kind": "norm",
+    "norm": "sleep"
+   },
+   "weight": 2.0
+  },
+  {
+   "id": "SU_TUT",
+   "dimension": "SU",
+   "kind": "tutoring_to_keep_up",
+   "from": [
+    "PR04",
+    "PR05"
+   ],
+   "keep_up_options": [
+    0,
+    1
+   ],
+   "score": {
+    "kind": "map_bool",
+    "true": 0,
+    "false": 100
+   },
+   "weight": 0.5
+  }
+ ]
+}
