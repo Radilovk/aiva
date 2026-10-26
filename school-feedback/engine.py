@@ -312,7 +312,9 @@ def _indicators(a: dict, role: str, grade: int, q: dict) -> dict:
         "labelled_aggression_disputed": None if a.get("CD06") in (None, 3) else int(a["CD06"] in (1, 2)),
         "recess_removed": None if a.get("CD08") in (None, 3) else int(a["CD08"] in (1, 2)),
         "bullying_repeated": None if a.get("SF01") is None else int(a["SF01"] >= (2 if young else 2)),
-        "psychosomatic_often": None if a.get("WB01") is None else int(a["WB01"] >= (2 if young else 3)),
+        # weekly or more often in school weeks (SC01); the short grade-4 form asks WB01 instead
+        "psychosomatic_often": int(a["SC01_S"] >= 2) if isinstance(a.get("SC01_S"), int)
+        else (None if a.get("WB01") is None else int(a["WB01"] >= (2 if young else 3))),
         "shouting_weekly": _at_least(a, "HP01", 2),
         "class_punishment": _at_least(a, "HP02", 1),
         "threats_weekly": _at_least(a, "HP03", 2),

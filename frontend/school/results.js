@@ -26,8 +26,8 @@
     bullying_repeated: "Повтарящ се тормоз", psychosomatic_often: "Чести главоболия или болки в корема",
   };
   const ASPECT = {
-    respect: "Уважение", clarity: "Яснота", engagement: "Интересни часове", feedback: "Обратна връзка",
-    fair_assessment: "Справедливо оценяване", climate: "Ред без крясъци", workload: "Разумен обем", parent_communication: "Общуване с родителите",
+    respect: "Уважение", clarity: "Обяснява ясно", fair_assessment: "Оценява справедливо", no_shouting: "Не вика",
+    no_humiliation: "Не се подиграва", climate: "Ред без крясъци", parent_communication: "Връзка с родителите",
   };
   const GROUP = { boy: "момчетата", girl: "момичетата", strong: "силните ученици (предимно 5 и 6)", struggling: "затрудняващите се (предимно 3 и 4 или слаби)" };
   const SHORT = { boy: "Момчета", girl: "Момичета", strong: "Силни", struggling: "Затрудняващи се" };
@@ -40,8 +40,8 @@
   ];
   // indicator groups, in the order a reader looks for harm
   const IND_GROUPS = [
-    ["Психоемоционално и физическо състояние", ["low_wellbeing", "very_low_wellbeing", "psychosomatic_often", "sleep_short", "school_worse"]],
-    ["Поведение на възрастните и дисциплина", ["shouting_weekly", "threats_weekly", "class_punishment", "sent_out", "grade_as_punishment", "recess_removed",
+    ["Как се чувстват децата", ["low_wellbeing", "very_low_wellbeing", "psychosomatic_often", "sleep_short", "school_worse"]],
+    ["Поведение на учителите и дисциплина", ["shouting_weekly", "threats_weekly", "class_punishment", "sent_out", "grade_as_punishment", "recess_removed",
       "physical_force", "labelled_aggression_disputed", "behaviour_note"]],
     ["Отношения между децата", ["bullying_repeated"]],
     ["Натоварване", ["homework_over_norm", "vacation_tasks", "tutoring_regular", "tutoring_keep_up"]],
@@ -89,11 +89,11 @@
     const high = sg.severity === "high";
     const chip = `<span class="sev ${high ? "sev-high" : "sev-el"}">${high ? "Висок приоритет" : "Повишено"}</span>`;
     if (sg.kind === "contrast") {
-      return `<div class="signal ${high ? "high" : ""}"><div class="sig-head">${chip}<h3>Симптомите са по-чести в учебно време, отколкото във ваканция</h3></div>
-        <p>При едни и същи деца главоболията, болките в корема, трудното заспиване, раздразнителността и тъгата са с <b>${fmt(sg.delta)} точки</b>
-        по-чести в учебни седмици (95% интервал ${fmt(sg.ci[0])}–${fmt(sg.ci[1])})${sg.ref !== null ? `, при ${fmt(sg.ref)} средно за страната` : ""}.
-        ${sg.share_worse !== null ? `${pct(sg.share_worse)} от децата са по-зле в учебно време.` : ""} Отговорили: ${sg.n}.</p>
-        <p class="ev">Сравнението е при същото дете, затова отделя влиянието на учебния период от семейството и детето.</p></div>`;
+      return `<div class="signal ${high ? "high" : ""}"><div class="sig-head">${chip}<h3>Децата са по-зле, когато има училище</h3></div>
+        <p>Главоболието и болките в корема, трудното заспиване и лошото настроение са с <b>${fmt(sg.delta)} точки</b> по-чести, когато има училище,
+        отколкото във ваканция (95% интервал ${fmt(sg.ci[0])}–${fmt(sg.ci[1])})${sg.ref !== null ? `. Средно за страната разликата е ${fmt(sg.ref)}` : ""}.
+        ${sg.share_worse !== null ? `${pct(sg.share_worse)} от децата са по-зле, когато има училище.` : ""} Отговорили: ${sg.n}.</p>
+        <p class="ev">Всяко дете се сравнява със себе си, затова разликата идва от учебния период, а не от семейството.</p></div>`;
     }
     const m = indMeta(sg.indicator);
     const who = sg.confirmed_by?.length === 2 ? "Потвърдено независимо от родители и ученици."
@@ -110,8 +110,8 @@
     if (!u.signals.length) return `<div class="note" style="margin-top:18px"><div class="priv">${ICON.shield}<span>Няма сигнали за проверка: нито един показател не е ясно над средното за страната.</span></div></div>`;
     return `<h2>Сигнали за проверка <span class="count">${u.signals.length}</span></h2>
       <div class="signals">${u.signals.map(signalHtml).join("")}</div>
-      <p class="section-note">Сигналът е повод за проверка, а не доказателство за нарушение: честота, ясно над средната за страната (поне 10 души,
-      долна граница на 95% интервал над средното). Виждат го инспекторатът, училището и съответният учител.</p>`;
+      <p class="section-note">Сигнал се появява, когато нещо се случва значително по-често, отколкото средно в страната (при поне 10 отговорили).
+      Той е повод за проверка, а не доказателство за нарушение. Виждат го само РУО, училището и съответният учител.</p>`;
   }
   function fill() { for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = ICON[el.dataset.icon] || ""; }
 
@@ -331,7 +331,7 @@
           ${ref !== null ? `<span class="small muted ref-note">средно ${pct(ref)}</span>` : ""}</div>`;
       }
     }
-    return out + `<p class="section-note">Дял от отговорилите. Тези показатели не влизат в индекса – те са фактите зад него.</p></div>`;
+    return out + `<p class="section-note">Дял от отговорилите. Не влизат в индекса – това са фактите зад него.</p></div>`;
   }
 
   function wellbeingBlock(level, u) {
@@ -341,14 +341,14 @@
     const refC = level === "system" ? null : nationalContrast(level, u.stage);
     let out = `<h2>Състояние на децата</h2><div class="grid grid-2">`;
     if (lw) {
-      out += `<div class="card flat stat"><span class="small muted">Ниско благополучие (WHO-5 ≤ 50)</span><b>${pct(lw.share)}</b>
+      out += `<div class="card flat stat"><span class="small muted">Ниско благополучие (WHO-5 до 50)</span><b>${pct(lw.share)}</b>
         <span class="small">${refLw !== null ? `при ${pct(refLw)} средно за страната · ` : ""}ученици 5–12 клас, ${lw.n} отговора</span>
-        <p class="ev">Валидиран скрининг на СЗО. Не е диагноза, но под 50 се препоръчва разговор със специалист.</p></div>`;
+        <p class="ev">Въпросник на СЗО. Не е диагноза, но при резултат до 50 е добре детето да поговори със специалист.</p></div>`;
     }
     if (c) {
-      out += `<div class="card flat stat"><span class="small muted">Ефект на учебното време</span><b>${c.symptom_delta > 0 ? "+" : ""}${fmt(c.symptom_delta)}</b>
-        <span class="small">точки по-чести симптоми в учебни седмици спрямо ваканция (95% интервал ${fmt(c.lo)}–${fmt(c.hi)})${refC !== null ? ` · средно ${fmt(refC)}` : ""}</span>
-        <p class="ev">${c.share_worse !== null ? `${pct(c.share_worse)} от децата са по-зле в учебно време. ` : ""}${c.sleep_lost_h !== null ? `Сън: ${fmt(c.sleep_lost_h, 1)} ч по-малко на нощ в учебни дни.` : ""}</p></div>`;
+      out += `<div class="card flat stat"><span class="small muted">Учебно време срещу ваканция</span><b>${c.symptom_delta > 0 ? "+" : ""}${fmt(c.symptom_delta)}</b>
+        <span class="small">точки повече оплаквания, когато има училище (95% интервал ${fmt(c.lo)}–${fmt(c.hi)})${refC !== null ? ` · средно за страната ${fmt(refC)}` : ""}</span>
+        <p class="ev">${c.share_worse !== null ? `${pct(c.share_worse)} от децата са по-зле, когато има училище. ` : ""}${c.sleep_lost_h !== null ? `В учебни дни спят средно ${fmt(c.sleep_lost_h, 1)} ч по-малко.` : ""}</p></div>`;
     }
     return out + `</div>`;
   }
@@ -371,7 +371,7 @@
       setDemo(d.demo);
       $("sig-meta").textContent = `${waveTitle()} · ${d.count} ${d.count === 1 ? "единица" : "единици"} със сигнали · ${whoLabel()}`;
       const LV = { school: "Училище", class: "Клас", teacher: "Учител", region: "Регион" };
-      const title = (g) => (g.kind === "contrast" ? "Ефект на учебното време" : indMeta(g.indicator).label);
+      const title = (g) => (g.kind === "contrast" ? "По-зле, когато има училище" : indMeta(g.indicator).label);
       // overview: how many units carry each signal, highest priority first
       const tally = new Map();
       for (const u of d.units) for (const g of u.signals) {

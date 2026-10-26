@@ -417,7 +417,8 @@ function indicators(a: Answers, role: string, grade: number, q: Questionnaire): 
     labelled_aggression_disputed: !has('CD06') || n('CD06') === 3 ? null : +in_('CD06', [1, 2]),
     recess_removed: !has('CD08') || n('CD08') === 3 ? null : +in_('CD08', [1, 2]),
     bullying_repeated: !has('SF01') ? null : +(n('SF01') >= 2),
-    psychosomatic_often: !has('WB01') ? null : +(n('WB01') >= (young ? 2 : 3)),
+    // weekly or more often in school weeks (SC01); the short grade-4 form asks WB01 instead
+    psychosomatic_often: isNum(a.SC01_S) ? +((a.SC01_S as number) >= 2) : !has('WB01') ? null : +(n('WB01') >= (young ? 2 : 3)),
     shouting_weekly: atLeast(a, 'HP01', 2),
     class_punishment: atLeast(a, 'HP02', 1),
     threats_weekly: atLeast(a, 'HP03', 2),
