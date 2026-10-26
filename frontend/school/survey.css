@@ -1,0 +1,115 @@
+/* Survey: one question per screen, thumb-friendly on phones, keyboard-friendly on desktop. */
+body.sv { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body.sv main { flex: 1; padding: 0; display: flex; flex-direction: column; }
+
+.sv-screen { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 28px 0 40px; }
+.sv-screen .narrow { width: 100%; }
+
+/* code entry */
+.code-box { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.code-input { font: 700 1.5rem/1 var(--mono) !important; letter-spacing: .14em; text-transform: uppercase; text-align: center;
+  min-height: 62px !important; flex: 1 1 260px; max-width: 100%; }
+.code-input::placeholder { color: var(--line-2); letter-spacing: .14em; }
+.code-box .btn { min-height: 62px; flex: 1 1 140px; font-size: 1.05rem; }
+.trust { display: grid; gap: 12px; margin-top: 26px; }
+.trust div { display: flex; gap: 12px; align-items: flex-start; color: var(--ink-2); font-size: .95rem; }
+.trust svg { width: 22px; height: 22px; color: var(--primary); flex: none; margin-top: 1px; }
+.demo-pick { margin-top: 14px; display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+.demo-pick .btn { grid-column: 1 / -1; }
+
+/* intro */
+.intro-meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 18px; }
+.intro-list { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 12px; }
+.intro-list li { display: flex; gap: 12px; color: var(--ink-2); }
+.intro-list svg { width: 22px; height: 22px; color: var(--primary); flex: none; margin-top: 1px; }
+
+/* question screen */
+.sv-bar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.sv-bar .narrow { display: flex; align-items: center; gap: 10px; min-height: 58px; }
+.icon-btn { appearance: none; width: 44px; height: 44px; border-radius: 12px; border: 0; background: transparent; color: var(--ink);
+  display: grid; place-items: center; cursor: pointer; flex: none; }
+.icon-btn:hover { background: var(--bg-2); }
+.icon-btn:disabled { opacity: .3; cursor: default; background: none; }
+.icon-btn svg { width: 24px; height: 24px; }
+.sv-where { flex: 1; min-width: 0; }
+.sv-section { font-size: .8rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-progress { height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.sv-progress > i { display: block; height: 100%; width: 0; background: var(--primary); border-radius: 6px; transition: width .35s ease; }
+.sv-left { font-size: .82rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.sv-stage { flex: 1; display: flex; flex-direction: column; padding: 8px 0 28px; }
+.sv-q { animation: qin .22s ease both; }
+.sv-q.back { animation-name: qback; }
+@keyframes qin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes qback { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+.who { display: inline-flex; align-items: center; gap: 8px; margin: 10px 0 12px; padding: 6px 12px 6px 6px; border-radius: 99px;
+  background: var(--primary-soft); color: var(--ink); font-size: .9rem; font-weight: 600; max-width: 100%; }
+.who .av { width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: var(--primary-ink); display: grid; place-items: center; font-size: .8rem; font-weight: 750; flex: none; }
+.who span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-text { font-size: clamp(1.3rem, 4.6vw, 1.65rem); font-weight: 680; line-height: 1.32; letter-spacing: -.01em; margin: 14px 0 6px; }
+.q-hint { color: var(--muted); font-size: .92rem; margin: 0 0 6px; }
+
+.opts { display: grid; gap: 10px; margin-top: 18px; }
+.opt { appearance: none; width: 100%; text-align: left; font: 500 1.06rem/1.35 var(--font); color: var(--ink); background: var(--card);
+  border: 1.5px solid var(--line-2); border-radius: 14px; padding: 14px 16px; min-height: 56px; display: flex; align-items: center; gap: 14px;
+  cursor: pointer; transition: border-color .12s, background .12s, transform .08s, box-shadow .12s; -webkit-tap-highlight-color: transparent; }
+.opt:hover { border-color: var(--primary-line); }
+.opt:active { transform: scale(.99); }
+.opt .mark { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line-2); flex: none; display: grid; place-items: center; transition: all .12s; }
+.opt.multi .mark { border-radius: 7px; }
+.opt .mark svg { width: 15px; height: 15px; opacity: 0; color: var(--primary-ink); }
+.opt[aria-checked="true"] { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 1px var(--primary) inset; }
+.opt[aria-checked="true"] .mark { background: var(--primary); border-color: var(--primary); }
+.opt[aria-checked="true"] .mark svg { opacity: 1; }
+.opt .lbl { flex: 1; }
+.opt kbd { display: none; font: 600 .78rem/1 var(--mono); color: var(--muted); border: 1px solid var(--line-2); border-radius: 6px; padding: 4px 6px; }
+@media (hover: hover) and (pointer: fine) { .opt kbd { display: inline-block; } }
+.opts-alt { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line-2); }
+.opt.alt { width: auto; min-height: 44px; padding: 9px 14px; font-size: .95rem; color: var(--ink-2); border-style: dashed; border-radius: 99px; }
+.opt.alt .mark { width: 18px; height: 18px; }
+.opt.alt .mark svg { width: 11px; height: 11px; }
+
+/* kids (grade 4): big emoji tiles */
+.opts.faces { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.opt.face { flex-direction: column; justify-content: center; text-align: center; gap: 8px; padding: 16px 8px; min-height: 128px; }
+.opt.face .emo { font-size: 2.8rem; line-height: 1; transition: transform .15s; }
+.opt.face[aria-checked="true"] .emo { transform: scale(1.12); }
+.opt.face .mark { display: none; }
+.opt.face kbd { position: absolute; }
+.opt.face .lbl { flex: none; font-weight: 600; }
+
+.q-actions { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
+.q-actions .btn { min-width: 150px; }
+.q-actions .spacer { flex: 1; }
+.kbd-help { display: none; color: var(--muted); font-size: .82rem; margin-top: 18px; }
+@media (hover: hover) and (pointer: fine) { .kbd-help { display: block; } }
+.kbd-help kbd { font: 600 .76rem/1 var(--mono); border: 1px solid var(--line-2); border-radius: 5px; padding: 2px 5px; }
+
+.counter { text-align: right; color: var(--muted); font-size: .82rem; margin-top: 6px; }
+
+/* support notice */
+.support { background: var(--primary-soft); border: 1px solid var(--primary-line); border-radius: var(--radius); padding: 22px; margin-top: 16px; }
+.support .big { display: flex; align-items: center; gap: 12px; margin-top: 14px; font-size: 1.6rem; font-weight: 800; letter-spacing: .02em; color: var(--primary); text-decoration: none; }
+.support svg { width: 28px; height: 28px; }
+
+/* review + done */
+.done-mark { width: 74px; height: 74px; border-radius: 50%; background: var(--primary); color: var(--primary-ink); display: grid; place-items: center; margin-bottom: 18px;
+  animation: pop .4s cubic-bezier(.2, 1.4, .4, 1) both; }
+.done-mark svg { width: 38px; height: 38px; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.stat-row { display: flex; gap: 28px; margin: 6px 0 22px; flex-wrap: wrap; }
+.stat-row b { display: block; font-size: 1.7rem; font-variant-numeric: tabular-nums; }
+.stat-row span { color: var(--muted); font-size: .88rem; }
+.skipped { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; }
+.skipped button { appearance: none; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  font: inherit; font-size: .92rem; color: var(--ink-2); cursor: pointer; }
+.skipped button:hover { border-color: var(--primary-line); color: var(--ink); }
+
+.demo-flag { background: var(--ok-soft); color: var(--ink); text-align: center; font-size: .85rem; padding: 6px 12px; border-bottom: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); }
+
+@media (min-width: 760px) {
+  .sv-stage { padding-top: 28px; }
+  .q-text { margin-top: 20px; }
+}

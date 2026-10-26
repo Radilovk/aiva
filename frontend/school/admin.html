@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Администрация · Глас за училището</title>
+<link rel="stylesheet" href="sf.css">
+<style>
+  .adm h2 { margin-top: 34px; }
+  .waves .w { display: grid; grid-template-columns: 1fr auto; gap: 8px 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .waves .w:last-child { border-bottom: 0; }
+  .waves .nm { font-weight: 650; }
+  .waves .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .form-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .roster { display: grid; gap: 8px; margin-top: 8px; }
+  .roster .r { display: grid; grid-template-columns: 1.3fr 1fr auto auto; gap: 8px; align-items: center; }
+  @media (max-width: 640px) { .roster .r { grid-template-columns: 1fr 1fr; } }
+  .roster label.ct { display: flex; gap: 6px; align-items: center; font-size: .88rem; white-space: nowrap; }
+  .keyout { font-family: var(--mono); word-break: break-all; background: var(--bg-2); padding: 12px; border-radius: 10px; }
+  /* printable code slips */
+  #slips { display: none; }
+  .slip { border: 1.5px dashed #999; border-radius: 10px; padding: 14px 16px; break-inside: avoid; font-size: 12pt; color: #000; background: #fff; }
+  .slip .c { font: 700 18pt/1.2 var(--mono); letter-spacing: .08em; margin: 6px 0; }
+  .slip .u { font-size: 10pt; }
+  .slip .p { font-size: 9pt; color: #444; margin-top: 6px; }
+  @media print {
+    body > *:not(#slips) { display: none !important; }
+    #slips { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8mm; padding: 6mm; }
+    @page { margin: 10mm; }
+  }
+</style>
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="./"><span class="brand-mark" data-icon="mark"></span><span class="brand-name">Глас за училището</span></a>
+    <nav class="site-nav"><a href="results.html">Резултати</a><a href="admin.html" aria-current="page">Администрация</a></nav>
+  </div>
+</header>
+<main class="adm">
+  <div class="wrap">
+    <section id="v-login">
+      <div class="narrow" style="padding:0">
+        <h1>Администрация</h1>
+        <p class="ink2">За оператора на платформата. Ключът се задава като тайна на Worker-а (<code>SF_ADMIN_KEY</code>).</p>
+        <form class="card" id="login-form">
+          <label class="field"><span>Администраторски ключ</span><input type="password" id="admin-key" autocomplete="off" spellcheck="false"></label>
+          <div class="row" style="margin-top:14px"><button class="btn">Влез</button></div>
+          <div class="err" id="login-err" hidden></div>
+        </form>
+      </div>
+    </section>
+
+    <section id="v-main" hidden>
+      <div class="row"><h1 style="margin:0">Администрация</h1><span class="spacer"></span><button class="btn quiet small" id="logout">Изход</button></div>
+
+      <h2>Вълни</h2>
+      <div class="card">
+        <div class="waves" id="waves"></div>
+        <form class="row" id="wave-form" style="margin-top:14px">
+          <input type="text" id="wave-id" placeholder="Идентификатор, напр. 2027-пролет" style="flex:1 1 200px" required>
+          <input type="text" id="wave-title" placeholder="Заглавие, напр. Пролет 2027" style="flex:1 1 200px">
+          <button class="btn small">Нова вълна</button>
+        </form>
+      </div>
+
+      <h2>Клас и кодове</h2>
+      <form class="card" id="class-form">
+        <div class="form-grid">
+          <label class="field"><span>Вълна</span><select id="c-wave" required></select></label>
+          <label class="field"><span>Регион</span><input type="text" id="c-region-name" placeholder="София-град" required></label>
+          <label class="field"><span>Училище</span><input type="text" id="c-school-name" placeholder="125 СУ „Боян Пенев“" required></label>
+          <label class="field"><span>Клас</span><input type="text" id="c-class-name" placeholder="6А" required></label>
+          <label class="field"><span>Година (1–12)</span><input type="number" id="c-grade" min="1" max="12" value="6" required></label>
+          <label class="field"><span>Ученици в класа</span><input type="number" id="c-size" min="1" max="60" value="24" required></label>
+          <label class="field"><span>Кодове за родители</span><input type="number" id="c-np" min="0" max="80" value="24"></label>
+          <label class="field"><span>Кодове за ученици</span><input type="number" id="c-ns" min="0" max="80" value="24"></label>
+        </div>
+        <h3 style="margin-top:20px">Учители на класа</h3>
+        <p class="small muted" style="margin:0">Учениците оценяват класния ръководител и двама други учители, избрани от системата. Учителският модул е само за училища, които сами го заявят.</p>
+        <div class="roster" id="roster"></div>
+        <div class="row" style="margin-top:10px"><button class="btn quiet small" type="button" id="add-teacher">+ Учител</button></div>
+        <div class="row" style="margin-top:18px"><button class="btn">Създай кодове</button></div>
+        <div class="err" id="class-err" hidden></div>
+      </form>
+      <div class="card" id="codes-out" hidden style="margin-top:14px"></div>
+
+      <h2>Ключове за достъп</h2>
+      <div class="card">
+        <form class="form-grid" id="key-form">
+          <label class="field"><span>Роля</span><select id="k-scope">
+            <option value="school_admin">Директор (едно училище)</option><option value="teacher">Учител (само своите резултати)</option>
+            <option value="researcher">Изследовател (класове, без учители)</option><option value="admin">Администратор</option></select></label>
+          <label class="field" id="k-school-f"><span>Училище (идентификатор)</span><input type="text" id="k-school" placeholder="от списъка по-долу"></label>
+          <label class="field" id="k-teacher-f" hidden><span>Учител (идентификатор)</span><input type="text" id="k-teacher"></label>
+          <label class="field"><span>Етикет</span><input type="text" id="k-label" placeholder="напр. Директор 125 СУ"></label>
+          <div class="field" style="align-self:end"><button class="btn small">Създай ключ</button></div>
+        </form>
+        <div id="key-out" style="margin-top:14px" hidden></div>
+        <table class="t" style="margin-top:14px"><thead><tr><th>Етикет</th><th>Роля</th><th>Обхват</th><th></th></tr></thead><tbody id="keys"></tbody></table>
+      </div>
+
+      <h2>Демо данни</h2>
+      <div class="card">
+        <p class="ink2">Две симулирани вълни (15 училища в 3 региона), ясно отбелязани като демо, за да се види порталът преди първите истински отговори. Изтриват се от списъка с вълни.</p>
+        <button class="btn secondary" id="demo-btn">Генерирай демо данни</button>
+      </div>
+    </section>
+  </div>
+</main>
+<div id="slips"></div>
+<script src="sf.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

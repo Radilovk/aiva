@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12151a" media="(prefers-color-scheme: dark)">
+<meta name="referrer" content="no-referrer">
+<title>Глас за училището</title>
+<meta name="description" content="Анонимна обратна връзка от родители и ученици за натоварването, съня, благополучието, преподаването и климата в училище.">
+<link rel="stylesheet" href="sf.css">
+<style>
+  .hero { padding: 40px 0 10px; display: grid; gap: 28px; align-items: center; }
+  .hero p.lead { font-size: 1.15rem; color: var(--ink-2); max-width: 620px; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+  .cta .btn { min-height: 54px; padding: 14px 24px; font-size: 1.05rem; }
+  .art { display: none; }
+  @media (min-width: 900px) { .hero { grid-template-columns: 1.2fr 1fr; padding-top: 64px; } .art { display: block; } }
+  .art .card { padding: 26px; }
+  .art .row-s { display: grid; grid-template-columns: 1fr 140px 40px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
+  .art .row-s:last-child { border-bottom: 0; }
+  .art .row-s b { text-align: right; font-variant-numeric: tabular-nums; }
+  .feat { margin-top: 56px; }
+  .feat .card h3 { display: flex; gap: 10px; align-items: center; }
+  .feat .card svg { width: 22px; height: 22px; color: var(--primary); }
+  .feat .card p { color: var(--ink-2); margin: 0; font-size: .96rem; }
+  .steps { counter-reset: s; list-style: none; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .steps li { counter-increment: s; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; color: var(--ink-2); }
+  .steps li::before { content: counter(s); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-weight: 750; margin-bottom: 10px; }
+  .steps b { color: var(--ink); }
+</style>
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="./"><span class="brand-mark" data-icon="mark"></span><span class="brand-name">Глас за училището</span></a>
+    <nav class="site-nav"><a href="survey.html">Анкета</a><a href="results.html">Резултати</a></nav>
+  </div>
+</header>
+<main>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <span class="chip primary">Анонимно · за родители и ученици</span>
+        <h1 style="margin-top:14px">Как наистина е в училище?</h1>
+        <p class="lead">Кратка анкета за натоварването, съня, благополучието, преподаването и отношенията в училище. Отговорите се превръщат в честни, обобщени резултати за класа, училището и страната.</p>
+        <div class="cta">
+          <a class="btn" href="survey.html">Попълни анкетата</a>
+          <a class="btn secondary" href="results.html">Виж резултатите</a>
+        </div>
+        <p class="small muted" style="margin-top:14px">Нямате код? <a href="survey.html?demo">Разгледайте пробната анкета</a> – нищо не се записва.</p>
+      </div>
+      <div class="art" aria-hidden="true">
+        <div class="card">
+          <div class="small muted" style="font-weight:650;margin-bottom:8px">Примерно училище</div>
+          <div class="row-s"><span>Натоварване</span><div class="ci"><div class="rng" style="left:58%;width:10%"></div><div class="ref" style="left:66%"></div><div class="dot" style="left:63%"></div></div><b>63</b></div>
+          <div class="row-s"><span>Сън и свободно време</span><div class="ci"><div class="rng" style="left:72%;width:8%"></div><div class="ref" style="left:70%"></div><div class="dot" style="left:76%"></div></div><b>76</b></div>
+          <div class="row-s"><span>Благополучие</span><div class="ci"><div class="rng" style="left:64%;width:9%"></div><div class="ref" style="left:67%"></div><div class="dot" style="left:68%"></div></div><b>68</b></div>
+          <div class="row-s"><span>Безопасност</span><div class="ci"><div class="rng" style="left:78%;width:8%"></div><div class="ref" style="left:71%"></div><div class="dot" style="left:82%"></div></div><b>82</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="feat grid grid-3">
+      <div class="card flat"><h3><span data-icon="shield"></span>Наистина анонимно</h3><p>Без имена, имейли и телефони. Кодът от листчето показва само класа и ролята и се използва веднъж.</p></div>
+      <div class="card flat"><h3><span data-icon="chart"></span>Честна статистика</h3><p>Всеки резултат идва с интервал на несигурност, а малките групи не се показват. Мястото е диапазон, не точна позиция.</p></div>
+      <div class="card flat"><h3><span data-icon="heart"></span>Не за наказание</h3><p>Резултатите за конкретен учител са поверителни – виждат ги само той и директорът. Целта е подобрение.</p></div>
+    </section>
+
+    <h2 style="margin-top:56px">Как работи</h2>
+    <ol class="steps">
+      <li><b>Училището раздава листчета</b> с кодове – по един за всеки родител и ученик. Никой не знае кой какъв код е взел.</li>
+      <li><b>Попълвате за около 8 минути</b> от телефон или компютър. Виждате само въпросите за вашата роля и клас.</li>
+      <li><b>Резултатите се изчисляват</b> обобщено за класа, училището, региона и страната – с интервали и сравнение със средното.</li>
+      <li><b>Публично излизат само обобщени данни</b> за училища и региони. Резултатите за класове и учители са поверителни и се виждат само с ключ.</li>
+    </ol>
+  </div>
+</main>
+<footer class="site-foot"><div class="wrap">Ако някой те тормози или ти е тежко, обади се безплатно на Националната телефонна линия за деца <a href="tel:116111"><b>116 111</b></a>.</div></footer>
+<script src="sf.js"></script>
+<script>for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = SF.ICON[el.dataset.icon] || "";</script>
+</body>
+</html>

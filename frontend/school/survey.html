@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12151a" media="(prefers-color-scheme: dark)">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Анкета · Глас за училището</title>
+<link rel="stylesheet" href="sf.css">
+<link rel="stylesheet" href="survey.css">
+</head>
+<body class="sv">
+<div class="demo-flag" id="demo-flag" hidden>Пробен режим – отговорите не се записват и не влизат в резултатите.</div>
+<main>
+  <!-- 1. code -->
+  <section class="sv-screen" id="s-code">
+    <div class="narrow">
+      <a class="brand" href="./" style="margin-bottom:28px"><span class="brand-mark" id="brand-mark"></span><span>Глас за училището</span></a>
+      <h1>Как е в училище?</h1>
+      <p class="ink2">Въведете кода от листчето, което получихте от училището. Анкетата е анонимна и отнема около 8 минути.</p>
+      <form id="code-form" class="code-box" autocomplete="off" novalidate>
+        <label class="sr-only" for="code">Код за достъп</label>
+        <input id="code" class="code-input" type="text" inputmode="text" autocapitalize="characters" spellcheck="false"
+               placeholder="XXXX-XXXX-XXXX" maxlength="16" aria-describedby="code-err">
+        <button class="btn" type="submit" id="code-btn">Започни</button>
+      </form>
+      <div id="code-err" class="err" role="alert" hidden></div>
+
+      <div class="trust" id="trust"></div>
+
+      <details class="explain" id="demo-box">
+        <summary>Нямате код? Разгледайте пробната анкета</summary>
+        <p class="small muted" style="margin-top:10px">Ще видите същите въпроси, но нищо няма да бъде записано.</p>
+        <div class="demo-pick">
+          <label class="field"><span>Попълвам като</span>
+            <select id="demo-role"><option value="parent">родител</option><option value="student">ученик</option></select></label>
+          <label class="field"><span>Клас</span><select id="demo-grade"></select></label>
+          <button class="btn secondary" type="button" id="demo-btn">Към пробната анкета</button>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- 2. intro -->
+  <section class="sv-screen" id="s-intro" hidden>
+    <div class="narrow">
+      <h1 id="intro-title"></h1>
+      <div class="intro-meta" id="intro-meta"></div>
+      <ul class="intro-list" id="intro-list"></ul>
+      <div class="note" id="consent-box" hidden>
+        <label class="check"><input type="checkbox" id="consent">
+          <span>Аз съм родител на детето и разрешавам да попълни анкетата. Няма да виждам отговорите му.</span></label>
+      </div>
+      <div class="q-actions"><button class="btn" id="start-btn">Започни <span id="start-icon"></span></button></div>
+      <div id="intro-err" class="err" role="alert" hidden></div>
+    </div>
+  </section>
+
+  <!-- 3. questions -->
+  <section id="s-q" hidden style="flex:1;display:flex;flex-direction:column">
+    <div class="sv-bar">
+      <div class="narrow">
+        <button class="icon-btn" id="back-btn" aria-label="Предишен въпрос"></button>
+        <div class="sv-where">
+          <div class="sv-section" id="sec"></div>
+          <div class="sv-progress" role="progressbar" aria-label="Напредък" aria-valuemin="0" aria-valuemax="100" id="prog"><i></i></div>
+        </div>
+        <div class="sv-left" id="left"></div>
+      </div>
+    </div>
+    <div class="sv-stage">
+      <div class="narrow" id="stage" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- 4. review -->
+  <section class="sv-screen" id="s-review" hidden>
+    <div class="narrow">
+      <h1>Почти готово</h1>
+      <div class="stat-row" id="review-stats"></div>
+      <div id="review-skipped"></div>
+      <div class="q-actions">
+        <button class="btn" id="submit-btn">Изпрати отговорите</button>
+        <button class="btn quiet" id="review-back">Назад</button>
+      </div>
+      <div id="submit-err" class="err" role="alert" hidden></div>
+      <p class="small muted" style="margin-top:18px">След изпращане отговорите не могат да се променят. Кодът спира да работи.</p>
+    </div>
+  </section>
+
+  <!-- 5. done -->
+  <section class="sv-screen" id="s-done" hidden>
+    <div class="narrow">
+      <div class="done-mark" id="done-mark"></div>
+      <h1 id="done-title">Благодарим ви!</h1>
+      <p class="ink2" id="done-text"></p>
+      <div class="support" id="done-support" hidden></div>
+      <div class="q-actions"><a class="btn secondary" href="results.html" id="done-link">Вижте публикуваните резултати</a></div>
+    </div>
+  </section>
+</main>
+<script src="sf.js"></script>
+<script src="survey.js"></script>
+</body>
+</html>

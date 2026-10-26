@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import secrets
 import threading
@@ -32,9 +31,6 @@ from urllib.parse import parse_qs, urlparse
 import engine as E
 
 Q = E.load_questionnaire()
-WEB = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web"))
-MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
-        ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml"}
 LEVELS = ("system", "region", "school", "class", "teacher")
 LOCK = threading.Lock()
 
@@ -147,21 +143,6 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("body too large")
         return json.loads(self.rfile.read(n) or b"{}")
 
-    def _static(self, parts: list[str]):
-        """Serves the website from web/ (survey app and results portal). No directory traversal."""
-        name = "/".join(parts) or "index.html"
-        path = os.path.realpath(os.path.join(WEB, name))
-        if not path.startswith(WEB + os.sep) or not os.path.isfile(path):
-            return self._send(404, {"error": "not found"})
-        with open(path, "rb") as f:
-            data = f.read()
-        self.send_response(200)
-        self.send_header("Content-Type", MIME.get(os.path.splitext(path)[1], "application/octet-stream"))
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.end_headers()
-        self.wfile.write(data)
-
     def _key(self) -> dict:
         return S.keys.get(self.headers.get("X-API-Key", ""), {"scope": "public"})
 
@@ -177,8 +158,6 @@ class Handler(BaseHTTPRequestHandler):
             u = urlparse(self.path)
             parts = [p for p in u.path.split("/") if p]
             qs = parse_qs(u.query)
-            if not parts or parts[0] != "v1":
-                return self._static(parts)
             key = self._key()
             if parts == ["v1", "questionnaire"]:
                 return self._send(200, {k: v for k, v in Q.items() if not k.startswith("_")})

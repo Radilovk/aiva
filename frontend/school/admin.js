@@ -1,0 +1,172 @@
+// Operator console: waves, classes + one-time codes (printable slips), access keys, demo data.
+"use strict";
+
+(function () {
+  const { api, esc, store, toast, ICON } = window.SF;
+  const $ = (id) => document.getElementById(id);
+  const ses = store("session");
+  const loc = store("local");   // known school ids, for the key form (no personal data)
+  let KEY = ses.get("sf-admin") || "";
+
+  for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = ICON[el.dataset.icon] || "";
+
+  /** Stable ids from names, so the same school keeps its id (and its trend) across waves. */
+  const slug = (s) => String(s || "").toLowerCase().replace(/[„“"'«»]/g, "").trim().replace(/\s+/g, "-").replace(/[^\p{L}\p{N}_.-]/gu, "").slice(0, 60);
+  const SCOPE = { school_admin: "Директор", teacher: "Учител", researcher: "Изследовател", admin: "Администратор" };
+
+  async function call(path, opts = {}) { return api(path, { ...opts, key: KEY }); }
+
+  // ------------------------------------------------------------------ login
+  $("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    KEY = $("admin-key").value.trim();
+    try { await enter(); ses.set("sf-admin", KEY); }
+    catch (err) { $("login-err").textContent = err.message; $("login-err").hidden = false; KEY = ""; }
+  });
+  $("logout").addEventListener("click", () => { ses.del("sf-admin"); KEY = ""; location.reload(); });
+
+  async function enter() {
+    await loadWaves();
+    $("v-login").hidden = true;
+    $("v-main").hidden = false;
+    loadKeys();
+    if (!$("roster").children.length) { addTeacher({ is_class_teacher: true }); addTeacher(); addTeacher(); }
+  }
+
+  // ------------------------------------------------------------------ waves
+  async function loadWaves() {
+    const { waves } = await call("/admin/waves");
+    $("waves").innerHTML = waves.length ? waves.slice().reverse().map((w) => `<div class="w" data-id="${esc(w.id)}">
+      <div><div class="nm">${esc(w.title)} ${w.demo ? '<span class="chip">демо</span>' : ""} ${w.open ? '<span class="chip primary">отворена</span>' : '<span class="chip">затворена</span>'}</div>
+        <div class="small muted">${esc(w.id)} · ${w.classes} класа · кодове ${w.used}/${w.codes} използвани · ${w.responses} отговора${w.computed_at ? " · изчислена " + esc(w.computed_at) : ""}</div>
+        ${w.meta?.campaign_alerts?.length ? `<div class="small err">Внимание: еднакви отговори в ${w.meta.campaign_alerts.map((a) => esc(a.unit_id)).join(", ")} – прегледайте преди публикуване.</div>` : ""}</div>
+      <div class="acts">
+        ${w.demo ? "" : `<button class="btn small" data-act="compute">Изчисли</button><button class="btn small secondary" data-act="toggle">${w.open ? "Затвори" : "Отвори"}</button>`}
+        <button class="btn small quiet" data-act="delete">Изтрий</button></div></div>`).join("")
+      : `<p class="muted" style="margin:0">Още няма вълни. Създайте първата по-долу.</p>`;
+    for (const row of $("waves").querySelectorAll(".w")) {
+      const id = row.dataset.id, w = waves.find((x) => x.id === id);
+      row.querySelector('[data-act="compute"]')?.addEventListener("click", async (e) => {
+        e.target.disabled = true; e.target.textContent = "Изчисляване…";
+        try { const r = await call(`/admin/waves/${encodeURIComponent(id)}/compute`, { method: "POST" }); toast(`Изчислено: ${r.meta.included} от ${r.meta.responses} отговора.`); }
+        catch (err) { toast(err.message); }
+        loadWaves();
+      });
+      row.querySelector('[data-act="toggle"]')?.addEventListener("click", async () => { await call(`/admin/waves/${encodeURIComponent(id)}/open`, { method: "POST", body: { open: !w.open } }); loadWaves(); });
+      row.querySelector('[data-act="delete"]').addEventListener("click", async () => {
+        if (!confirm(`Изтриване на „${w.title}“ с всички кодове, отговори и резултати? Това не може да се отмени.`)) return;
+        await call(`/admin/waves/${encodeURIComponent(id)}`, { method: "DELETE" }); toast("Изтрито."); loadWaves();
+      });
+    }
+    const open = waves.filter((w) => !w.demo);
+    $("c-wave").innerHTML = open.map((w) => `<option value="${esc(w.id)}">${esc(w.title)}</option>`).join("") || `<option value="">първо създайте вълна</option>`;
+  }
+
+  $("wave-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = slug($("wave-id").value);
+    try { await call("/admin/waves", { method: "POST", body: { id, title: $("wave-title").value.trim() || $("wave-id").value.trim() } }); $("wave-form").reset(); loadWaves(); }
+    catch (err) { toast(err.message); }
+  });
+
+  // ------------------------------------------------------------------ class + codes
+  function addTeacher(t = {}) {
+    const r = document.createElement("div");
+    r.className = "r";
+    r.innerHTML = `<input type="text" placeholder="Име, напр. г-жа Иванова" value="${esc(t.name || "")}" data-f="name">
+      <input type="text" placeholder="Предмет" value="${esc(t.subject || "")}" data-f="subject">
+      <label class="ct"><input type="radio" name="ct" ${t.is_class_teacher ? "checked" : ""}> класен</label>
+      <button class="btn quiet small" type="button" aria-label="Премахни">${ICON.x}</button>`;
+    r.querySelector("button").addEventListener("click", () => r.remove());
+    $("roster").appendChild(r);
+  }
+  $("add-teacher").addEventListener("click", () => addTeacher());
+
+  $("class-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("class-err").hidden = true;
+    const regionName = $("c-region-name").value.trim(), schoolName = $("c-school-name").value.trim(), className = $("c-class-name").value.trim();
+    const regionId = slug(regionName), schoolId = slug(schoolName), classId = `${schoolId}-${slug(className)}`;
+    const roster = [...$("roster").children].map((r) => ({
+      name: r.querySelector('[data-f="name"]').value.trim(), subject: r.querySelector('[data-f="subject"]').value.trim(),
+      is_class_teacher: r.querySelector('input[type="radio"]').checked,
+    })).filter((t) => t.name).map((t) => ({ ...t, teacher_id: `${schoolId}-${slug(t.name)}` }));
+    const body = { wave: $("c-wave").value, region_id: regionId, region_name: regionName, school_id: schoolId, school_name: schoolName,
+      class_id: classId, class_name: className, grade: Number($("c-grade").value), class_size: Number($("c-size").value),
+      n_parent: Number($("c-np").value), n_student: Number($("c-ns").value), roster };
+    try {
+      const r = await call("/admin/classes", { method: "POST", body });
+      const schools = loc.get("sf-schools") || {};
+      schools[schoolId] = schoolName;
+      loc.set("sf-schools", schools);
+      showCodes(body, r.codes);
+      loadWaves();
+    } catch (err) { $("class-err").textContent = err.message; $("class-err").hidden = false; }
+  });
+
+  function showCodes(c, codes) {
+    const url = new URL("survey.html", location.href).href.replace(/^https?:\/\//, "");
+    const all = [...codes.parent.map((k) => ["родител", k]), ...codes.student.map((k) => ["ученик", k])];
+    $("codes-out").hidden = false;
+    $("codes-out").innerHTML = `<h3 style="margin-top:0">${all.length} кода за ${esc(c.class_name)} · ${esc(c.school_name)}</h3>
+      <p class="ink2 small">Показват се само сега – сървърът пази единствено хешовете им. Отпечатайте листчетата, разрежете ги и ги раздайте разбъркано, така че никой да не знае кой какъв код е взел.</p>
+      <div class="row"><button class="btn" id="print-btn">Отпечатай листчета</button><button class="btn secondary" id="copy-btn">Копирай като текст</button></div>
+      <p class="small muted" style="margin:14px 0 0">Идентификатор на училището (за ключа на директора): <code>${esc(c.school_id)}</code></p>`;
+    $("slips").innerHTML = all.map(([role, k]) => `<div class="slip"><div><b>Глас за училището</b> · анкета за ${role === "родител" ? "родители" : "ученици"} · ${esc(c.class_name)}</div>
+      <div class="c">${esc(k)}</div><div class="u">Отворете <b>${esc(url)}</b> и въведете кода.</div>
+      <div class="p">Анонимно: кодът показва само класа и ролята и се използва веднъж. ${role === "ученик" && c.grade <= 7 ? "Родителят отметва съгласие преди началото." : ""}</div></div>`).join("");
+    $("print-btn").addEventListener("click", () => window.print());
+    $("copy-btn").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(all.map(([r, k]) => `${r}\t${k}`).join("\n")); toast("Копирано."); } catch (e) { toast("Копирането не е позволено от браузъра."); }
+    });
+    $("codes-out").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // ------------------------------------------------------------------ keys
+  function syncKeyForm() {
+    const s = $("k-scope").value;
+    $("k-school-f").hidden = s !== "school_admin";
+    $("k-teacher-f").hidden = s !== "teacher";
+  }
+  $("k-scope").addEventListener("change", syncKeyForm);
+  syncKeyForm();
+  const known = loc.get("sf-schools") || {};
+  if (Object.keys(known).length) {
+    const dl = document.createElement("datalist");
+    dl.id = "schools-dl";
+    dl.innerHTML = Object.entries(known).map(([id, name]) => `<option value="${esc(id)}">${esc(name)}</option>`).join("");
+    document.body.appendChild(dl);
+    $("k-school").setAttribute("list", "schools-dl");
+  }
+
+  $("key-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = { scope: $("k-scope").value, label: $("k-label").value.trim(), school_id: $("k-school").value.trim() || undefined, teacher_id: $("k-teacher").value.trim() || undefined };
+    try {
+      const r = await call("/admin/keys", { method: "POST", body });
+      $("key-out").hidden = false;
+      $("key-out").innerHTML = `<div class="note"><b>Новият ключ се показва само сега.</b> Предайте го лично на получателя.<div class="keyout" style="margin-top:10px">${esc(r.key)}</div></div>`;
+      $("key-form").reset(); syncKeyForm(); loadKeys();
+    } catch (err) { toast(err.message); }
+  });
+
+  async function loadKeys() {
+    const { keys } = await call("/admin/keys");
+    $("keys").innerHTML = keys.map((k) => `<tr><td>${esc(k.label || "–")}</td><td>${esc(SCOPE[k.scope] || k.scope)}</td><td class="small">${esc(k.school_id || k.teacher_id || "всичко")}</td>
+      <td style="text-align:right"><button class="btn quiet small" data-id="${esc(k.id)}">Отнеми</button></td></tr>`).join("") || `<tr><td colspan="4" class="muted">Няма ключове.</td></tr>`;
+    for (const b of $("keys").querySelectorAll("button[data-id]")) b.addEventListener("click", async () => {
+      if (!confirm("Да се отнеме ли този ключ?")) return;
+      await call(`/admin/keys/${b.dataset.id}`, { method: "DELETE" }); loadKeys();
+    });
+  }
+
+  // ------------------------------------------------------------------ demo
+  $("demo-btn").addEventListener("click", async (e) => {
+    e.target.disabled = true; e.target.textContent = "Генериране… (около 10 секунди)";
+    try { await call("/admin/demo", { method: "POST" }); toast("Демо данните са готови."); loadWaves(); }
+    catch (err) { toast(err.message); }
+    e.target.disabled = false; e.target.textContent = "Генерирай демо данни";
+  });
+
+  if (KEY) enter().catch(() => { ses.del("sf-admin"); KEY = ""; });
+})();
