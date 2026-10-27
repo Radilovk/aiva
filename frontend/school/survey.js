@@ -223,6 +223,10 @@
     // Children under 14: a parent unlocks the code with consent (Personal Data Protection Act).
     $("consent-box").hidden = !(s.role === "student" && s.grade <= 7);
     $("start-icon").innerHTML = ICON.next;
+    $("intro-legal").innerHTML = (s.role === "student"
+      ? "Участието е доброволно – можеш да спреш по всяко време. Отговорите ти се обработват анонимно и само обобщено."
+      : "Участието е доброволно. С попълването се съгласявате отговорите да бъдат обработени анонимно за обобщени резултати, включително въпросите за здравето.") +
+      ' <a href="privacy.html" target="_blank" rel="noopener">Как пазим данните</a>';
   }
 
   // ------------------------------------------------------------------ question flow

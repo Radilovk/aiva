@@ -82,5 +82,26 @@
     building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20.5h18M5 20.5V9.5l7-5 7 5v11"/><path d="M9 20.5v-5h6v5M9 11.5h.01M15 11.5h.01"/></svg>',
   };
 
-  window.SF = { api, ApiError, esc, fmt, pct, store, toast, plural, ICON, apiBase };
+  /** Organisation details (org.js) into [data-org]; an empty field reads "предстои", never an invented value. */
+  function fillOrg(root = document) {
+    const o = window.SF_ORG || {};
+    for (const el of root.querySelectorAll("[data-org]")) {
+      const v = o[el.dataset.org] || (el.dataset.fallback && o[el.dataset.fallback]) || "";
+      if (!v) { el.innerHTML = '<span class="todo">предстои</span>'; continue; }
+      if (/email$/.test(el.dataset.org) || /@/.test(v)) el.innerHTML = `<a href="mailto:${esc(v)}">${esc(v)}</a>`;
+      else el.textContent = v;
+    }
+    for (const el of root.querySelectorAll("[data-org-line]")) el.hidden = !o[el.dataset.orgLine];
+    for (const el of root.querySelectorAll("[data-org-href]")) { const v = o[el.dataset.orgHref]; if (v) el.href = v; else el.hidden = true; }
+  }
+
+  function fillIcons(root = document) {
+    for (const el of root.querySelectorAll("[data-icon]")) if (!el.querySelector("svg")) el.innerHTML = ICON[el.dataset.icon] || "";
+    for (const el of root.querySelectorAll("[data-i]")) if (!el.querySelector("svg")) el.insertAdjacentHTML("afterbegin", ICON[el.dataset.i] || "");
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => { fillOrg(); fillIcons(); });
+  else { fillOrg(); fillIcons(); }
+
+  window.SF = { api, ApiError, esc, fmt, pct, store, toast, plural, ICON, apiBase, fillOrg, fillIcons };
 })();

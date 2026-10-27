@@ -413,6 +413,9 @@ sf.post('/responses', async (c) => {
       .bind(resp.id, x.wave_id, JSON.stringify(resp), tt ? JSON.stringify(tt.themes) : null, tt ? JSON.stringify(tt.texts) : null,
         new Date().toISOString().slice(0, 10)),
     ...tans.map((t) => c.env.DB.prepare('INSERT INTO sf_rating_counts (teacher_id, n) VALUES (?, 1) ON CONFLICT(teacher_id) DO UPDATE SET n = n + 1').bind(t.teacher_id)),
+    // retention promised in the privacy notice: free text 12 months, raw answers 3 years (published aggregates stay)
+    c.env.DB.prepare("UPDATE sf_responses SET texts = NULL WHERE texts IS NOT NULL AND day < date('now', '-12 months')"),
+    c.env.DB.prepare("DELETE FROM sf_responses WHERE day < date('now', '-3 years')"),
   ]);
   return c.json({ status: 'recorded' }, 201);
 });
