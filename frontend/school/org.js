@@ -1,18 +1,19 @@
 // The organisation behind the platform: the one place to fill in. Every legal page reads from here.
-// Leave a field empty and the page shows "предстои" instead of inventing a value.
+// An empty field is left out of the page (lists) or shows "предстои" (in a sentence); values are never invented.
 "use strict";
 window.SF_ORG = {
-  brand: "Глас за училището",
-  legal_name: "",          // e.g. Сдружение „Глас за училището“
-  legal_form: "",          // e.g. сдружение с нестопанска цел в обществена полза
-  eik: "",                 // ЕИК по БУЛСТАТ / Търговски регистър
-  address: "",             // седалище и адрес на управление
-  representative: "",      // представляващ
-  email: "",               // общ имейл
-  privacy_email: "",       // за защита на данните
-  dpo: "",                 // длъжностно лице по защита на данните: име и имейл
+  brand: "SchoolRating.eu",
+  site: "https://schoolrating.eu",
+  legal_name: "SchoolRating.eu",
+  legal_form: "независима гражданска инициатива",
+  eik: "",                 // ЕИК по БУЛСТАТ – after the association is registered
+  address: "",             // седалище и адрес на управление – after registration
+  representative: "",      // представляващ – after registration
+  email: "info@schoolrating.eu",
+  privacy_email: "privacy@schoolrating.eu",
+  dpo: "dpo@schoolrating.eu",
   phone: "",
-  funding: "",             // източници на финансиране, ако има
+  funding: "Платформата е безплатна за родители, ученици и училища, без реклами и без продажба на данни.",
   updated: "27.10.2026",   // последна редакция на правните текстове
   source_code: "https://github.com/Radilovk/aiva",
 };

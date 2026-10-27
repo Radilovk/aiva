@@ -211,7 +211,7 @@
       ]);
       if (my !== seq) return;
       setDemo(u.demo);
-      document.title = `${u.name} · Глас за училището`;
+      document.title = `${u.name} · SchoolRating.eu`;
       $("unit").innerHTML = unitHtml(level, u, trend, themes, cmp);
       window.scrollTo(0, 0);
     } catch (e) {
@@ -367,7 +367,7 @@
   async function loadSignals() {
     const my = ++seq;
     show("v-signals");
-    document.title = "Сигнали · Глас за училището";
+    document.title = "Сигнали · SchoolRating.eu";
     const lvl = st.sigLevel;
     $("sig-wave").innerHTML = $("wave").innerHTML;
     $("sig-wave").value = st.wave;
@@ -438,7 +438,7 @@
     if (level === "signals") return allowed(TABS.at(-1)) ? loadSignals() : (openLogin("Сигналите се виждат само с ключ на инспектората, директора или учителя."), go("#/school"));
     if (level && id) return loadUnit(level, decodeURIComponent(id));
     st.level = TABS.some((t) => t.level === level && level !== "system") ? level : st.who.scope === "teacher" ? "teacher" : "school";
-    document.title = "Резултати · Глас за училището";
+    document.title = "Резултати · SchoolRating.eu";
     loadList();
   }
 

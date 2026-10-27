@@ -1,4 +1,4 @@
-// Глас за училището – shared helpers for the survey, results portal and admin pages.
+// SchoolRating.eu – shared helpers for the survey, results portal and admin pages.
 "use strict";
 
 (function () {
@@ -6,8 +6,8 @@
   const WORKER_ORIGIN = "https://aiva.radilov-k.workers.dev";
   function apiBase() {
     const h = location.hostname;
-    if (h === "localhost" || h === "127.0.0.1" || h.endsWith(".workers.dev")) return "";
-    return WORKER_ORIGIN;
+    // same origin on schoolrating.eu, *.workers.dev and locally; the old static copy on GitHub Pages calls the Worker
+    return h.endsWith("ai-kasy.online") || h.endsWith("github.io") ? WORKER_ORIGIN : "";
   }
 
   class ApiError extends Error {
@@ -87,7 +87,12 @@
     const o = window.SF_ORG || {};
     for (const el of root.querySelectorAll("[data-org]")) {
       const v = o[el.dataset.org] || (el.dataset.fallback && o[el.dataset.fallback]) || "";
-      if (!v) { el.innerHTML = '<span class="todo">предстои</span>'; continue; }
+      if (!v) {
+        const dd = el.closest("dd");
+        if (dd) { dd.hidden = true; if (dd.previousElementSibling?.tagName === "DT") dd.previousElementSibling.hidden = true; }
+        else el.innerHTML = '<span class="todo">предстои</span>';
+        continue;
+      }
       if (/email$/.test(el.dataset.org) || /@/.test(v)) el.innerHTML = `<a href="mailto:${esc(v)}">${esc(v)}</a>`;
       else el.textContent = v;
     }

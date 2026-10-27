@@ -23,7 +23,7 @@ NAV = [("./", "Начало", True), ("survey.html", "Анкета", False), ("r
 FOOT = """<footer class="site-foot">
   <div class="wrap">
     <div class="cols">
-      <div><h4>Глас за училището</h4><p style="margin:0">Независима платформа за анонимна обратна връзка от родители и ученици за училищната среда. Не е част от Министерството на образованието и науката или от регионалните управления на образованието.</p></div>
+      <div><h4>SchoolRating.eu</h4><p style="margin:0">Независима платформа за анонимна обратна връзка от родители и ученици за училищната среда. Не е част от Министерството на образованието и науката или от регионалните управления на образованието.</p></div>
       <div><h4>Платформата</h4><ul><li><a href="survey.html">Анкета</a></li><li><a href="results.html">Резултати</a></li><li><a href="methodology.html">Методология</a></li><li><a href="schools.html">За училища и РУО</a></li><li><a href="results.html#/login">Вход с ключ</a></li></ul></div>
       <div><h4>Организацията</h4><ul><li><a href="about.html">За нас</a></li><li><a href="faq.html">Въпроси и отговори</a></li><li><a href="contact.html">Контакт</a></li><li><a href="child-safety.html">Ако дете е в опасност</a></li></ul></div>
       <div><h4>Правна информация</h4><ul><li><a href="privacy.html">Поверителност и лични данни</a></li><li><a href="terms.html">Условия за ползване</a></li><li><a href="accessibility.html">Достъпност</a></li></ul></div>
@@ -40,7 +40,7 @@ def head(active: str) -> str:
     return f"""{STRIP}
 <header class="site-head">
   <div class="wrap">
-    <a class="brand" href="./"><span class="brand-mark" data-icon="mark"></span><span class="brand-name">Глас за училището<small>Обратна връзка за училищната среда</small></span></a>
+    <a class="brand" href="./"><span class="brand-mark" data-icon="mark"></span><span class="brand-name">SchoolRating.eu<small>Обратна връзка за училищната среда</small></span></a>
     <nav class="site-nav" aria-label="Основно меню">{links}</nav>"""
 
 

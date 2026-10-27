@@ -115,7 +115,7 @@
       <div class="row"><button class="btn" id="print-btn">Отпечатай листчета</button><button class="btn secondary" id="copy-btn">Копирай като текст</button></div>
       <p class="small muted" style="margin:14px 0 0">Идентификатор на училището (за ключа на директора): <code>${esc(c.school_id)}</code></p>`;
     const direct = (k) => new URL(`survey.html?code=${encodeURIComponent(k)}`, location.href).href;
-    $("slips").innerHTML = all.map(([role, k]) => `<div class="slip"><div><div><b>Глас за училището</b> · анкета за ${role === "родител" ? "родители" : "ученици"} · ${esc(c.class_name)}</div>
+    $("slips").innerHTML = all.map(([role, k]) => `<div class="slip"><div><div><b>SchoolRating.eu</b> · анкета за ${role === "родител" ? "родители" : "ученици"} · ${esc(c.class_name)}</div>
       <div class="c">${esc(k)}</div><div class="u">Сканирайте кода или отворете <b>${esc(url)}</b> и въведете кода.</div>
       <div class="p">Анонимно: кодът показва само класа и ролята и се използва веднъж. ${role === "ученик" && c.grade <= 7 ? "Родителят отметва съгласие преди началото." : ""}</div></div>
       <div class="q">${SF.qrSvg(direct(k), 2)}</div></div>`).join("");
@@ -146,7 +146,7 @@
     const ps = e.target.closest("[data-poster]");
     if (!ps) return;
     const link = SF.schoolLink(ps.dataset.poster);
-    $("slips").innerHTML = `<div class="poster"><div><b>Глас за училището</b> · анонимна анкета за родители и ученици</div>
+    $("slips").innerHTML = `<div class="poster"><div><b>SchoolRating.eu</b> · анонимна анкета за родители и ученици</div>
       <h1>Как е в ${esc(ps.dataset.name)}?</h1>
       <div>Сън, натоварване, настроение, безопасност и отношение към децата. Около 6 минути, без имена.</div>
       <div class="q">${SF.qrSvg(link, 8)}</div><div class="u">${esc(link.replace(/^https?:\/\//, ""))}</div>
