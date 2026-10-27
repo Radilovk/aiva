@@ -125,3 +125,18 @@ body.sv main { flex: 1; padding: 0; display: flex; flex-direction: column; }
   .seg { grid-template-columns: 1fr; gap: 6px; }
   .seg .opt { min-height: 46px; justify-content: flex-start; text-align: left; font-size: 1rem; padding: 10px 14px; }
 }
+
+/* entry without a code: big taps, nothing to type except the school */
+.btn.wide { width: 100%; margin-top: 14px; min-height: 52px; }
+.pick { display: grid; gap: 10px; margin-top: 20px; }
+.pick.two { grid-template-columns: 1fr 1fr; }
+.pick.two .opt { min-height: 96px; justify-content: center; text-align: center; }
+.pick .lbl b { display: block; font-size: 1.15rem; }
+.pick .lbl small { display: block; color: var(--muted); font-size: .88rem; font-weight: 450; margin-top: 2px; }
+.pick.grades { grid-template-columns: repeat(4, 1fr); }
+.pick.grades .opt { justify-content: center; font-size: 1.3rem; font-weight: 650; min-height: 64px; padding: 10px; }
+.pick.grades .opt:disabled { opacity: .35; cursor: not-allowed; }
+.pick-back { margin: 0 0 6px -8px; }
+.school-input { width: 100%; font: 500 1.1rem/1.3 var(--font); padding: 14px 16px; border-radius: 14px; border: 1.5px solid var(--line-2);
+  background: var(--card); color: var(--ink); margin-top: 18px; }
+.school-input:focus { outline: none; border-color: var(--primary); }

@@ -24,6 +24,8 @@ SCALES = {
     "who5": ["През цялото време", "През повечето време", "Повече от половината време", "По-малко от половината време", "Понякога", "Никога"],
     # concrete behaviour counts for the last month – facts, not opinions
     "month4": ["Нито веднъж", "1–2 пъти", "Почти всяка седмица", "Почти всеки ден"],
+    # follow-up after a ticked checklist item: it happened, so how often
+    "month3": ["1–2 пъти за месеца", "Почти всяка седмица", "Почти всеки ден"],
     # HBSC Symptom Checklist frequencies, from rare to daily
     "hbsc5": ["Рядко или никога", "Около веднъж месечно", "Около веднъж седмично", "Няколко пъти седмично", "Почти всеки ден"],
     "sleep_hours": ["Под 7 часа", "7–8 часа", "8–9 часа", "9–10 часа", "Над 10 часа"],
@@ -39,7 +41,7 @@ LIKERT_NEG = {"kind": "likert", "polarity": -1}
 
 def item(id, module, dim, text, *, roles=("parent", "student"), grades=ALL, scale=None, options=None,
          type="single", score=None, show_if=None, young=None, weight=1.0, core=True, aspect=None,
-         repeat=None, hint=None, optional=True, notice=None, rows=None):
+         repeat=None, hint=None, optional=True, notice=None, rows=None, grades_by_role=None):
     it = {"id": id, "module": module, "dimension": dim, "roles": list(roles), "grades": list(grades),
           "type": type, "text": text, "weight": weight, "core": core, "optional": optional}
     if scale: it["scale"] = scale
@@ -52,6 +54,7 @@ def item(id, module, dim, text, *, roles=("parent", "student"), grades=ALL, scal
     if hint: it["hint"] = hint
     if notice: it["notice"] = notice
     if rows: it["rows"] = [{"id": id + r["suffix"], "label": r["label"]} for r in rows]
+    if grades_by_role: it["grades_by_role"] = grades_by_role
     return it
 
 
@@ -64,6 +67,9 @@ def q_in(qid, values):  return {"q": qid, "op": "in", "v": values}
 def q_not(qid, values): return {"q": qid, "op": "not_in", "v": values}
 def answered(qid):      return {"q": qid, "op": "answered"}
 def grade(op, v):       return {"ctx": "grade", "op": op, "v": v}
+# follow-ups appear only when the screening answer points to a problem
+HOMEWORK_HEAVY = {"any": [q_in("WL01", [4, 5, 6, 7]), q_in("WL07", [2, 3, 4])]}
+SHORT_SLEEP = q_in("SC06_S", [0, 1])
 
 
 items = []
@@ -77,22 +83,13 @@ items += [
     item("PR02A", "PR", None, T("Каква оценка получава обикновено детето?"), roles=["parent"], grades=[1, 1],
          options=["Отличен (звезда)", "Много добър (сърце)", "Добър (усмивка)", "Задоволителен", "Незадоволителен", "Не знам"],
          hint="derived:grade_band=[5,4,3,2,1,null]"),
-    item("PR02B_BEL", "PR", None, T("Каква оценка получава обикновено детето по български език и литература?"), roles=["parent"], grades=[2, 3],
+    item("PR02B_BEL", "PR", None, T("Как се справя детето в училище според оценките на учителя?"), roles=["parent"], grades=[2, 3],
          options=["Отличен", "Много добър", "Добър", "Задоволителен", "Незадоволителен", "Не знам"],
          hint="derived:grade_band=[5,4,3,2,1,null]"),
-    item("PR02B_MAT", "PR", None, T("Каква оценка получава обикновено детето по математика?"), roles=["parent"], grades=[2, 3],
-         options=["Отличен", "Много добър", "Добър", "Задоволителен", "Незадоволителен", "Не знам"],
+    item("PR02C_BEL", "PR", None, T("Какъв е общият успех на детето?", "Какъв е общият ти успех?"),
+         grades=[4, 12], options=["Отличен (6)", "Много добър (5)", "Добър (4)", "Среден (3)", "Има двойки", "Не знам / не искам да кажа"],
+         young={"text": "Какви оценки получаваш обикновено?", "options": ["Предимно 6", "Предимно 5 и 6", "Предимно 4 и 5", "По-ниски", "Не знам"]},
          hint="derived:grade_band=[5,4,3,2,1,null]"),
-    item("PR02C_BEL", "PR", None, T("Какви оценки получава обикновено детето по български език и литература?", "Какви оценки получаваш обикновено по български език и литература?"),
-         grades=[4, 12], options=["Предимно 6", "Предимно 5 и 6", "Предимно 4 и 5", "Предимно 3 и 4", "Има и двойки", "Не знам / не искам да кажа"],
-         young={"text": "Какви оценки получаваш обикновено по български език?", "options": ["Предимно 6", "Предимно 5 и 6", "Предимно 4 и 5", "По-ниски", "Не знам"]},
-         hint="derived:grade_band=[5,4,3,2,1,null]"),
-    item("PR02C_MAT", "PR", None, T("Какви оценки получава обикновено детето по математика?", "Какви оценки получаваш обикновено по математика?"),
-         grades=[4, 12], options=["Предимно 6", "Предимно 5 и 6", "Предимно 4 и 5", "Предимно 3 и 4", "Има и слаби (2)", "Не знам / не искам да кажа"],
-         young={"text": "Какви оценки получаваш обикновено по математика?", "options": ["Предимно 6", "Предимно 5 и 6", "Предимно 4 и 5", "По-ниски", "Не знам"]},
-         hint="derived:grade_band=[5,4,3,2,1,null]"),
-    item("PR03", "PR", None, T("Остава ли детето в училище следобед на занималня (ЦОУД)?"),
-         grades=[1, 7], options=["Да", "Не", "Понякога"], roles=["parent"]),
     item("PR04", "PR", None, T("Ходи ли детето на частни уроци по училищни предмети?", "Ходиш ли на частни уроци по училищни предмети?"),
          options=["Не", "Понякога", "Редовно (поне веднъж седмично)"]),
     item("PR05", "PR", None, T("Защо ходи на частни уроци?", "Защо ходиш на частни уроци?"), type="multi",
@@ -114,17 +111,17 @@ items += [
                 "score": {"kind": "norm", "norm": "homework_weekday", "minutes": [20, 60, 100]}}),
     item("WL02", "WL", "WL", T("Колко време учи детето за училище през уикенда (събота и неделя общо)?",
                                 "Колко време учиш за училище през уикенда (събота и неделя общо)?"),
-         options=HW_WE_OPTS, score={"kind": "norm", "norm": "homework_weekend", "minutes": HW_WE_MIN}, weight=1.5),
+         options=HW_WE_OPTS, score={"kind": "norm", "norm": "homework_weekend", "minutes": HW_WE_MIN}, weight=1.5, show_if=HOMEWORK_HEAVY),
     item("WL03", "WL", "WL", T("Имаше ли детето писмени задачи за последната ваканция?", "Имаше ли писмени задачи за последната ваканция?"),
          options=["Не", "Малко", "Много", "Не помня"], score={"kind": "map", "values": [100, 50, 0, None]}),
     item("WL04", "WL", "WL", T("Колко често се налага да обяснявате урока или да седите до детето, за да си напише домашните?",
                                 "Колко често ти трябва помощ от възрастен, за да си напишеш домашните?"),
-         grades=[1, 9], scale="freq5", score=LIKERT_NEG),
+         grades=[1, 9], scale="freq5", score=LIKERT_NEG, show_if=HOMEWORK_HEAVY),
     item("WL05", "WL", "WL", T("Колко домашни има детето за възрастта си?", "Домашните ти са:"),
-         options=["Твърде малко", "Колкото трябва", "Малко много", "Твърде много"], score={"kind": "map", "values": [75, 100, 50, 0]}),
+         options=["Твърде малко", "Колкото трябва", "Малко много", "Твърде много"], score={"kind": "map", "values": [75, 100, 50, 0]}, show_if=HOMEWORK_HEAVY),
     item("WL06", "WL", "WL", T("Колко контролни и класни има детето в най-натоварената седмица?",
                                 "Колко контролни и класни имаш в най-натоварената седмица?"),
-         grades=[5, 12], options=["0–1", "2", "3", "4 или повече"], score={"kind": "map", "values": [100, 75, 35, 0]}),
+         grades=[5, 12], options=["0–1", "2", "3", "4 или повече"], score={"kind": "map", "values": [100, 75, 35, 0]}, show_if=HOMEWORK_HEAVY),
     item("WL07", "WL", "WL", T("Колко често домашните водят до напрежение или скандали вкъщи?",
                                 "Колко често се изнервяш заради домашните?"),
          scale="freq5", score=LIKERT_NEG,
@@ -137,12 +134,8 @@ BED_H = [20.25, 20.75, 21.25, 21.75, 22.25, 22.75, 23.5, 24.5]
 WAKE_OPTS = ["Преди 6:00", "6:00–6:30", "6:30–7:00", "7:00–7:30", "След 7:30"]
 WAKE_H = [5.75, 6.25, 6.75, 7.25, 7.75]
 items += [
-    item("SL01", "SL", None, T("В колко часа заспива обикновено детето в учебни дни?", "В колко часа заспиваш обикновено в учебни дни?"),
-         options=BED_OPTS, hint=f"hours={BED_H}"),
-    item("SL02", "SL", None, T("В колко часа става детето в учебни дни?", "В колко часа ставаш в учебни дни?"),
-         options=WAKE_OPTS, hint=f"hours={WAKE_H}"),
     item("SL03", "SL", "SL", T("Случва ли се детето да си ляга по-късно заради домашни?", "Случва ли се да си лягаш по-късно заради домашни?"),
-         options=["Никога", "Рядко", "Понякога", "Често"], score={"kind": "map", "values": [100, 70, 35, 0]}),
+         options=["Никога", "Рядко", "Понякога", "Често"], score={"kind": "map", "values": [100, 70, 35, 0]}, show_if=SHORT_SLEEP),
     item("SL04", "SL", "SL", T("Колко свободно време има детето в учебен ден – за игра или занимания по избор, без екрани и уроци?",
                                 "Колко свободно време имаш в учебен ден за неща, които избираш ти – без телефон, компютър и уроци?"),
          options=["Под 30 мин", "30–60 мин", "1–2 часа", "Над 2 часа"], score={"kind": "map", "values": [0, 40, 80, 100]},
@@ -152,11 +145,12 @@ items += [
          options=["0–1", "2–3", "4–5", "6–7"], score={"kind": "map", "values": [0, 40, 75, 100]}),
     item("SL06", "SL", "SL", T("Отказвало ли се е детето от спорт, изкуство, приятели или време със семейството заради уроци и домашни?",
                                 "Отказвал/а ли си се от спорт, приятели или хоби заради уроци и домашни?"),
-         options=["Не", "Да, понякога", "Да, редовно"], score={"kind": "map", "values": [100, 50, 0]}),
+         options=["Не", "Да, понякога", "Да, редовно"], score={"kind": "map", "values": [100, 50, 0]}, show_if={"any": [q_in("SL04", [0]), HOMEWORK_HEAVY]}),
 ]
 DERIVED = [
-    {"id": "SL_SLEEP", "dimension": "SL", "kind": "sleep_hours", "from": ["SL01", "SL02"],
-     "bed_hours": BED_H, "wake_hours": WAKE_H, "score": {"kind": "norm", "norm": "sleep"}, "weight": 2.0},
+    # hours of sleep on school nights (SC06, school-weeks row) against the norm for the age
+    {"id": "SL_SLEEP", "dimension": "SL", "kind": "sleep_from_hours", "from": "SC06_S",
+     "hours": [6.5, 7.5, 8.5, 9.5, 10.5], "score": {"kind": "norm", "norm": "sleep"}, "weight": 2.0},
     {"id": "SU_TUT", "dimension": "SU", "kind": "tutoring_to_keep_up", "from": ["PR04", "PR05"],
      "keep_up_options": [0, 1], "score": {"kind": "map_bool", "true": 0, "false": 100}, "weight": 0.5},
 ]
@@ -169,11 +163,12 @@ items += [
     item("WB02", "WB", "WB", T("Колко често детето не иска да ходи на училище или е притеснено сутрин?", "Колко често не ти се ходи на училище или си притеснен/а сутрин?"),
          scale="freq5", score=LIKERT_NEG, young={"text": "Тъжен/тъжна или притеснен/а ли си сутрин преди училище?", "scale": "kid3_freq", "score": LIKERT_NEG}),
     item("WB04", "WB", "WB", T("Колко често детето разказва с радост за нещо от училище?", "Колко често в училище научаваш неща, които ти харесват?"),
-         scale="freq5", score=LIKERT_POS, young={"text": "Харесва ли ти да учиш нови неща в училище?", "scale": "kid3_agree", "score": LIKERT_POS}),
+         scale="freq5", score=LIKERT_POS, young={"text": "Харесва ли ти да учиш нови неща в училище?", "scale": "kid3_agree", "score": LIKERT_POS},
+         grades_by_role={"parent": [1, 12], "student": [4, 4]}),
     item("WB06", "WB", "WB", T("", "Чувствам се приет/а в класа."), roles=["student"], scale="agree5", score=LIKERT_POS,
          young={"text": "Имаш ли приятели в класа?", "scale": "kid3_agree", "score": LIKERT_POS}),
     item("WB07", "WB", "WB", T("Детето е под силен натиск заради оценките.", "Чувствам силен натиск заради оценките."),
-         grades=[3, 12], scale="agree5", score=LIKERT_NEG),
+         grades=[3, 12], scale="agree5", score=LIKERT_NEG, show_if=q_in("WB02", [2, 3, 4])),
 ]
 
 # ---------------------------------------------------------------- TQ: качество на преподаването (класът като цяло)
@@ -181,11 +176,11 @@ items += [
     item("TQ01", "TQ", "TQ", T("Детето разбира повечето уроци в час и не се налага да ги учим отново вкъщи.",
                                 "Повечето учители обясняват така, че разбирам."),
          scale="agree5", score=LIKERT_POS, young={"text": "Разбираш ли какво обяснява учителката?", "scale": "kid3_agree", "score": LIKERT_POS}),
-    item("TQ02", "TQ", "TQ", T("Детето разказва с интерес за часовете.", "Часовете са интересни и участвам активно."),
+    item("TQ02", "TX", "TQ", T("Детето разказва с интерес за часовете.", "Часовете са интересни и участвам активно."),
          scale="agree5", score=LIKERT_POS, young={"text": "Интересно ли ти е в час?", "scale": "kid3_agree", "score": LIKERT_POS}),
-    item("TQ03", "TQ", "TQ", T("Получавам ясна информация какво детето знае и какво да подобри.", "Когато сгреша, учителите ми показват как да се поправя."),
+    item("TQ03", "TX", "TQ", T("Получавам ясна информация какво детето знае и какво да подобри.", "Когато сгреша, учителите ми показват как да се поправя."),
          scale="agree5", score=LIKERT_POS),
-    item("TQ04", "TQ", "TQ", T("Изискванията са съобразени с възрастта на детето.", "Задачите в час са по силите ми – нито твърде лесни, нито непосилни."),
+    item("TQ04", "TX", "TQ", T("Изискванията са съобразени с възрастта на детето.", "Задачите в час са по силите ми – нито твърде лесни, нито непосилни."),
          scale="agree5", score=LIKERT_POS),
     item("TQ05", "TQ", "TQ", T("Колко често се налага вкъщи да обяснявате урок, който не е обяснен в час?", "Колко често учиш новите уроци вкъщи, защото не са обяснени в час?"),
          scale="freq5", score=LIKERT_NEG, weight=1.5),
@@ -200,8 +195,6 @@ items += [
     item("TC02", "TC", "TC", T("", "{teacher} обяснява ясно, а ако не разбера – обяснява по друг начин."),
          roles=["student"], scale="agree5", score=LIKERT_POS, aspect="clarity", repeat=TC_REPEAT, grades=[4, 12],
          young={"text": "{teacher} обяснява ли така, че да разбереш?", "scale": "kid3_agree", "score": LIKERT_POS}),
-    item("TC05", "TC", "TC", T("", "{teacher} оценява справедливо и казва предварително какво се изисква."), roles=["student"],
-         scale="agree5", score=LIKERT_POS, aspect="fair_assessment", repeat=TC_REPEAT, grades=[5, 12]),
     item("TC06", "TC", "TC", T("", "В часа на {teacher} има ред, без да се крещи или унижава."), roles=["student"],
          scale="agree5", score=LIKERT_POS, aspect="climate", repeat=TC_REPEAT, grades=[4, 4],
          young={"text": "Вика ли {teacher} на децата?", "scale": "kid3_freq", "score": LIKERT_NEG}),
@@ -211,8 +204,6 @@ items += [
          roles=["student"], scale="month4", score=MONTH4, aspect="no_humiliation", repeat=TC_REPEAT, grades=[5, 12]),
     item("TC08", "TC", "TC", T("Класният ръководител отговаря бързо и ясно на въпросите ми."), roles=["parent"],
          scale="agree5", score=LIKERT_POS, aspect="parent_communication", repeat=TC_REPEAT),
-    item("TC09", "TC", "TC", T("Когато има проблем, класният ръководител го описва конкретно и предлага решение, а не само се оплаква."),
-         roles=["parent"], scale="agree5", score=LIKERT_POS, aspect="parent_communication", repeat=TC_REPEAT),
 ]
 # Parent-version TC01 applies from grade 1 (rated teacher = класен ръководител / начален учител)
 for it in items:
@@ -240,24 +231,19 @@ items += [
     item("SC06", "SC", None, T("Колко часа спи детето на нощ?", "Колко часа спиш на нощ?"), scale="sleep_hours", type="grid", rows=SCHOOL_VS_VACATION),
 ]
 
-# ---------------------------------------------------------------- HP: практики с доказан вреден ефект (факти за последния месец)
+# ---------------------------------------------------------------- HP: практики с доказан вреден ефект (един списък + колко често)
+HP_LIST = ["Учител вика на ученици", "Учител заплашва с двойка или наказание, за да има тишина",
+           "Целият клас е наказан заради един или няколко ученици", "Ученик е отстранен от час",
+           "Учител поставя по-ниска оценка заради поведение", "Възрастен удря, дърпа грубо или блъска дете", "Нищо от изброените"]
+MONTH3 = {"kind": "map", "values": [60, 20, 0]}
 items += [
-    item("HP01", "HP", "CD", T("Колко пъти през последния месец детето е разказвало, че учител вика на ученици?",
-                               "Колко пъти през последния месец учител е викал на ученици в класа ти?"),
-         scale="month4", score=MONTH4, weight=1.5),
-    item("HP02", "HP", "CD", T("Колко пъти през последния месец целият клас е бил наказан заради един или няколко ученици?"),
-         scale="month4", score=MONTH4),
-    item("HP03", "HP", "CD", T("Колко пъти през последния месец учител е заплашвал с двойка или наказание, за да има тишина?"),
-         scale="month4", score=MONTH4),
-    item("HP04", "HP", "CD", T("Колко пъти през последния месец детето е било отстранено от час?",
-                               "Колко пъти през последния месец ученици са били отстранявани от час?"),
-         scale="month4", score=MONTH4),
-    item("HP05", "HP", "SF", T("През последния месец детето казвало ли е, че възрастен в училище е ударил, дръпнал грубо или блъснал дете?",
-                               "През последния месец виждал/а ли си възрастен в училище да удари, да дръпне грубо или да блъсне ученик?"),
-         options=["Не", "Да, веднъж", "Да, повече от веднъж", "Не знам"], score={"kind": "map", "values": [100, 0, 0, None]}, weight=2.0),
-    item("HP06", "HP", "CD", T("Тази година случвало ли се е учител да постави на детето по-ниска оценка заради поведение, а не заради знания?",
-                               "Тази година случвало ли се е учител да ти постави по-ниска оценка заради поведение, а не заради знанията ти?"),
-         options=["Не", "Да", "Не знам"], score={"kind": "map", "values": [100, 0, None]}),
+    item("HP00", "HP", None, T("През последния месец детето разказвало ли е за някое от тези неща в класа?",
+                               "През последния месец случвало ли се е някое от тези неща в класа ти?"),
+         type="multi", options=HP_LIST),
+    item("HP01", "HP", "CD", T("Колко често учител вика на ученици?"), scale="month3", score=MONTH3, weight=1.5, show_if=q_in("HP00", [0])),
+    item("HP03", "HP", "CD", T("Колко често учител заплашва с двойка или наказание?"), scale="month3", score=MONTH3, show_if=q_in("HP00", [1])),
+    item("HP02", "HP", "CD", T("Колко често целият клас е наказван заради един или няколко ученици?"), scale="month3", score=MONTH3, show_if=q_in("HP00", [2])),
+    item("HP04", "HP", "CD", T("Колко често ученици са отстранявани от час?"), scale="month3", score=MONTH3, show_if=q_in("HP00", [3])),
 ]
 for it in items:
     if it["module"] == "HP":
@@ -271,9 +257,6 @@ items += [
          scale="agree5", score=LIKERT_POS, young={"text": "Ако не разбереш нещо, помагат ли ти в училище?", "scale": "kid3_agree", "score": LIKERT_POS}),
     item("SU02", "SU", "SU", T("Учителите се отнасят еднакво справедливо към всички деца в класа.", "Учителите се отнасят еднакво справедливо към всички ученици."),
          scale="agree5", score=LIKERT_POS),
-    item("SU03", "SU", "SU", T("Детето би се справило с училището без помощ от родител или частен учител.",
-                                "Мога да се справям с училището без частни уроци."),
-         scale="yes_partly_no", score={"kind": "map", "values": [100, 50, 0]}),
 ]
 
 # ---------------------------------------------------------------- CD: климат и дисциплина
@@ -323,49 +306,43 @@ items += [
     item("CP01", "CP", "CP", T("Получавам навреме информацията, която ми е нужна (оценки, събития, промени)."), roles=["parent"], scale="agree5", score=LIKERT_POS),
     item("CP02", "CP", "CP", T("Мога да не се съглася с учител или с директора, без това да се отрази на детето."), roles=["parent"],
          scale="yes_partly_no", score={"kind": "map", "values": [100, 50, 0]}, weight=1.5),
-    item("CP03", "CP", "CP", T("Съобщенията от училището са учтиви и конкретни."), roles=["parent"], scale="agree5", score=LIKERT_POS),
     item("CP04", "CP", "CP", T("Мнението на родителите се взема предвид при решения, които засягат децата."), roles=["parent"], scale="agree5", score=LIKERT_POS),
-    item("CP05", "CP", "CP", T("", "Учителите ни питат какво мислим (например за начина на работа или за домашните)."), roles=["student"],
-         grades=[5, 12], scale="agree5", score=LIKERT_POS),
 ]
 
 # ---------------------------------------------------------------- SY: система (планирано попълване от 50% от анкетираните)
 items += [
     item("SY01", "SY", "SY", T("Учебният материал е съобразен с възрастта на детето.", "Материалът е толкова, че може да се научи в училище."),
          scale="agree5", score=LIKERT_POS),
-    item("SY02", "SY", "SY", T("Учебниците са разбираеми за детето без допълнителна помощ.", "Учебниците са разбираеми без допълнителна помощ."),
-         scale="agree5", score=LIKERT_POS),
     item("SY03", "SY", "SY", T("Подготовката за НВО създава прекалено много стрес.",
                                 "Подготовката за НВО или матурите ми създава прекалено много стрес."),
          grades=[4, 12], scale="agree5", score=LIKERT_NEG),
     item("SY04", "SY", "SY", T("Учебният ден (продължителност, смени, разписание) е подходящ за възрастта на детето.",
                                 "Учебният ден (продължителност, смени, разписание) е разумен."), scale="agree5", score=LIKERT_POS),
-    item("SY05", "SY", "SY", T("Училището подготвя децата за реалния живот.", "Това, което уча, ще ми е полезно в живота."),
-         scale="agree5", score=LIKERT_POS),
 ]
 
 # ---------------------------------------------------------------- OT: свободни отговори
 items += [
-    item("OT01", "OT", None, T("Какво цените най-много в училището?", "Какво ти харесва най-много в училището?"), type="text"),
     item("OT02", "OT", None, T("Какво бихте променили в училище?", "Какво би променил/а в училище?"), type="text",
          young={"text": "Какво би искал/а да е различно в училище?", "type": "text"}),
     item("OT03", "OT", None, T("Искате ли да опишете конкретен случай? Моля, без имена на деца и учители.",
-                                "Искаш ли да разкажеш за конкретен случай? Моля, без имена."), type="text"),
+                                "Искаш ли да разкажеш за конкретен случай? Моля, без имена."), type="text",
+         show_if={"any": [q_in("HP00", [0, 1, 2, 3, 4, 5]), q_in("SF01", [1, 2, 3]), q_in("CD09", [2, 3, 4])]}),
 ]
 
 MODULES = [
     {"id": "PR", "title": "Профил", "scored": False},
     {"id": "WL", "title": "Натоварване", "scored": True},
+    {"id": "SC", "title": "Учебно време и ваканция", "scored": False},
     {"id": "SL", "title": "Сън и свободно време", "scored": True},
     {"id": "WB", "title": "Благополучие", "scored": True},
     {"id": "WH", "title": "Последните две седмици", "scored": True},
-    {"id": "SC", "title": "Учебно време и ваканция", "scored": False},
     {"id": "TQ", "title": "Преподаване в класа", "scored": True},
+    {"id": "TX", "title": "Преподаване в класа", "scored": True, "sampling_rate": 0.5},
     {"id": "TC", "title": "Учители", "scored": True, "repeat": "teacher"},
     {"id": "SU", "title": "Подкрепа и справедливост", "scored": True},
     {"id": "CD", "title": "Климат и дисциплина", "scored": True},
-    {"id": "SF", "title": "Безопасност", "scored": True},
     {"id": "HP", "title": "Какво се случва в час", "scored": True},
+    {"id": "SF", "title": "Безопасност", "scored": True},
     {"id": "CP", "title": "Комуникация", "scored": True},
     {"id": "SY", "title": "Образователната система", "scored": True, "sampling_rate": 0.5},
     {"id": "OT", "title": "Вашите думи", "scored": False},
@@ -481,7 +458,7 @@ PARAMS = {
               "labels": {"2": "Значително над средното", "1": "Над средното", "0": "Около средното",
                          "-1": "Под средното", "-2": "Значително под средното", "na": "Недостатъчно данни"}},
     "absolute_bands": [[80, "Добро"], [60, "Приемливо"], [40, "Тревожно"], [0, "Критично"]],
-    "teacher_assignment": {"always_class_teacher": True, "extra_teachers": 2},
+    "teacher_assignment": {"always_class_teacher": True, "extra_teachers": 1},
     "equity": {"flag_gap": 10.0, "z": 1.96},
     "grade_bands": {"5": "силни", "4": "силни", "3": "средни", "2": "затрудняващи се", "1": "затрудняващи се"},
     "who5": {"low": 50, "very_low": 28, "source": "Topp et al. 2015, Psychother Psychosom – WHO-5: ≤50 ниско благополучие, ≤28 вероятна депресия (скрининг, не диагноза)"},

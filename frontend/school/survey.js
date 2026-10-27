@@ -9,7 +9,7 @@
 
   const SECTIONS = {
     PR: ["За детето", "За теб"], WL: ["Домашни и натоварване"], SL: ["Сън и свободно време"],
-    WB: ["Как се чувства детето", "Как се чувстваш"], TQ: ["Часовете"], TC: ["Учителите"], SU: ["Подкрепа"],
+    WB: ["Как се чувства детето", "Как се чувстваш"], TQ: ["Часовете"], TX: ["Часовете"], TC: ["Учителите"], SU: ["Подкрепа"],
     CD: ["Правила и дисциплина"], SF: ["Безопасност"], WH: ["Последните две седмици"], SC: ["Учебно време и ваканция"],
     HP: ["Какво се случва в час"], QC: ["Проверка"], CP: ["Връзка с училището"],
     SY: ["Учебната система"], OT: ["Със свои думи"],
@@ -18,7 +18,9 @@
   const ALT = /^(не знам|не помня|предпочитам да не посоча|не искам да кажа)/i;
   const SECONDS = { single: 6, multi: 10, text: 30, notice: 4, grid: 9 };   // measured tap-through pace, not reading-every-word pace
 
-  const st = { code: "", s: null, qs: [], answers: {}, idx: 0, started: 0, triggers: new Set(), dir: 1, busy: false };
+  const NONE = /^нищо от изброените/i;   // exclusive answer in checklists
+
+  const st = { pick: { role: null, grade: null }, code: "", s: null, qs: [], answers: {}, idx: 0, started: 0, triggers: new Set(), dir: 1, busy: false };
 
   // ------------------------------------------------------------------ wording
   /** Students see grammatical gender that matches their answer to PR01 ("напрегнат/а" -> "напрегната"). */
@@ -60,8 +62,6 @@
       [ICON.chart, "Резултатите се публикуват само обобщено, когато в клас има поне 5 отговора."],
       [ICON.clock, "Можете да пропускате въпроси и да се връщате назад."],
     ].map(([i, t]) => `<div>${i}<span>${esc(t)}</span></div>`).join("");
-    $("demo-grade").innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}"${i === 5 ? " selected" : ""}>${i + 1} клас</option>`).join("");
-
     const input = $("code");
     input.addEventListener("input", () => {
       const raw = input.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 13);
@@ -72,30 +72,98 @@
       $("code-err").hidden = true;
     });
     $("code-form").addEventListener("submit", (e) => { e.preventDefault(); start(input.value); });
-    $("demo-role").addEventListener("change", syncDemoGrades);
+    setupNoCode();
+  }
+
+  // ------------------------------------------------------------------ no code: who -> grade -> school (or demo)
+  function setupNoCode() {
+    for (const b of document.querySelectorAll(".pick-back")) {
+      b.innerHTML = ICON.back;
+      b.addEventListener("click", () => show(b.dataset.back));
+    }
+    $("nocode-btn").addEventListener("click", () => show("s-who"));
+    for (const b of $("who-pick").querySelectorAll("[data-role]")) {
+      b.addEventListener("click", () => {
+        st.pick.role = b.dataset.role;
+        mark($("who-pick"), b);
+        renderGrades();
+        setTimeout(() => show("s-grade"), 180);
+      });
+    }
+    let timer = null;
+    $("school-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchSchools, 250); });
     $("demo-btn").addEventListener("click", async () => {
       const btn = $("demo-btn");
       btn.disabled = true;
       try {
-        const r = await api("/demo-session", { method: "POST", body: { role: $("demo-role").value, grade: Number($("demo-grade").value) } });
-        await start(r.code);
-      } catch (e) { showErr("code-err", e.message); }
+        const r = await api("/demo-session", { method: "POST", body: { role: st.pick.role, grade: st.pick.grade } });
+        await start(r.code, "school-err");
+      } catch (e) { showErr("school-err", e.message); }
       btn.disabled = false;
     });
-    syncDemoGrades();
   }
 
-  function syncDemoGrades() {
-    const student = $("demo-role").value === "student";
-    for (const o of $("demo-grade").options) o.disabled = student && Number(o.value) < 4;
-    if (student && Number($("demo-grade").value) < 4) $("demo-grade").value = "4";
+  function mark(group, on) {
+    for (const x of group.querySelectorAll(".opt")) x.setAttribute("aria-checked", String(x === on));
+  }
+
+  function renderGrades() {
+    const student = st.pick.role === "student";
+    $("grade-title").textContent = student ? "В кой клас си?" : "В кой клас е детето?";
+    $("grade-hint").hidden = student;
+    const box = $("grade-pick");
+    box.innerHTML = "";
+    for (let g = 1; g <= 12; g++) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt";
+      b.textContent = String(g);
+      b.setAttribute("aria-label", `${g} клас`);
+      b.disabled = student && g < 4;
+      b.setAttribute("aria-checked", String(st.pick.grade === g));
+      b.addEventListener("click", () => {
+        st.pick.grade = g;
+        mark(box, b);
+        setTimeout(() => { show("s-school"); $("school-q").focus({ preventScroll: true }); }, 180);
+      });
+      box.appendChild(b);
+    }
+  }
+
+  async function searchSchools() {
+    const q = $("school-q").value.trim();
+    const list = $("school-list");
+    $("school-err").hidden = true;
+    if (q.length < 2) { list.innerHTML = ""; return; }
+    try {
+      const r = await api(`/schools?q=${encodeURIComponent(q)}`);
+      if ($("school-q").value.trim() !== q) return;   // a newer search is on its way
+      list.innerHTML = r.schools.length ? "" : `<p class="small muted">Няма такова училище в анкетата в момента. Попитайте класния ръководител за код.</p>`;
+      for (const sc of r.schools) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "opt";
+        b.setAttribute("role", "listitem");
+        b.innerHTML = `<span class="lbl"><b>${esc(sc.name)}</b>${sc.region ? `<small>${esc(sc.region)}</small>` : ""}</span>`;
+        b.addEventListener("click", () => openSession(sc, b));
+        list.appendChild(b);
+      }
+    } catch (e) { showErr("school-err", e.message); }
+  }
+
+  async function openSession(sc, b) {
+    mark($("school-list"), b);
+    try {
+      const r = await api("/open-session", { method: "POST", body: { school_id: sc.school_id, role: st.pick.role, grade: st.pick.grade } });
+      await start(r.code, "school-err");
+    } catch (e) { showErr("school-err", e.message); }
   }
 
   function showErr(id, msg) { const el = $(id); el.textContent = msg; el.hidden = false; }
 
-  async function start(code) {
+  async function start(code, errId = "code-err") {
     code = String(code || "").trim();
-    if (code.replace(/[^0-9A-Za-z]/g, "").length < 8) return showErr("code-err", "Кодът има 12 знака, например K7QM-2FHD-9XTA.");
+    if (code.replace(/[^0-9A-Za-z]/g, "").length < 8) return showErr(errId, "Кодът има 12 знака, например K7QM-2FHD-9XTA.");
     const btn = $("code-btn");
     btn.disabled = true;
     btn.textContent = "Проверяваме…";
@@ -121,7 +189,7 @@
         show("s-intro");
       }
     } catch (e) {
-      showErr("code-err", e.message);
+      showErr(errId, e.message);
     } finally {
       btn.disabled = false;
       btn.textContent = "Започни";
@@ -338,8 +406,13 @@
       b.addEventListener("click", () => {
         const cur = new Set(Array.isArray(st.answers[q.id]) ? st.answers[q.id] : []);
         cur.has(i) ? cur.delete(i) : cur.add(i);
+        if (cur.has(i)) {
+          // "none of these" excludes the rest, and the other way round
+          const none = q.options.findIndex((o) => NONE.test(o));
+          if (none >= 0) for (const j of [...cur]) if ((i === none) !== (j === none)) cur.delete(j);
+        }
+        for (const x of main.querySelectorAll(".opt")) x.setAttribute("aria-checked", String(cur.has(Number(x.dataset.i))));
         if (cur.size) st.answers[q.id] = [...cur].sort((a, c) => a - c); else delete st.answers[q.id];
-        b.setAttribute("aria-checked", String(cur.has(i)));
         syncNext(wrap, q);
         save();
       });
@@ -566,6 +639,6 @@
     $("code").value = pre.toUpperCase();
     start(pre);
   } else if (params.get("demo") !== null) {
-    $("demo-box").open = true;
+    show("s-who");
   }
 })();

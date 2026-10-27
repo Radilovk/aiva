@@ -21,7 +21,7 @@ class Flow(unittest.TestCase):
         self.assertNotIn("PR02B_BEL", p1)
         self.assertIn("PR02B_BEL", p2)
         self.assertNotIn("PR02C_BEL", p2)
-        self.assertIn("PR02C_MAT", p6)
+        self.assertIn("PR02C_BEL", p6)
         self.assertNotIn("PR02A", p6)
 
     def test_gender_asked_to_both_roles(self):
@@ -61,7 +61,7 @@ class Flow(unittest.TestCase):
                  [{"teacher_id": f"T{i}", "name": f"У{i}", "is_class_teacher": False} for i in range(2, 8)]
         st = E.assign_teachers(Q, "tokX", "student", roster)
         self.assertEqual(st[0]["teacher_id"], "T1")
-        self.assertEqual(len(st), 3)
+        self.assertEqual(len(st), 2)   # class teacher + one more
         self.assertEqual(st, E.assign_teachers(Q, "tokX", "student", roster))  # deterministic
         pa = E.assign_teachers(Q, "tokX", "parent", roster)
         self.assertEqual([t["teacher_id"] for t in pa], ["T1"])
@@ -69,7 +69,7 @@ class Flow(unittest.TestCase):
         self.assertEqual([t["teacher_id"] for t in young], ["T1"])
         f = E.flow(Q, {"role": "student", "grade": 8, "token": "tokX"}, {}, st)
         tc = [v for v in f if v["id"].startswith("TC")]
-        self.assertEqual(len(tc), 3 * 5)   # respect, clarity, fair assessment + 2 behaviour counts (TC10, TC11)
+        self.assertEqual(len(tc), 2 * 4)   # respect, clarity + 2 behaviour counts (TC10, TC11)
         self.assertTrue(any("г-жа А" in v["text"] for v in tc))
 
     def test_balanced_assignment_spreads_ratings(self):
@@ -110,24 +110,37 @@ class Scoring(unittest.TestCase):
         self.assertIsNone(s["items"]["CD06"])
 
     def test_dimension_needs_half_of_items(self):
-        r = {"role": "parent", "grade": 5, "answers": {"WB02": 0}}
-        self.assertNotIn("WB", E.score_respondent(Q, r)["dims"])
+        r = {"role": "parent", "grade": 5, "answers": {"TQ01": 0}}   # 1 of 2 core items, the sampled ones count when shown
+        self.assertIn("TQ", E.score_respondent(Q, r)["dims"])
+        r = {"role": "parent", "grade": 5, "answers": {"CP01": 0}}   # 1 of 3
+        self.assertNotIn("CP", E.score_respondent(Q, r)["dims"])
 
     def test_derived_sleep_and_tutoring(self):
-        r = {"role": "parent", "grade": 2, "answers": {"SL01": 0, "SL02": 2, "PR04": 2, "PR05": [0]}}
+        r = {"role": "parent", "grade": 2, "answers": {"SC06_S": 4, "PR04": 2, "PR05": [0]}}
         s = E.score_respondent(Q, r)
-        self.assertEqual(s["items"]["SL_SLEEP"], 100)    # 20:15 -> 6:45 = 10.5 h
+        self.assertEqual(s["items"]["SL_SLEEP"], 100)    # over 10 h on school nights
         self.assertEqual(s["items"]["SU_TUT"], 0)
         self.assertEqual(s["ctx"]["indicators"]["tutoring_keep_up"], 1)
+        short = E.score_respondent(Q, {"role": "parent", "grade": 2, "answers": {"SC06_S": 1}})
+        self.assertEqual(short["ctx"]["indicators"]["sleep_short"], 1)   # 7–8 h at 7–8 years
 
     def test_grade_band_unified_across_scales(self):
-        s1 = E.score_respondent(Q, {"role": "parent", "grade": 2, "answers": {"PR02B_BEL": 0, "PR02B_MAT": 2}})
-        s2 = E.score_respondent(Q, {"role": "parent", "grade": 8, "answers": {"PR02C_BEL": 0, "PR02C_MAT": 2}})
+        s1 = E.score_respondent(Q, {"role": "parent", "grade": 2, "answers": {"PR02B_BEL": 1}})
+        s2 = E.score_respondent(Q, {"role": "parent", "grade": 8, "answers": {"PR02C_BEL": 1}})
         self.assertEqual(s1["ctx"]["grade_band"], 4)
         self.assertEqual(s2["ctx"]["grade_band"], 4)
 
+    def test_practices_checklist(self):
+        s = E.score_respondent(Q, {"role": "student", "grade": 7, "answers": {"HP00": [0, 5], "HP01": 1}})["ctx"]["indicators"]
+        self.assertEqual((s["shouting_weekly"], s["physical_force"], s["class_punishment"]), (1, 1, 0))
+        s = E.score_respondent(Q, {"role": "student", "grade": 7, "answers": {"HP00": [6]}})["ctx"]["indicators"]
+        self.assertEqual((s["shouting_weekly"], s["physical_force"]), (0, 0))
+        f = ids(E.flow(Q, {"role": "student", "grade": 7, "token": "a"}, {"HP00": [2]}))
+        self.assertIn("HP02", f)
+        self.assertNotIn("HP01", f)
+
     def test_quality_flags(self):
-        a = {k: 0 for k in ("WB02", "WB04", "WB07", "TQ01", "TQ02", "TQ03", "TQ04", "TQ05", "CD01", "CD09", "CP01")}
+        a = {k: 0 for k in ("WL07", "WB02", "WB04", "WB07", "TQ01", "TQ02", "TQ03", "TQ04", "TQ05", "SU01", "SU02", "CD01", "CD09", "CP01", "CP04")}
         s = E.score_respondent(Q, {"role": "parent", "grade": 5, "answers": a})
         self.assertIn("straightline", s["flags"])
         s = E.score_respondent(Q, {"role": "parent", "grade": 5, "answers": {"QC01": 4}})

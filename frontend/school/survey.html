@@ -19,7 +19,7 @@
     <div class="narrow">
       <a class="brand" href="./" style="margin-bottom:28px"><span class="brand-mark" id="brand-mark"></span><span>Глас за училището</span></a>
       <h1>Как е в училище?</h1>
-      <p class="ink2">Въведете кода от листчето, което получихте от училището. Анкетата е анонимна и отнема около 8 минути.</p>
+      <p class="ink2">Ако училището ви е дало листче с код, въведете го. Анкетата е анонимна и отнема около 6 минути.</p>
       <form id="code-form" class="code-box" autocomplete="off" novalidate>
         <label class="sr-only" for="code">Код за достъп</label>
         <input id="code" class="code-input" type="text" inputmode="text" autocapitalize="characters" spellcheck="false"
@@ -30,16 +30,41 @@
 
       <div class="trust" id="trust"></div>
 
-      <details class="explain" id="demo-box">
-        <summary>Нямате код? Разгледайте пробната анкета</summary>
-        <p class="small muted" style="margin-top:10px">Ще видите същите въпроси, но нищо няма да бъде записано.</p>
-        <div class="demo-pick">
-          <label class="field"><span>Попълвам като</span>
-            <select id="demo-role"><option value="parent">родител</option><option value="student">ученик</option></select></label>
-          <label class="field"><span>Клас</span><select id="demo-grade"></select></label>
-          <button class="btn secondary" type="button" id="demo-btn">Към пробната анкета</button>
-        </div>
-      </details>
+      <button class="btn secondary wide" type="button" id="nocode-btn">Нямам код</button>
+    </div>
+  </section>
+
+  <!-- 1b. no code: who, grade, school -->
+  <section class="sv-screen" id="s-who" hidden>
+    <div class="narrow">
+      <button class="icon-btn pick-back" type="button" data-back="s-code" aria-label="Назад"></button>
+      <h1>Кой попълва?</h1>
+      <div class="pick two" id="who-pick">
+        <button class="opt" type="button" data-role="parent"><span class="lbl"><b>Родител</b><small>за моето дете</small></span></button>
+        <button class="opt" type="button" data-role="student"><span class="lbl"><b>Ученик</b><small>от 4 клас нагоре</small></span></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="sv-screen" id="s-grade" hidden>
+    <div class="narrow">
+      <button class="icon-btn pick-back" type="button" data-back="s-who" aria-label="Назад"></button>
+      <h1 id="grade-title">В кой клас е детето?</h1>
+      <p class="ink2 small" id="grade-hint">Ако имате повече деца – попълнете поотделно за всяко.</p>
+      <div class="pick grades" id="grade-pick"></div>
+    </div>
+  </section>
+
+  <section class="sv-screen" id="s-school" hidden>
+    <div class="narrow">
+      <button class="icon-btn pick-back" type="button" data-back="s-grade" aria-label="Назад"></button>
+      <h1>Кое е училището?</h1>
+      <label class="sr-only" for="school-q">Търсене на училище</label>
+      <input id="school-q" class="school-input" type="search" placeholder="Име или град, напр. 125 СУ" autocomplete="off">
+      <div class="pick" id="school-list" role="list"></div>
+      <p class="small muted" id="school-msg">Без код отговорите се броят наполовина, защото не можем да проверим класа.</p>
+      <div id="school-err" class="err" role="alert" hidden></div>
+      <button class="link-btn" type="button" id="demo-btn" style="margin-top:22px">Само да разгледам – пробна анкета, нищо не се записва</button>
     </div>
   </section>
 

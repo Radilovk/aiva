@@ -218,8 +218,8 @@ def grade_band(q: dict, role: str, grade: int, answers: dict):
     bands = []
     for qid in ("PR02A", "PR02B_BEL", "PR02B_MAT", "PR02C_BEL", "PR02C_MAT"):
         a = answers.get(qid)
-        it = q["_by_id"][qid]
-        if a is None or not applies(q, it, role, grade):
+        it = q["_by_id"].get(qid)   # older banks asked per subject; the current one asks the overall success
+        if a is None or it is None or not applies(q, it, role, grade):
             continue
         if is_young(q, role, grade):
             mapping = [5, 4, 3, 2, None]
@@ -259,12 +259,11 @@ def score_respondent(q: dict, resp: dict) -> dict:
             per_dim[v["dimension"]].append((s, v["weight"]))
     # derived items
     for d in q["derived"]:
-        if d["kind"] == "sleep_hours":
-            b, w = answers.get("SL01"), answers.get("SL02")
-            if b is None or w is None:
+        if d["kind"] == "sleep_from_hours":
+            hours = _sleep_hours(answers, q)
+            if hours is None:
                 per_dim[d["dimension"]].append((None, d["weight"]))
                 continue
-            hours = 24 - d["bed_hours"][b] + d["wake_hours"][w]
             s = norm_score(q, "sleep", hours, grade)
             items[d["id"]] = s
             per_dim[d["dimension"]].append((s, d["weight"]))
@@ -315,12 +314,13 @@ def _indicators(a: dict, role: str, grade: int, q: dict) -> dict:
         # weekly or more often in school weeks (SC01); the short grade-4 form asks WB01 instead
         "psychosomatic_often": int(a["SC01_S"] >= 2) if isinstance(a.get("SC01_S"), int)
         else (None if a.get("WB01") is None else int(a["WB01"] >= (2 if young else 3))),
-        "shouting_weekly": _at_least(a, "HP01", 2),
-        "class_punishment": _at_least(a, "HP02", 1),
-        "threats_weekly": _at_least(a, "HP03", 2),
-        "sent_out": _at_least(a, "HP04", 1),
-        "physical_force": None if a.get("HP05") in (None, 3) else int(a["HP05"] in (1, 2)),
-        "grade_as_punishment": None if a.get("HP06") in (None, 2) else int(a["HP06"] == 1),
+        # HP00 is a checklist; the "how often" follow-up (HP01, HP03) decides "every week"
+        "shouting_weekly": _weekly(a, 0, "HP01"),
+        "threats_weekly": _weekly(a, 1, "HP03"),
+        "class_punishment": _ticked(a, 2),
+        "sent_out": _ticked(a, 3),
+        "grade_as_punishment": _ticked(a, 4),
+        "physical_force": _ticked(a, 5),
     }
     ind.update(_wellbeing(a, q))
     ind["school_worse"] = _school_worse(a, q)
@@ -329,9 +329,17 @@ def _indicators(a: dict, role: str, grade: int, q: dict) -> dict:
     return ind
 
 
-def _at_least(a: dict, qid: str, k: int):
-    v = a.get(qid)
-    return None if not isinstance(v, int) else int(v >= k)
+def _ticked(a: dict, opt: int):
+    v = a.get("HP00")
+    return None if not isinstance(v, list) else int(opt in v)
+
+
+def _weekly(a: dict, opt: int, follow_up: str):
+    t = _ticked(a, opt)
+    if t != 1:
+        return t
+    f = a.get(follow_up)
+    return None if not isinstance(f, int) else int(f >= 1)   # month3: 1 = almost every week
 
 
 def _wellbeing(a: dict, q: dict) -> dict:
@@ -354,12 +362,17 @@ def _school_worse(a: dict, q: dict):
     return int(sum(1 for x, y in pairs if x - y >= c["worse_steps"]) >= c["worse_min_symptoms"])
 
 
+def _sleep_hours(a: dict, q: dict):
+    """Hours slept on school nights, from the school-weeks row of SC06."""
+    d = next((x for x in q["derived"] if x["kind"] == "sleep_from_hours"), None)
+    v = a.get(d["from"]) if d else None
+    return d["hours"][v] if isinstance(v, int) and v < len(d["hours"]) else None
+
+
 def _sleep_short(a: dict, q: dict, grade: int):
-    d = next((x for x in q["derived"] if x["kind"] == "sleep_hours"), None)
-    b, w = a.get("SL01"), a.get("SL02")
-    if d is None or not isinstance(b, int) or not isinstance(w, int):
+    hours = _sleep_hours(a, q)
+    if hours is None:
         return None
-    hours = 24 - d["bed_hours"][b] + d["wake_hours"][w]
     need = q["params"]["norms"]["sleep"]["min_hours_by_grade"]["1-6" if grade <= 6 else "7-12"]
     return int(hours < need)
 
@@ -897,12 +910,13 @@ def _sim_grid(ans: dict, v: dict, rng: random.Random, latent: float, grade: int)
 
 def _sim_rare(ans: dict, v: dict, rng: random.Random, latent: float):
     """Harmful practices are rare events, more frequent where the school climate is poor."""
-    if v["id"] == "HP05":
-        ans[v["id"]] = 1 if rng.random() < 0.01 + (0.08 if latent < -1.5 else 0.0) else 0
-    elif v["id"] == "HP06":
-        ans[v["id"]] = 1 if rng.random() < 0.04 + (0.12 if latent < -1.0 else 0.0) else 0
+    if v["id"] == "HP00":
+        # base rate of each practice, rising where the climate is poor
+        base = [0.08, 0.07, 0.12, 0.12, 0.05, 0.01]
+        ticked = [k for k, b in enumerate(base) if rng.random() < b + max(0.0, -latent) * b * 1.5]
+        ans[v["id"]] = ticked or [6]
     else:
-        ans[v["id"]] = int(min(3, max(0, round(-0.8 - 0.9 * latent + rng.gauss(0, 0.8)))))
+        ans[v["id"]] = int(min(2, max(0, round(-0.6 - 0.7 * latent + rng.gauss(0, 0.7)))))
 
 
 def _sim_answers(q: dict, rng: random.Random, role: str, grade: int, latent: float, gender: int, token: str) -> dict:
@@ -922,12 +936,12 @@ def _sim_answers(q: dict, rng: random.Random, role: str, grade: int, latent: flo
                 ans[v["id"]] = [0] if latent < 0 else [4]
             elif v["id"] == "QC01":
                 ans[v["id"]] = 1 if rng.random() > 0.05 else 3
+            elif v["module"] == "HP":
+                _sim_rare(ans, v, rng, latent)
             elif v["type"] == "multi":
                 ans[v["id"]] = [rng.randrange(len(v["options"]))]
             elif v["type"] == "grid":
                 _sim_grid(ans, v, rng, latent, grade)
-            elif v["module"] == "HP":
-                _sim_rare(ans, v, rng, latent)
             elif v.get("score"):
                 ans[v["id"]] = _pick(q, v, 62 + 14 * latent + rng.gauss(0, 12), grade)
             elif v.get("options"):
