@@ -424,6 +424,7 @@
 
   function route() {
     const [, level, id] = (location.hash.match(/^#\/([a-z]+)(?:\/(.+))?$/) || []);
+    if (level === "login") { go("#/school"); return openLogin(""); }
     if (level === "signals") return allowed(TABS.at(-1)) ? loadSignals() : (openLogin("Сигналите се виждат само с ключ на инспектората, директора или учителя."), go("#/school"));
     if (level && id) return loadUnit(level, decodeURIComponent(id));
     st.level = TABS.some((t) => t.level === level && level !== "system") ? level : st.who.scope === "teacher" ? "teacher" : "school";

@@ -3,81 +3,198 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#12151a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0f2440">
 <meta name="referrer" content="no-referrer">
 <title>Глас за училището</title>
-<meta name="description" content="Анонимна обратна връзка от родители и ученици за натоварването, съня, благополучието, преподаването и климата в училище.">
+<meta name="description" content="Анонимна обратна връзка от родители и ученици за съня, натоварването, благополучието, безопасността и отношението към децата в училище.">
+<link rel="preload" href="fonts/serif-cyr.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="img/hero.webp" as="image">
 <link rel="stylesheet" href="sf.css">
 <style>
-  .hero { padding: 40px 0 10px; display: grid; gap: 28px; align-items: center; }
-  .hero p.lead { font-size: 1.15rem; color: var(--ink-2); max-width: 620px; }
-  .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
-  .cta .btn { min-height: 54px; padding: 14px 24px; font-size: 1.05rem; }
-  .art { display: none; }
-  @media (min-width: 900px) { .hero { grid-template-columns: 1.2fr 1fr; padding-top: 64px; } .art { display: block; } }
-  .art .card { padding: 26px; }
-  .art .row-s { display: grid; grid-template-columns: 1fr 140px 40px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
-  .art .row-s:last-child { border-bottom: 0; }
-  .art .row-s b { text-align: right; font-variant-numeric: tabular-nums; }
-  .feat { margin-top: 56px; }
-  .feat .card h3 { display: flex; gap: 10px; align-items: center; }
-  .feat .card svg { width: 22px; height: 22px; color: var(--primary); }
-  .feat .card p { color: var(--ink-2); margin: 0; font-size: .96rem; }
-  .steps { counter-reset: s; list-style: none; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-  .steps li { counter-increment: s; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; color: var(--ink-2); }
-  .steps li::before { content: counter(s); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-weight: 750; margin-bottom: 10px; }
-  .steps b { color: var(--ink); }
+  main { padding: 0; }
+  .hero { position: relative; color: #fff; background: var(--navy-deep) url(img/hero.webp) center 40% / cover no-repeat; }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10, 24, 44, .94) 0%, rgba(10, 24, 44, .82) 45%, rgba(10, 24, 44, .35) 100%); }
+  .hero .wrap { position: relative; padding-top: 72px; padding-bottom: 76px; }
+  .hero .eyebrow { display: inline-flex; gap: 10px; align-items: center; font-size: .82rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: #e5c983; }
+  .hero .eyebrow::before { content: ""; width: 28px; height: 2px; background: var(--accent); }
+  .hero h1 { color: #fff; font-size: clamp(2rem, 5.4vw, 3.2rem); max-width: 760px; margin: 18px 0 18px; line-height: 1.12; }
+  .hero p.lead { font-size: clamp(1.05rem, 2.2vw, 1.2rem); color: #dbe3ee; max-width: 620px; margin-bottom: 28px; }
+  .hero .btn { min-height: 54px; padding: 14px 26px; font-size: 1.05rem; }
+  .hero .btn.light { --b: #fff; color: var(--navy-deep); }
+  .hero .btn.ghost { background: transparent; border-color: rgba(255,255,255,.6); color: #fff; }
+  .hero .meta { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 30px; font-size: .92rem; color: #c8d3e1; }
+  .hero .meta span { display: inline-flex; gap: 8px; align-items: center; }
+  .hero .meta svg { width: 18px; height: 18px; color: #e5c983; }
+  .hero .meta a { color: #fff; }
+
+  section.band { padding: 64px 0; }
+  section.band.alt { background: var(--card); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .kicker { font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  .band h2 { margin-top: 0; font-size: clamp(1.5rem, 3.4vw, 2.1rem); max-width: 720px; }
+  .band .intro { color: var(--ink-2); max-width: 680px; font-size: 1.05rem; }
+
+  .measures { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-top: 30px;
+    grid-template-columns: 1fr; }
+  @media (min-width: 560px) { .measures { grid-template-columns: 1fr 1fr; } .measures > div:last-child { grid-column: 1 / -1; } }
+  @media (min-width: 960px) { .measures { grid-template-columns: repeat(5, 1fr); } .measures > div:last-child { grid-column: auto; } }
+  .measures > div { background: var(--card); padding: 24px 22px; }
+  .measures svg { width: 28px; height: 28px; color: var(--primary); }
+  .measures h3 { margin: 14px 0 6px; font-size: 1.05rem; }
+  .measures p { margin: 0; color: var(--ink-2); font-size: .94rem; }
+
+  .split { display: grid; gap: 36px; align-items: center; }
+  @media (min-width: 880px) { .split { grid-template-columns: 1fr 1fr; gap: 56px; } .split.rev > figure { order: 2; } }
+  .split figure { margin: 0; }
+  .split img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius); display: block; }
+  .split figcaption { font-size: .8rem; color: var(--muted); margin-top: 8px; }
+  .ticks { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 12px; }
+  .ticks li { display: grid; grid-template-columns: 24px 1fr; gap: 12px; color: var(--ink-2); }
+  .ticks svg { width: 22px; height: 22px; color: var(--good); margin-top: 2px; }
+  .ticks b { color: var(--ink); }
+
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 30px 0 0; display: grid; gap: 0; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border-top: 2px solid var(--primary); }
+  .steps li { counter-increment: s; padding: 22px 22px 6px 0; color: var(--ink-2); }
+  .steps li::before { content: counter(s, decimal-leading-zero); display: block; font: 700 1.6rem/1 var(--serif); color: var(--accent); margin-bottom: 12px; }
+  .steps b { display: block; color: var(--ink); font-size: 1.05rem; margin-bottom: 4px; }
+
+  .audiences { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); margin-top: 30px; }
+  .aud { background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--primary); border-radius: var(--radius-sm); padding: 22px; display: flex; flex-direction: column; }
+  .aud svg { width: 26px; height: 26px; color: var(--primary); }
+  .aud h3 { margin: 12px 0 6px; }
+  .aud p { color: var(--ink-2); font-size: .94rem; margin: 0 0 16px; flex: 1; }
+  .aud a { font-weight: 650; text-decoration: none; }
+  .aud a:hover { text-decoration: underline; }
+
+  .help { background: var(--primary); color: #fff; border-radius: var(--radius); padding: 28px; display: grid; gap: 16px; align-items: center; }
+  @media (min-width: 760px) { .help { grid-template-columns: 1fr auto; padding: 32px 40px; } }
+  .help h2 { color: #fff; margin: 0 0 6px; font-size: 1.4rem; }
+  .help p { margin: 0; color: #dbe3ee; }
+  .help a.num { color: #fff; font: 700 2rem/1 var(--serif); text-decoration: none; display: inline-flex; gap: 12px; align-items: center; }
+  .help a.num svg { width: 28px; height: 28px; }
 </style>
 </head>
 <body>
+<div class="gov-strip"><div class="wrap"><span class="long">Независима платформа за анонимна обратна връзка от родители и ученици</span><span class="sp"></span><span>Телефон за деца: <a href="tel:116111">116 111</a></span></div></div>
 <header class="site-head">
   <div class="wrap">
-    <a class="brand" href="./"><span class="brand-mark" data-icon="mark"></span><span class="brand-name">Глас за училището</span></a>
-    <nav class="site-nav"><a href="survey.html">Анкета</a><a href="results.html">Резултати</a></nav>
+    <a class="brand" href="./"><span class="brand-mark" data-icon="mark"></span><span class="brand-name">Глас за училището<small>Обратна връзка за училищната среда</small></span></a>
+    <nav class="site-nav"><a href="./" aria-current="page" class="opt-link">Начало</a><a href="survey.html">Анкета</a><a href="results.html">Резултати</a><a href="#metod" class="opt-link">Методология</a></nav>
   </div>
 </header>
 <main>
-  <div class="wrap">
-    <section class="hero">
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">Анонимна анкета за родители и ученици</span>
+      <h1>Как наистина се чувстват децата в училище</h1>
+      <p class="lead">Оценките показват какво знаят децата, но не и дали спят достатъчно, дали ги боли глава преди час, дали ги е страх. Вашите отговори превръщат това в данни, които училището и инспекторатът не могат да пренебрегнат.</p>
+      <div class="row" style="gap:12px">
+        <a class="btn light" href="survey.html">Попълнете анкетата</a>
+        <a class="btn ghost" href="results.html">Резултати по училища</a>
+      </div>
+      <div class="meta">
+        <span data-i="clock">Около 6 минути</span>
+        <span data-i="shield">Без имена и лични данни</span>
+        <span data-i="users">1.–12. клас</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <p class="kicker">Какво измерваме</p>
+      <h2>Факти от последния месец, а не впечатления</h2>
+      <p class="intro">Питаме за конкретни неща, които се случват или не се случват. Отговорите се сравняват с норми за възрастта и със средното за страната.</p>
+      <div class="measures">
+        <div><span data-i="moon"></span><h3>Сън и натоварване</h3><p>Часове сън в учебно време и във ваканция, време за домашни, свободно време.</p></div>
+        <div><span data-i="heart"></span><h3>Благополучие</h3><p>Утвърденият индекс WHO-5, главоболие и болки в корема, тревожност преди училище.</p></div>
+        <div><span data-i="shield"></span><h3>Безопасност</h3><p>Тормоз между деца, сигурност в училище и дали има към кого да се обърне детето.</p></div>
+        <div><span data-i="alert"></span><h3>Вредни практики</h3><p>Викане, заплахи с оценка, колективни наказания, отстраняване от час, физическа сила.</p></div>
+        <div><span data-i="book"></span><h3>Преподаване и подкрепа</h3><p>Ясни ли са часовете, по силите ли са задачите, помагат ли учителите.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band alt" id="metod">
+    <div class="wrap split">
+      <figure><img src="img/teaching.webp" alt="Учител пише на черна дъска" loading="lazy" width="1000" height="750"></figure>
       <div>
-        <span class="chip primary">Анонимно · за родители и ученици</span>
-        <h1 style="margin-top:14px">Как наистина е в училище?</h1>
-        <p class="lead">Оценките показват какво знаят децата, но не и как се чувстват в училище. Тук родители и ученици описват факти – сън, болки, тревожност, тормоз, викане, наказания – които се сравняват с валидирани норми и със средното за страната.</p>
-        <div class="cta">
-          <a class="btn" href="survey.html">Попълни анкетата</a>
-          <a class="btn secondary" href="results.html">Виж резултатите</a>
-        </div>
-        <p class="small muted" style="margin-top:14px">Нямате код? Можете да изберете училището сами или да <a href="survey.html?demo">разгледате пробната анкета</a>.</p>
+        <p class="kicker">Методология</p>
+        <h2>Измерване, на което може да се разчита</h2>
+        <ul class="ticks">
+          <li><span data-i="check"></span><span><b>Утвърдени въпросници.</b> Индекс на благополучие на СЗО (WHO-5) и въпроси от международното изследване HBSC за здравето на учениците.</span></li>
+          <li><span data-i="check"></span><span><b>Едно и също дете – в учебно време и във ваканция.</b> Така се вижда какво идва от училището, а не от семейството или възрастта.</span></li>
+          <li><span data-i="check"></span><span><b>Интервал на несигурност</b> за всеки резултат. Малките разлики не се представят като големи.</span></li>
+          <li><span data-i="check"></span><span><b>Сигнал само при значимо отклонение</b> от средното за страната и при поне 10 отговора.</span></li>
+        </ul>
       </div>
-      <div class="art" aria-hidden="true">
-        <div class="card">
-          <div class="small muted" style="font-weight:650;margin-bottom:8px">Примерно училище</div>
-          <div class="row-s"><span>Натоварване</span><div class="ci"><div class="rng" style="left:58%;width:10%"></div><div class="ref" style="left:66%"></div><div class="dot" style="left:63%"></div></div><b>63</b></div>
-          <div class="row-s"><span>Сън и свободно време</span><div class="ci"><div class="rng" style="left:72%;width:8%"></div><div class="ref" style="left:70%"></div><div class="dot" style="left:76%"></div></div><b>76</b></div>
-          <div class="row-s"><span>Благополучие</span><div class="ci"><div class="rng" style="left:64%;width:9%"></div><div class="ref" style="left:67%"></div><div class="dot" style="left:68%"></div></div><b>68</b></div>
-          <div class="row-s"><span>Безопасност</span><div class="ci"><div class="rng" style="left:78%;width:8%"></div><div class="ref" style="left:71%"></div><div class="dot" style="left:82%"></div></div><b>82</b></div>
-        </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <p class="kicker">Как работи</p>
+      <h2>От отговора до обобщения резултат</h2>
+      <ol class="steps">
+        <li><b>Получавате код</b>Училището раздава листчета с кодове. Можете да попълните и без код – като изберете училището и класа.</li>
+        <li><b>Попълвате анонимно</b>От телефон или компютър, за около 6 минути. Допълнителни въпроси има само ако нещо не е наред.</li>
+        <li><b>Резултатите се обобщават</b>За класа, училището, региона и страната, при поне 5 отговора и с интервал на несигурност.</li>
+        <li><b>Сигнал към инспектората</b>Когато вредна практика се среща значително по-често от средното, РУО получава сигнал с доказателствата.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="band alt">
+    <div class="wrap split rev">
+      <figure><img src="img/survey.webp" alt="Ръка попълва лист с отговори" loading="lazy" width="1000" height="750"></figure>
+      <div>
+        <p class="kicker">Поверителност</p>
+        <h2>Анонимно по начина, по който е направена</h2>
+        <ul class="ticks">
+          <li><span data-i="check"></span><span>Не питаме за имена, имейли, телефони. Кодът показва само класа и дали попълва родител или ученик.</span></li>
+          <li><span data-i="check"></span><span>Свободният текст се почиства от имена и телефони още при изпращането.</span></li>
+          <li><span data-i="check"></span><span>Публично излизат само обобщени резултати за училища и региони. Резултатите за класове и учители се виждат само с ключ за достъп.</span></li>
+          <li><span data-i="check"></span><span>Сайтът не зарежда нищо от външни услуги – без реклами, без проследяване.</span></li>
+        </ul>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="feat grid grid-3">
-      <div class="card flat"><h3><span data-icon="shield"></span>Наистина анонимно</h3><p>Без имена, имейли и телефони. Кодът от листчето показва само класа и ролята и се използва веднъж.</p></div>
-      <div class="card flat"><h3><span data-icon="chart"></span>Измерване, не мнения</h3><p>Утвърдени въпросници на СЗО, конкретни факти за последния месец и сравнение на всяко дете в учебно време и във ваканция.</p></div>
-      <div class="card flat"><h3><span data-icon="heart"></span>Сигнал, когато има вреда</h3><p>Когато вредна практика се среща значително по-често от средното за страната, РУО получава сигнал с доказателствата. Резултатите за учител не се публикуват.</p></div>
-    </section>
+  <section class="band">
+    <div class="wrap">
+      <p class="kicker">За кого</p>
+      <h2>Една анкета, четири гледни точки</h2>
+      <div class="audiences">
+        <div class="aud"><span data-i="users"></span><h3>Родители</h3><p>За всяко дете поотделно, от 1. до 12. клас. Въпросите са за това, което детето разказва и което виждате у дома.</p><a href="survey.html">Към анкетата →</a></div>
+        <div class="aud"><span data-i="book"></span><h3>Ученици</h3><p>От 4. клас нагоре, с по-кратък и по-прост вариант за най-малките. Никой не вижда отговорите ти.</p><a href="survey.html">Към анкетата →</a></div>
+        <div class="aud"><span data-i="building"></span><h3>Училища</h3><p>Директорът вижда резултатите по класове и сравнение със страната, за да знае къде да се намеси.</p><a href="results.html">Резултати →</a></div>
+        <div class="aud"><span data-i="alert"></span><h3>Инспекторат (РУО)</h3><p>Сигнали за проверка в региона, с доказателствата и печатен доклад. Сигналът е повод за проверка, не присъда.</p><a href="results.html#/signals">Сигнали →</a></div>
+      </div>
+    </div>
+  </section>
 
-    <h2 style="margin-top:56px">Как работи</h2>
-    <ol class="steps">
-      <li><b>Училището раздава листчета</b> с кодове – по един за всеки родител и ученик. Никой не знае кой какъв код е взел.</li>
-      <li><b>Попълвате за около 6 минути</b> от телефон или компютър. Виждате само въпросите за вашата роля и клас.</li>
-      <li><b>Резултатите се изчисляват</b> обобщено за класа, училището, региона и страната – с интервали и сравнение със средното.</li>
-      <li><b>Публично излизат само обобщени данни</b> за училища и региони. Резултатите за класове и учители са поверителни и се виждат само с ключ.</li>
-    </ol>
-  </div>
+  <section class="band" style="padding-top:0">
+    <div class="wrap">
+      <div class="help">
+        <div><h2>Ако на детето му е тежко сега</h2><p>Националната телефонна линия за деца е безплатна, денонощна и анонимна.</p></div>
+        <a class="num" href="tel:116111"><span data-i="phone"></span>116 111</a>
+      </div>
+    </div>
+  </section>
 </main>
-<footer class="site-foot"><div class="wrap">Ако някой те тормози или ти е тежко, обади се безплатно на Националната телефонна линия за деца <a href="tel:116111"><b>116 111</b></a>.</div></footer>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div><h4>Глас за училището</h4><p style="margin:0">Независима платформа за анонимна обратна връзка от родители и ученици за училищната среда.</p></div>
+      <div><h4>Платформата</h4><ul><li><a href="survey.html">Анкета</a></li><li><a href="results.html">Резултати</a></li><li><a href="#metod">Методология</a></li><li><a href="results.html#login">Вход за училища и РУО</a></li></ul></div>
+      <div><h4>Помощ</h4><ul><li>Телефон за деца: <a href="tel:116111">116 111</a></li><li><a href="survey.html?demo">Пробна анкета</a></li></ul></div>
+    </div>
+    <div class="base"><span>© 2026 Глас за училището</span><span class="sp"></span><span>Снимки: Unsplash</span></div>
+  </div>
+</footer>
 <script src="sf.js"></script>
-<script>for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = SF.ICON[el.dataset.icon] || "";</script>
+<script>
+  for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = SF.ICON[el.dataset.icon] || "";
+  for (const el of document.querySelectorAll("[data-i]")) el.insertAdjacentHTML("afterbegin", SF.ICON[el.dataset.i] || "");
+</script>
 </body>
 </html>

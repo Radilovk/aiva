@@ -27,7 +27,7 @@ body.sv main { flex: 1; padding: 0; display: flex; flex-direction: column; }
 .sv-bar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .sv-bar .narrow { display: flex; align-items: center; gap: 10px; min-height: 58px; }
-.icon-btn { appearance: none; width: 44px; height: 44px; border-radius: 12px; border: 0; background: transparent; color: var(--ink);
+.icon-btn { appearance: none; width: 44px; height: 44px; border-radius: var(--radius-sm); border: 0; background: transparent; color: var(--ink);
   display: grid; place-items: center; cursor: pointer; flex: none; }
 .icon-btn:hover { background: var(--bg-2); }
 .icon-btn:disabled { opacity: .3; cursor: default; background: none; }
@@ -53,7 +53,7 @@ body.sv main { flex: 1; padding: 0; display: flex; flex-direction: column; }
 
 .opts { display: grid; gap: 10px; margin-top: 18px; }
 .opt { appearance: none; width: 100%; text-align: left; font: 500 1.06rem/1.35 var(--font); color: var(--ink); background: var(--card);
-  border: 1.5px solid var(--line-2); border-radius: 14px; padding: 14px 16px; min-height: 56px; display: flex; align-items: center; gap: 14px;
+  border: 1.5px solid var(--line-2); border-radius: 8px; padding: 14px 16px; min-height: 56px; display: flex; align-items: center; gap: 14px;
   cursor: pointer; transition: border-color .12s, background .12s, transform .08s, box-shadow .12s; -webkit-tap-highlight-color: transparent; }
 .opt:hover { border-color: var(--primary-line); }
 .opt:active { transform: scale(.99); }
@@ -103,7 +103,7 @@ body.sv main { flex: 1; padding: 0; display: flex; flex-direction: column; }
 .stat-row b { display: block; font-size: 1.7rem; font-variant-numeric: tabular-nums; }
 .stat-row span { color: var(--muted); font-size: .88rem; }
 .skipped { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; }
-.skipped button { appearance: none; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+.skipped button { appearance: none; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px;
   font: inherit; font-size: .92rem; color: var(--ink-2); cursor: pointer; }
 .skipped button:hover { border-color: var(--primary-line); color: var(--ink); }
 
@@ -137,6 +137,18 @@ body.sv main { flex: 1; padding: 0; display: flex; flex-direction: column; }
 .pick.grades .opt { justify-content: center; font-size: 1.3rem; font-weight: 650; min-height: 64px; padding: 10px; }
 .pick.grades .opt:disabled { opacity: .35; cursor: not-allowed; }
 .pick-back { margin: 0 0 6px -8px; }
-.school-input { width: 100%; font: 500 1.1rem/1.3 var(--font); padding: 14px 16px; border-radius: 14px; border: 1.5px solid var(--line-2);
+.school-input { width: 100%; font: 500 1.1rem/1.3 var(--font); padding: 14px 16px; border-radius: var(--radius-sm); border: 1.5px solid var(--line-2);
   background: var(--card); color: var(--ink); margin-top: 18px; }
 .school-input:focus { outline: none; border-color: var(--primary); }
+
+/* code screen: a quiet photo beside the form on wide screens */
+.code-layout { width: 100%; }
+.sv-art { display: none; margin: 0; }
+@media (min-width: 980px) {
+  .code-layout { max-width: 1080px; margin: 0 auto; padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+  .code-layout .narrow { padding: 0; order: -1; }
+  .sv-art { display: block; }
+  .sv-art img { width: 100%; height: auto; max-height: 76vh; aspect-ratio: 4 / 5; object-fit: cover; object-position: center 20%; border-radius: var(--radius); display: block; }
+}
+.sv-screen h1 { margin-bottom: .4em; }
+@media (max-width: 560px) { body.sv .brand-name { display: block; } }
