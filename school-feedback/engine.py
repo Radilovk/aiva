@@ -117,14 +117,14 @@ def assign_teachers(q: dict, token: str, role: str, class_teachers: list[dict], 
     """Which teachers a respondent rates.
 
     Parent  -> class teacher only.
-    Student in the short (grade 4) form -> class teacher only.
     Student -> class teacher + k others, taken from the least-rated teachers so far (balances coverage),
+               also in grades 1-4 when the class has subject teachers besides the class teacher;
                deterministic per token so the form re-renders identically.
     class_teachers: [{"teacher_id","name","subject","is_class_teacher"}]
     """
     p = q["params"]["teacher_assignment"]
     head = [t for t in class_teachers if t.get("is_class_teacher")]
-    if role == "parent" or (grade is not None and is_young(q, role, grade)):
+    if role == "parent":
         return head[:1]
     others = [t for t in class_teachers if not t.get("is_class_teacher")]
     counts = rating_counts or {}

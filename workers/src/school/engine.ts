@@ -195,7 +195,8 @@ export function assignTeachers(q: Questionnaire, token: string, role: string, cl
   ratingCounts: Dict<number> = {}, grade?: number): Teacher[] {
   const p = q.params.teacher_assignment;
   const head = classTeachers.filter((t) => t.is_class_teacher);
-  if (role === 'parent' || (grade !== undefined && isYoung(q, role, grade))) return head.slice(0, 1);
+  // parents rate the class teacher; students (grades 1-4 too, where a class has subject teachers) also rate others
+  if (role === 'parent') return head.slice(0, 1);
   const pool = classTeachers.filter((t) => !t.is_class_teacher);
   const rng = new Rng(Math.floor(hashUnit('assign', token) * 2 ** 32));
   const chosen: Teacher[] = [];

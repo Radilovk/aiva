@@ -65,8 +65,15 @@ class Flow(unittest.TestCase):
         self.assertEqual(st, E.assign_teachers(Q, "tokX", "student", roster))  # deterministic
         pa = E.assign_teachers(Q, "tokX", "parent", roster)
         self.assertEqual([t["teacher_id"] for t in pa], ["T1"])
+        # grades 1-4 can have subject teachers too: a 4th-grader rates them like older students
         young = E.assign_teachers(Q, "tokX", "student", roster, grade=4)
-        self.assertEqual([t["teacher_id"] for t in young], ["T1"])
+        self.assertEqual(young[0]["teacher_id"], "T1")
+        self.assertEqual(len(young), 2)
+        # a class with one teacher for everything: only that teacher
+        only = E.assign_teachers(Q, "tokX", "student", roster[:1], grade=4)
+        self.assertEqual([t["teacher_id"] for t in only], ["T1"])
+        fy = E.flow(Q, {"role": "student", "grade": 4, "token": "tokX"}, {}, young)
+        self.assertEqual({v["teacher_id"] for v in fy if v["id"].startswith("TC")}, {"T1", young[1]["teacher_id"]})
         f = E.flow(Q, {"role": "student", "grade": 8, "token": "tokX"}, {}, st)
         tc = [v for v in f if v["id"].startswith("TC")]
         self.assertEqual(len(tc), 2 * 4)   # respect, clarity + 2 behaviour counts (TC10, TC11)
