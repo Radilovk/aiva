@@ -25,6 +25,17 @@
   .slip .c { font: 700 18pt/1.2 var(--mono); letter-spacing: .08em; margin: 6px 0; }
   .slip .u { font-size: 10pt; }
   .slip .p { font-size: 9pt; color: #444; margin-top: 6px; }
+  .slip { display: grid; grid-template-columns: 1fr 26mm; gap: 4mm; align-items: center; }
+  .slip .q svg, .qr-card .q svg { width: 100%; height: auto; display: block; }
+  .qr-card { display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: center; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; }
+  .qr-card .q { background: #fff; padding: 4px; border-radius: 4px; }
+  .qr-card code { word-break: break-all; font-size: .85rem; }
+  .req { display: grid; grid-template-columns: 1fr auto; gap: 8px 14px; align-items: center; border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .poster { grid-column: 1 / -1; text-align: center; color: #000; padding: 12mm 10mm; font-size: 14pt; }
+  .poster h1 { font: 700 26pt/1.15 var(--serif); margin: 6mm 0; color: #000; }
+  .poster .q { width: 110mm; margin: 8mm auto; }
+  .poster .q svg { width: 100%; height: auto; }
+  .poster .u { font: 600 13pt var(--mono); }
   @media print {
     body > *:not(#slips) { display: none !important; }
     #slips { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8mm; padding: 6mm; }
@@ -91,6 +102,23 @@
       </form>
       <div class="card" id="codes-out" hidden style="margin-top:14px"></div>
 
+      <h2>Училища: връзка и QR код</h2>
+      <div class="card">
+        <p class="ink2 small" style="margin-top:0">Всяко училище има собствен адрес на анкетата. Родителите и учениците избират само кой попълва и класа. Отговорите без код се отчитат с половин тежест и сами не задействат сигнал.</p>
+        <input type="search" id="qr-q" placeholder="Търсене на училище по име или град" autocomplete="off">
+        <div id="qr-list" class="stack" style="margin-top:12px"></div>
+      </div>
+
+      <h2>Регистър на училищата</h2>
+      <div class="card">
+        <p class="ink2 small" style="margin-top:0">Внесете списъка на училищата (например регистъра на активните институции на МОН), за да могат родителите да попълват без код за всяко училище в страната. По един ред: <code>код;име;населено място;област</code>.</p>
+        <textarea id="reg-text" placeholder="1000101;СУ „Христо Ботев“;Банско;Благоевград"></textarea>
+        <div class="row" style="margin-top:10px"><button class="btn small" type="button" id="reg-btn">Внеси</button><span class="small muted" id="reg-msg"></span></div>
+      </div>
+
+      <h2>Предложени училища</h2>
+      <div class="card"><div id="req-list" class="stack"><p class="muted small">Няма нови предложения.</p></div></div>
+
       <h2>Ключове за достъп</h2>
       <div class="card">
         <form class="form-grid" id="key-form">
@@ -132,6 +160,7 @@
 <div id="slips"></div>
 <script src="org.js"></script>
 <script src="sf.js"></script>
+<script src="lib/qrcode.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

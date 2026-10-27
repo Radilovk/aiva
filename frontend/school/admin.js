@@ -30,6 +30,7 @@
     $("v-login").hidden = true;
     $("v-main").hidden = false;
     loadKeys();
+    loadRequests();
     if (!$("roster").children.length) { addTeacher({ is_class_teacher: true }); addTeacher(); addTeacher(); }
   }
 
@@ -113,15 +114,82 @@
       <p class="ink2 small">Показват се само сега – сървърът пази единствено хешовете им. Отпечатайте листчетата, разрежете ги и ги раздайте разбъркано, така че никой да не знае кой какъв код е взел.</p>
       <div class="row"><button class="btn" id="print-btn">Отпечатай листчета</button><button class="btn secondary" id="copy-btn">Копирай като текст</button></div>
       <p class="small muted" style="margin:14px 0 0">Идентификатор на училището (за ключа на директора): <code>${esc(c.school_id)}</code></p>`;
-    $("slips").innerHTML = all.map(([role, k]) => `<div class="slip"><div><b>Глас за училището</b> · анкета за ${role === "родител" ? "родители" : "ученици"} · ${esc(c.class_name)}</div>
-      <div class="c">${esc(k)}</div><div class="u">Отворете <b>${esc(url)}</b> и въведете кода.</div>
-      <div class="p">Анонимно: кодът показва само класа и ролята и се използва веднъж. ${role === "ученик" && c.grade <= 7 ? "Родителят отметва съгласие преди началото." : ""}</div></div>`).join("");
+    const direct = (k) => new URL(`survey.html?code=${encodeURIComponent(k)}`, location.href).href;
+    $("slips").innerHTML = all.map(([role, k]) => `<div class="slip"><div><div><b>Глас за училището</b> · анкета за ${role === "родител" ? "родители" : "ученици"} · ${esc(c.class_name)}</div>
+      <div class="c">${esc(k)}</div><div class="u">Сканирайте кода или отворете <b>${esc(url)}</b> и въведете кода.</div>
+      <div class="p">Анонимно: кодът показва само класа и ролята и се използва веднъж. ${role === "ученик" && c.grade <= 7 ? "Родителят отметва съгласие преди началото." : ""}</div></div>
+      <div class="q">${SF.qrSvg(direct(k), 2)}</div></div>`).join("");
     $("print-btn").addEventListener("click", () => window.print());
     $("copy-btn").addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(all.map(([r, k]) => `${r}\t${k}`).join("\n")); toast("Копирано."); } catch (e) { toast("Копирането не е позволено от браузъра."); }
     });
     $("codes-out").scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  // ------------------------------------------------------------------ school links, QR, posters
+  let qrTimer = null;
+  $("qr-q").addEventListener("input", () => { clearTimeout(qrTimer); qrTimer = setTimeout(findSchools, 250); });
+  async function findSchools() {
+    const q = $("qr-q").value.trim();
+    if (q.length < 2) { $("qr-list").innerHTML = ""; return; }
+    const { schools } = await api(`/schools?q=${encodeURIComponent(q)}`);
+    $("qr-list").innerHTML = schools.length ? schools.map((sc) => {
+      const link = SF.schoolLink(sc.school_id);
+      return `<div class="qr-card"><div class="q">${SF.qrSvg(link)}</div><div><b>${esc(sc.name)}</b><div class="small muted">${esc(sc.region || "")} · ${esc(sc.school_id)}</div>
+        <code>${esc(link)}</code><div class="row" style="margin-top:8px"><button class="btn small secondary" data-copy="${esc(link)}">Копирай връзката</button>
+        <button class="btn small" data-poster="${esc(sc.school_id)}" data-name="${esc(sc.name)}">Плакат за печат</button></div></div></div>`;
+    }).join("") : '<p class="muted small">Няма училище с отворена анкета. Внесете го в регистъра или създайте клас.</p>';
+  }
+  document.addEventListener("click", async (e) => {
+    const cp = e.target.closest("[data-copy]");
+    if (cp) { try { await navigator.clipboard.writeText(cp.dataset.copy); toast("Копирано."); } catch { toast("Копирайте ръчно."); } return; }
+    const ps = e.target.closest("[data-poster]");
+    if (!ps) return;
+    const link = SF.schoolLink(ps.dataset.poster);
+    $("slips").innerHTML = `<div class="poster"><div><b>Глас за училището</b> · анонимна анкета за родители и ученици</div>
+      <h1>Как е в ${esc(ps.dataset.name)}?</h1>
+      <div>Сън, натоварване, настроение, безопасност и отношение към децата. Около 6 минути, без имена.</div>
+      <div class="q">${SF.qrSvg(link, 8)}</div><div class="u">${esc(link.replace(/^https?:\/\//, ""))}</div>
+      <p style="margin-top:8mm;font-size:11pt">Родители – за всяко дете поотделно. Ученици – от 4. клас нагоре.<br>Ако дете е в опасност: 112 · Телефон за деца 116 111</p></div>`;
+    window.print();
+  });
+
+  // ------------------------------------------------------------------ register import and proposals
+  $("reg-btn").addEventListener("click", async () => {
+    const rows = $("reg-text").value.split(/\r?\n/).map((l) => l.split(/[;\t]/).map((x) => x.trim())).filter((r) => r[0] && r[1]);
+    if (!rows.length) return;
+    const msg = $("reg-msg");
+    let done = 0, total = 0;
+    try {
+      for (let i = 0; i < rows.length; i += 500) {
+        const schools = rows.slice(i, i + 500).map(([code, name, town, region]) => ({ school_id: code, name, town, region_id: region ? slug(region) : null, region_name: region || null, source: "register" }));
+        const r = await call("/admin/schools", { method: "POST", body: { schools } });
+        done += r.imported; total = r.total;
+        msg.textContent = `Внесени ${done} от ${rows.length}…`;
+      }
+      msg.textContent = `Готово: ${done} реда. В регистъра има ${total} училища.`;
+    } catch (err) { msg.textContent = err.message; }
+  });
+
+  async function loadRequests() {
+    const { requests } = await call("/admin/school-requests");
+    const ROLE = { parent: "родител", student: "ученик", teacher: "учител", director: "директор" };
+    $("req-list").innerHTML = requests.length ? requests.map((r) => `<div class="req" data-id="${esc(r.id)}"><div><b>${esc(r.name)}</b>
+      <div class="small muted">${esc(r.town || "")}${r.region_name ? " · " + esc(r.region_name) : ""} · предложено от ${esc(ROLE[r.role] || "посетител")} · ${esc(String(r.created_at).slice(0, 10))}</div></div>
+      <div class="row"><input type="text" placeholder="код по НЕИСПУО (по желание)" style="width:200px;min-height:38px"><button class="btn small" data-act="approve">Одобри</button><button class="btn small quiet" data-act="reject">Откажи</button></div></div>`).join("")
+      : '<p class="muted small">Няма нови предложения.</p>';
+  }
+  $("req-list").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const row = b.closest(".req");
+    const code = row.querySelector("input").value.trim();
+    try {
+      await call(`/admin/school-requests/${row.dataset.id}`, { method: "POST", body: { action: b.dataset.act, school_id: code || undefined } });
+      toast(b.dataset.act === "approve" ? "Училището е добавено." : "Отказано.");
+      loadRequests();
+    } catch (err) { toast(err.message); }
+  });
 
   // ------------------------------------------------------------------ keys
   function syncKeyForm() {

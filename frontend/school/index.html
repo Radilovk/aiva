@@ -71,6 +71,17 @@
   .help p { margin: 0; color: #dbe3ee; }
   .help a.num { color: #fff; font: 700 2rem/1 var(--serif); text-decoration: none; display: inline-flex; gap: 12px; align-items: center; }
   .help a.num svg { width: 28px; height: 28px; }
+  .refs { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 26px; }
+  .ref { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm);
+    text-decoration: none; color: var(--ink); transition: border-color .12s; }
+  .ref:hover { border-color: var(--primary); }
+  .ref b { font-size: 1rem; }
+  .ref span { color: var(--ink-2); font-size: .9rem; flex: 1; }
+  .ref em { font-style: normal; color: var(--primary); font-size: .82rem; font-weight: 600; margin-top: 6px; }
+  .invite { display: grid; gap: 18px; align-items: center; border: 1px solid var(--line); border-left: 4px solid var(--accent); background: var(--card); border-radius: var(--radius-sm); padding: 22px 24px; }
+  @media (min-width: 760px) { .invite { grid-template-columns: 1fr auto; } }
+  .invite h3 { margin: 0 0 4px; font-family: var(--serif); font-size: 1.25rem; }
+  .invite p { margin: 0; color: var(--ink-2); }
 </style>
 </head>
 <body>
@@ -172,10 +183,30 @@
         <div class="aud"><span data-i="building"></span><h3>Училища</h3><p>Директорът вижда резултатите по класове и сравнение със страната, за да знае къде да се намеси.</p><a href="results.html">Резултати →</a></div>
         <div class="aud"><span data-i="alert"></span><h3>Инспекторат (РУО)</h3><p>Сигнали за проверка в региона, с доказателствата и печатен доклад. Сигналът е повод за проверка, не присъда.</p><a href="results.html#/signals">Сигнали →</a></div>
       </div>
+      <div class="invite" style="margin-top:22px">
+        <div><h3>Няма го вашето училище?</h3><p>Предложете го – след проверка родителите и учениците могат да попълват и без код. Директорите могат да поискат кодове по класове.</p></div>
+        <div class="row"><a class="btn" href="survey.html?propose">Предложете училище</a><a class="btn secondary" href="schools.html">За училища и РУО</a></div>
+      </div>
     </div>
   </section>
 
-  <section class="band" style="padding-top:0">
+  <section class="band alt" id="sources">
+    <div class="wrap">
+      <p class="kicker">Източници и полезни институции</p>
+      <h2>На какво стъпваме и към кого да се обърнете</h2>
+      <p class="intro">Въпросникът използва публични международни инструменти. Връзките са за справка – платформата не е свързана с тези институции и не говори от тяхно име.</p>
+      <div class="refs">
+        <a class="ref" href="https://www.who.int/publications/m/item/WHO-UCN-MSD-MHE-2024.01" rel="noopener"><b>Световна здравна организация</b><span>Индекс на благополучие WHO-5</span><em>who.int</em></a>
+        <a class="ref" href="https://hbsc.org" rel="noopener"><b>HBSC</b><span>Здравно поведение на децата в училищна възраст – международно изследване</span><em>hbsc.org</em></a>
+        <a class="ref" href="https://www.mon.bg" rel="noopener"><b>Министерство на образованието и науката</b><span>Нормативна уредба, регионални управления на образованието</span><em>mon.bg</em></a>
+        <a class="ref" href="https://sacp.government.bg" rel="noopener"><b>Държавна агенция за закрила на детето</b><span>Права на детето, сигнали за дете в риск</span><em>sacp.government.bg</em></a>
+        <a class="ref" href="https://www.cpdp.bg" rel="noopener"><b>Комисия за защита на личните данни</b><span>Надзорен орган по защита на данните</span><em>cpdp.bg</em></a>
+        <a class="ref" href="https://www.unicef.org/bulgaria" rel="noopener"><b>УНИЦЕФ България</b><span>Насилие и тормоз в училище, психично здраве на децата</span><em>unicef.org/bulgaria</em></a>
+        <a class="ref" href="https://nmd.bg" rel="noopener"><b>Национална мрежа за децата</b><span>Граждански организации за правата на децата</span><em>nmd.bg</em></a>
+      </div>
+    </div>
+  </section>
+  <section class="band">
     <div class="wrap">
       <div class="help">
         <div><h2>Ако на детето му е тежко сега</h2><p>Националната телефонна линия за деца е безплатна, денонощна и анонимна.</p></div>

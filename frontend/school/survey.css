@@ -156,3 +156,8 @@ body.sv main { flex: 1; padding: 0; display: flex; flex-direction: column; }
 .legal-links { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 26px; font-size: .85rem; }
 .legal-links a { color: var(--muted); }
 #intro-legal { margin: 0 0 18px; }
+
+.school-banner { display: flex; gap: 10px; align-items: center; background: var(--primary-soft); border: 1px solid var(--primary-line); border-radius: var(--radius-sm);
+  padding: 10px 14px; margin-bottom: 18px; color: var(--ink); }
+.school-banner svg { width: 22px; height: 22px; color: var(--primary); flex: none; }
+.propose { display: grid; gap: 12px; margin-top: 14px; }

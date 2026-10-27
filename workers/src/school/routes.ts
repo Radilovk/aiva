@@ -42,7 +42,11 @@ type C = Context<{ Bindings: SfEnv }>;
 const Q = loadQuestionnaire();
 const LEVELS = ['system', 'region', 'school', 'class', 'teacher'] as const;
 const MAX_FAILED_CODES_PER_DAY = 30;
-const MAX_OPEN_SESSIONS_PER_DAY = 20;   // per network address; open answers count half anyway
+const MAX_OPEN_SESSIONS_PER_DAY = 10;   // per network address; open answers count half and never confirm a signal alone
+const MAX_SCHOOL_REQUESTS_PER_DAY = 5;
+const MAX_BAD_KEYS_PER_DAY = 30;
+const POW_BITS = 15;                    // ~33k SHA-256 on average: under a second in a browser, costly at scale
+const POW_TTL_MS = 15 * 60 * 1000;
 
 /** Question ids that other questions' show_if depends on: the client re-asks /flow only after answering these. */
 const TRIGGERS = (() => {
@@ -76,6 +80,12 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS sf_attempts (key TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, day TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS idx_sf_units_unit ON sf_units (level, unit_id)`,
   `CREATE TABLE IF NOT EXISTS sf_rating_counts (teacher_id TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)`,
+  // schools anyone can fill in for without a code: imported from the official register or proposed and approved
+  `CREATE TABLE IF NOT EXISTS sf_schools (school_id TEXT PRIMARY KEY, name TEXT NOT NULL, town TEXT, region_id TEXT, region_name TEXT,
+     source TEXT, created_at TEXT DEFAULT (datetime('now')))`,
+  `CREATE TABLE IF NOT EXISTS sf_school_requests (id TEXT PRIMARY KEY, name TEXT NOT NULL, town TEXT, region_name TEXT, role TEXT, note TEXT,
+     status TEXT NOT NULL DEFAULT 'pending', created_at TEXT DEFAULT (datetime('now')))`,
+  `CREATE TABLE IF NOT EXISTS sf_meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS sf_keys (hash TEXT PRIMARY KEY, scope TEXT NOT NULL, school_id TEXT, teacher_id TEXT, label TEXT,
      created_at TEXT DEFAULT (datetime('now')))`,
 ];
@@ -127,10 +137,14 @@ async function callerKey(c: C): Promise<Key> {
   const m = /^Bearer\s+(.+)$/i.exec(c.req.header('Authorization') || '');
   if (!m) return { scope: 'public' };
   const token = m[1].trim();
+  const badKey = 'key|' + (await ipKey(c));
+  const bad = await c.env.DB.prepare('SELECT n FROM sf_attempts WHERE key = ?').bind(badKey).first<{ n: number }>();
+  if ((bad?.n || 0) >= MAX_BAD_KEYS_PER_DAY) throw new HttpError(429, 'Твърде много грешни ключове от тази връзка. Опитайте утре.');
   if (c.env.SF_ADMIN_KEY && safeEqual(token, c.env.SF_ADMIN_KEY)) return { scope: 'admin', label: 'оператор' };
   if (c.env.SF_ADMIN_KEY_SHA256 && safeEqual(await sha256(token), c.env.SF_ADMIN_KEY_SHA256.toLowerCase())) return { scope: 'admin', label: 'оператор' };
   const row = await c.env.DB.prepare('SELECT scope, school_id, teacher_id, region_id, label FROM sf_keys WHERE hash = ?')
     .bind(await sha256('sf-key|' + token)).first<Key>();
+  if (!row) await bump(c, badKey);
   return row || { scope: 'invalid' };
 }
 
@@ -212,6 +226,9 @@ sf.use('*', async (c, next) => {
   await ensureSchema(c.env.DB);
   await next();
   c.header('Cache-Control', 'no-store');
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('Referrer-Policy', 'no-referrer');
 });
 
 sf.onError((err, c) => {
@@ -324,20 +341,110 @@ sf.post('/demo-session', async (c) => {
 // Answers without a code cannot be tied to a class list, so the engine counts them at half weight ("unverified").
 // They go to one class per grade of the school; there are no teacher ratings without a code.
 
-/** Schools taking part in an open (non-demo) wave, for the "I have no code" search. */
+async function bump(c: C, key: string) {
+  const day = new Date().toISOString().slice(0, 10);
+  await c.env.DB.batch([
+    c.env.DB.prepare('INSERT INTO sf_attempts (key, n, day) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET n = n + 1').bind(key, day),
+    c.env.DB.prepare('DELETE FROM sf_attempts WHERE day < ?').bind(day),
+  ]);
+}
+
+async function underLimit(c: C, prefix: string, max: number, msg: string): Promise<string> {
+  const key = prefix + '|' + (await ipKey(c));
+  const att = await c.env.DB.prepare('SELECT n FROM sf_attempts WHERE key = ?').bind(key).first<{ n: number }>();
+  if ((att?.n || 0) >= max) throw new HttpError(429, msg);
+  return key;
+}
+
+// ------------------------------------------------------------------ proof of work (no captcha, no third party)
+// The browser finds a nonce so that SHA-256(challenge:nonce) starts with POW_BITS zero bits. Challenges are signed
+// with a secret kept in D1, expire after 15 minutes and are accepted once.
+async function powSecret(db: D1Database): Promise<string> {
+  const row = await db.prepare("SELECT v FROM sf_meta WHERE k = 'pow'").first<{ v: string }>();
+  if (row) return row.v;
+  const v = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  await db.prepare("INSERT OR IGNORE INTO sf_meta (k, v) VALUES ('pow', ?)").bind(v).run();
+  return (await db.prepare("SELECT v FROM sf_meta WHERE k = 'pow'").first<{ v: string }>())!.v;
+}
+
+function leadingZeroBits(hex: string): number {
+  let bits = 0;
+  for (const ch of hex) {
+    const v = parseInt(ch, 16);
+    if (v === 0) { bits += 4; continue; }
+    return bits + Math.clz32(v) - 28;
+  }
+  return bits;
+}
+
+sf.get('/pow', async (c) => {
+  const body = `${Date.now()}.${[...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+  const sig = (await sha256(`${await powSecret(c.env.DB)}|${body}`)).slice(0, 20);
+  return c.json({ challenge: `${body}.${sig}`, bits: POW_BITS });
+});
+
+async function verifyPow(c: C, pow: unknown) {
+  const p = (pow || {}) as Dict;
+  const ch = String(p.challenge || ''), nonce = String(p.nonce ?? '');
+  const m = /^(\d{13})\.([0-9a-f]{16})\.([0-9a-f]{20})$/.exec(ch);
+  const fail = () => new HttpError(400, 'Проверката не мина. Презаредете страницата и опитайте отново.');
+  if (!m || !/^\d{1,12}$/.test(nonce)) throw fail();
+  if (Date.now() - Number(m[1]) > POW_TTL_MS) throw fail();
+  if ((await sha256(`${await powSecret(c.env.DB)}|${m[1]}.${m[2]}`)).slice(0, 20) !== m[3]) throw fail();
+  if (leadingZeroBits(await sha256(`${ch}:${nonce}`)) < POW_BITS) throw fail();
+  try {   // once only
+    await c.env.DB.prepare('INSERT INTO sf_attempts (key, n, day) VALUES (?, 1, ?)').bind('pow|' + m[2], new Date().toISOString().slice(0, 10)).run();
+  } catch { throw fail(); }
+}
+
+// ------------------------------------------------------------------ open mode: no code, the respondent picks the school
+// Answers without a code cannot be tied to a class list, so the engine counts them at half weight ("unverified") and
+// they never confirm a signal on their own. They go to one class per grade of the school; no teacher ratings.
+
+const latestOpenWave = (db: D1Database) =>
+  db.prepare('SELECT id FROM sf_waves WHERE open = 1 AND demo = 0 ORDER BY created_at DESC LIMIT 1').first<{ id: string }>();
+
+/** Where a school's open answers go: the wave its registered classes are in, else the latest open wave (register schools). */
+async function openHome(db: D1Database, schoolId: string): Promise<{ wave_id: string; region_id: string; name: string; region: string | null } | null> {
+  const cls = await db.prepare(
+    `SELECT c.wave_id, c.region_id, n.name, r.name AS region FROM sf_classes c JOIN sf_waves w ON w.id = c.wave_id
+       LEFT JOIN sf_names n ON n.level = 'school' AND n.unit_id = c.school_id LEFT JOIN sf_names r ON r.level = 'region' AND r.unit_id = c.region_id
+     WHERE c.school_id = ? AND w.open = 1 AND w.demo = 0 ORDER BY w.created_at DESC LIMIT 1`).bind(schoolId).first<Dict>();
+  if (cls) return { wave_id: cls.wave_id, region_id: cls.region_id, name: cls.name || schoolId, region: cls.region };
+  const reg = await db.prepare('SELECT name, town, region_id, region_name FROM sf_schools WHERE school_id = ?').bind(schoolId).first<Dict>();
+  const w = reg && (await latestOpenWave(db));
+  if (!reg || !w) return null;
+  return { wave_id: w.id, region_id: reg.region_id || 'неуточнен', name: reg.name, region: reg.region_name || reg.town || null };
+}
+
+/** Schools that can be filled in for without a code, for the search box. */
 sf.get('/schools', async (c) => {
   const q = String(c.req.query('q') || '').trim().toLowerCase().replace(/[%_]/g, '').slice(0, 60);
   if (q.length < 2) return c.json({ schools: [] });
   // SQLite LIKE ignores case only for Latin letters: try "софия", "София" and "СОФИЯ"
   const pats = [...new Set([q, q[0].toUpperCase() + q.slice(1), q.toUpperCase()])].map((v) => `%${v}%`);
-  const like = (col: string) => pats.map(() => `${col} LIKE ?`).join(' OR ');
-  const rows = await c.env.DB.prepare(
-    `SELECT DISTINCT c.school_id, n.name AS name, r.name AS region FROM sf_classes c JOIN sf_waves w ON w.id = c.wave_id
-       JOIN sf_names n ON n.level = 'school' AND n.unit_id = c.school_id
-       LEFT JOIN sf_names r ON r.level = 'region' AND r.unit_id = c.region_id
-     WHERE w.open = 1 AND w.demo = 0 AND (${like('n.name')} OR ${like('r.name')}) ORDER BY n.name LIMIT 20`)
-    .bind(...pats, ...pats).all<Dict>();
-  return c.json({ schools: rows.results });
+  const like = (cols: string[]) => cols.flatMap((col) => pats.map(() => `${col} LIKE ?`)).join(' OR ');
+  const [cls, reg, w] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT DISTINCT c.school_id, n.name AS name, r.name AS region FROM sf_classes c JOIN sf_waves w ON w.id = c.wave_id
+         JOIN sf_names n ON n.level = 'school' AND n.unit_id = c.school_id
+         LEFT JOIN sf_names r ON r.level = 'region' AND r.unit_id = c.region_id
+       WHERE w.open = 1 AND w.demo = 0 AND (${like(['n.name', 'r.name'])}) ORDER BY n.name LIMIT 20`).bind(...pats, ...pats).all<Dict>(),
+    c.env.DB.prepare(`SELECT school_id, name, coalesce(town, region_name) AS region FROM sf_schools
+       WHERE ${like(['name', 'town', 'region_name'])} ORDER BY name LIMIT 20`).bind(...pats, ...pats, ...pats).all<Dict>(),
+    latestOpenWave(c.env.DB),
+  ]);
+  const out = new Map<string, Dict>();
+  for (const r of cls.results) out.set(r.school_id, r);
+  if (w) for (const r of reg.results) if (!out.has(r.school_id)) out.set(r.school_id, r);
+  return c.json({ schools: [...out.values()].slice(0, 20) });
+});
+
+/** One school, for its own survey link and QR code (survey.html?s=<id>). */
+sf.get('/schools/:id', async (c) => {
+  const home = await openHome(c.env.DB, id(c.req.param('id'), 'училище'));
+  if (!home) throw new HttpError(404, 'Това училище в момента не събира отговори.');
+  return c.json({ school_id: c.req.param('id'), name: home.name, region: home.region });
 });
 
 sf.post('/open-session', async (c) => {
@@ -347,24 +454,37 @@ sf.post('/open-session', async (c) => {
   const grade = Number(b.grade);
   if (!(grade >= 1 && grade <= 12)) throw new HttpError(400, 'Изберете клас от 1 до 12.');
   if (role === 'student' && grade < Q.params.student_min_grade) throw new HttpError(400, 'Учениците от I–III клас не попълват анкета; попълва родителят.');
-  const home = await c.env.DB.prepare(
-    `SELECT c.wave_id, c.region_id FROM sf_classes c JOIN sf_waves w ON w.id = c.wave_id
-     WHERE c.school_id = ? AND w.open = 1 AND w.demo = 0 ORDER BY w.created_at DESC LIMIT 1`).bind(schoolId).first<Dict>();
+  const home = await openHome(c.env.DB, schoolId);
   if (!home) throw new HttpError(404, 'Това училище в момента не събира отговори.');
-  const key = 'open|' + (await ipKey(c));
-  const att = await c.env.DB.prepare('SELECT n FROM sf_attempts WHERE key = ?').bind(key).first<{ n: number }>();
-  if ((att?.n || 0) >= MAX_OPEN_SESSIONS_PER_DAY) throw new HttpError(429, 'От тази връзка днес са попълнени много анкети. Опитайте утре.');
-  const classId = `${schoolId}-g${grade}`, code = newCode(), day = new Date().toISOString().slice(0, 10);
+  const key = await underLimit(c, 'open', MAX_OPEN_SESSIONS_PER_DAY, 'От тази връзка днес са попълнени много анкети. Опитайте утре.');
+  await verifyPow(c, b.pow);
+  const classId = `${schoolId}-g${grade}`, code = newCode();
   await c.env.DB.batch([
     c.env.DB.prepare(`INSERT OR IGNORE INTO sf_classes (wave_id, class_id, school_id, region_id, grade, class_size, roster)
       VALUES (?, ?, ?, ?, ?, NULL, '[]')`).bind(home.wave_id, classId, schoolId, home.region_id, grade),
     c.env.DB.prepare('INSERT OR IGNORE INTO sf_names (level, unit_id, name) VALUES (?, ?, ?)').bind('class', classId, `${grade} клас`),
+    c.env.DB.prepare('INSERT OR IGNORE INTO sf_names (level, unit_id, name) VALUES (?, ?, ?)').bind('school', schoolId, home.name),
+    ...(home.region ? [c.env.DB.prepare('INSERT OR IGNORE INTO sf_names (level, unit_id, name) VALUES (?, ?, ?)').bind('region', home.region_id, home.region)] : []),
     c.env.DB.prepare("INSERT INTO sf_codes (hash, wave_id, class_id, role, mode) VALUES (?, ?, ?, ?, 'open')")
       .bind(await codeHash(code), home.wave_id, classId, role),
-    c.env.DB.prepare('INSERT INTO sf_attempts (key, n, day) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET n = n + 1').bind(key, day),
-    c.env.DB.prepare('DELETE FROM sf_attempts WHERE day < ?').bind(day),
   ]);
+  await bump(c, key);
   return c.json({ code });
+});
+
+/** Anyone may propose a missing school; it becomes available once the operator approves it. */
+sf.post('/school-requests', async (c) => {
+  const b = await body(c, 8 * 1024);
+  const clean = (v: unknown, n: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const name = clean(b.name, 160), town = clean(b.town, 80);
+  if (name.length < 4 || town.length < 2) throw new HttpError(400, 'Напишете името на училището и населеното място.');
+  const key = await underLimit(c, 'req', MAX_SCHOOL_REQUESTS_PER_DAY, 'Днес от тази връзка са изпратени много предложения. Опитайте утре.');
+  await verifyPow(c, b.pow);
+  await c.env.DB.prepare('INSERT INTO sf_school_requests (id, name, town, region_name, role, note) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), name, town, clean(b.region_name, 80) || null, ['parent', 'student', 'teacher', 'director'].includes(b.role) ? b.role : null,
+      clean(b.note, 500) || null).run();
+  await bump(c, key);
+  return c.json({ status: 'received' }, 201);
 });
 
 sf.post('/session', async (c) => {
@@ -732,6 +852,49 @@ sf.delete('/admin/keys/:id', async (c) => {
   await requireAdmin(c);
   await c.env.DB.prepare('DELETE FROM sf_keys WHERE substr(hash, 1, 12) = ?').bind(c.req.param('id')).run();
   return c.json({ deleted: c.req.param('id') });
+});
+
+// ------------------------------------------------------------------ admin: school register and proposals
+/** Bulk import of the register (e.g. the МОН list of active institutions), up to 1000 rows per call. */
+sf.post('/admin/schools', async (c) => {
+  await requireAdmin(c);
+  const b = await body(c, 1024 * 1024);
+  const rows = (Array.isArray(b.schools) ? b.schools : []).slice(0, 1000);
+  const str = (v: unknown, n: number) => (v == null || v === '' ? null : String(v).trim().slice(0, n));
+  const stmts = rows.map((r: Dict) => c.env.DB.prepare(`INSERT INTO sf_schools (school_id, name, town, region_id, region_name, source) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(school_id) DO UPDATE SET name = excluded.name, town = excluded.town, region_id = excluded.region_id,
+      region_name = excluded.region_name, source = excluded.source`)
+    .bind(id(r.school_id, 'училище'), str(r.name, 160) || id(r.school_id, 'училище'), str(r.town, 80), r.region_id ? id(r.region_id, 'регион') : null,
+      str(r.region_name, 80), str(r.source, 40) || 'import'));
+  for (let i = 0; i < stmts.length; i += 100) await c.env.DB.batch(stmts.slice(i, i + 100));
+  const total = await c.env.DB.prepare('SELECT count(*) AS n FROM sf_schools').first<{ n: number }>();
+  return c.json({ imported: stmts.length, total: total?.n || 0 });
+});
+
+sf.get('/admin/school-requests', async (c) => {
+  await requireAdmin(c);
+  const rows = await c.env.DB.prepare("SELECT * FROM sf_school_requests WHERE status = 'pending' ORDER BY created_at LIMIT 200").all();
+  return c.json({ requests: rows.results });
+});
+
+sf.post('/admin/school-requests/:id', async (c) => {
+  await requireAdmin(c);
+  const b = await body(c);
+  const req = await c.env.DB.prepare('SELECT * FROM sf_school_requests WHERE id = ?').bind(c.req.param('id')).first<Dict>();
+  if (!req) throw new HttpError(404, 'Няма такова предложение.');
+  if (b.action === 'approve') {
+    const schoolId = b.school_id ? id(b.school_id, 'училище') : 'u-' + req.id.slice(0, 8);
+    const regionName = String(b.region_name || req.region_name || '').trim().slice(0, 80) || null;
+    const regionId = b.region_id ? id(b.region_id, 'регион') : regionName ? regionName.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 64) : null;
+    await c.env.DB.batch([
+      c.env.DB.prepare(`INSERT OR IGNORE INTO sf_schools (school_id, name, town, region_id, region_name, source) VALUES (?, ?, ?, ?, ?, 'proposal')`)
+        .bind(schoolId, String(b.name || req.name).slice(0, 160), req.town, regionId, regionName),
+      c.env.DB.prepare("UPDATE sf_school_requests SET status = 'approved' WHERE id = ?").bind(req.id),
+    ]);
+    return c.json({ status: 'approved', school_id: schoolId });
+  }
+  await c.env.DB.prepare("UPDATE sf_school_requests SET status = 'rejected' WHERE id = ?").bind(req.id).run();
+  return c.json({ status: 'rejected' });
 });
 
 /**

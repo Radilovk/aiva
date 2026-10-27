@@ -716,7 +716,14 @@ export function aggregate(q: Questionnaire, scored: Scored[], level: string,
     if (total < P.k_anonymity.unit_min || !Object.keys(dimsOut).length) {
       res = { unit_id: u, level, suppressed: true, reason: 'k_anonymity', stage: res.stage, n_respondents: res.n_respondents };
     } else {
-      res.signals = signalsFor(q, rs, level, res.stage, natRefs);
+      // Answers without a code cannot be checked, so they never confirm a signal on their own: a signal from verified
+      // answers is a signal; one that appears only once unverified answers are added is shown apart as "unverified".
+      const open = rs.filter((r) => r.mode === 'open').length;
+      res.open_share = pyRound(open / rs.length, 2);
+      const verified = signalsFor(q, rs.filter((r) => r.mode !== 'open'), level, res.stage, natRefs);
+      const seen = new Set(verified.map((x) => x.id));
+      const extra = open ? signalsFor(q, rs, level, res.stage, natRefs).filter((x) => !seen.has(x.id)) : [];
+      res.signals = [...verified, ...extra.map((x) => ({ ...x, severity: 'unverified', unverified: true }))];
     }
     results[u] = res;
   }

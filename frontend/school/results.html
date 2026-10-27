@@ -60,7 +60,7 @@
 
     <!-- signals: inspectorate, school, teacher -->
     <section id="v-signals" hidden>
-      <button class="btn quiet small back-link no-print" type="button" onclick="location.hash='#/school'"><span data-icon="back"></span>Всички резултати</button>
+      <button class="btn quiet small back-link no-print" type="button" id="sig-back"><span data-icon="back"></span>Всички резултати</button>
       <div class="page-head">
         <div>
           <h1>Сигнали за проверка</h1>
@@ -68,7 +68,7 @@
         </div>
         <div class="row no-print" style="align-items:flex-end">
           <label class="field wave-pick"><span>Вълна</span><select id="sig-wave"></select></label>
-          <button class="btn secondary" type="button" onclick="window.print()">Печат / PDF доклад</button>
+          <button class="btn secondary" type="button" id="sig-print">Печат / PDF доклад</button>
         </div>
       </div>
       <p class="small muted" style="max-width:760px">Сигнал се появява, когато вредна практика или неблагополучие на децата се среща значително по-често,
@@ -116,6 +116,7 @@
 
 <script src="org.js"></script>
 <script src="sf.js"></script>
+<script src="lib/qrcode.js"></script>
 <script src="results.js"></script>
 </body>
 </html>

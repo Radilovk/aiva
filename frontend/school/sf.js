@@ -100,8 +100,41 @@
     for (const el of root.querySelectorAll("[data-i]")) if (!el.querySelector("svg")) el.insertAdjacentHTML("afterbegin", ICON[el.dataset.i] || "");
   }
 
+  /** Proof of work for actions without a code (see /api/sf/pow): ~33k SHA-256, under a second, done in the background. */
+  let powJob = null;
+  function pow() {
+    if (powJob && Date.now() - powJob.at < 10 * 60 * 1000) return powJob.p;
+    const p = (async () => {
+      const { challenge, bits } = await api("/pow");
+      const enc = new TextEncoder();
+      const zeros = (b) => { let n = 0; for (const x of b) { if (x === 0) { n += 8; continue; } return n + Math.clz32(x) - 24; } return n; };
+      for (let base = 0; base < 1e9; base += 512) {
+        const hs = await Promise.all(Array.from({ length: 512 }, (_, i) => crypto.subtle.digest("SHA-256", enc.encode(`${challenge}:${base + i}`))));
+        for (let i = 0; i < hs.length; i++) if (zeros(new Uint8Array(hs[i])) >= bits) return { challenge, nonce: String(base + i) };
+      }
+      throw new Error("Проверката не успя.");
+    })();
+    powJob = { at: Date.now(), p };
+    p.catch(() => { powJob = null; });
+    return p;
+  }
+  /** A solved challenge is accepted once: start the next one for a later action. */
+  const powUsed = () => { powJob = null; };
+
+  /** QR code as inline SVG (lib/qrcode.js, MIT); empty string if the library is not on the page. */
+  function qrSvg(text, cell = 4) {
+    if (!window.qrcode) return "";
+    const q = window.qrcode(0, "M");
+    q.addData(text);
+    q.make();
+    return q.createSvgTag({ cellSize: cell, margin: 2, scalable: true });
+  }
+
+  /** Public survey address of a school (what its QR code points to). */
+  const schoolLink = (id) => new URL(`survey.html?s=${encodeURIComponent(id)}`, location.href).href;
+
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => { fillOrg(); fillIcons(); });
   else { fillOrg(); fillIcons(); }
 
-  window.SF = { api, ApiError, esc, fmt, pct, store, toast, plural, ICON, apiBase, fillOrg, fillIcons };
+  window.SF = { api, ApiError, esc, fmt, pct, store, toast, plural, ICON, apiBase, fillOrg, fillIcons, pow, powUsed, qrSvg, schoolLink };
 })();

@@ -87,7 +87,9 @@
 
   function signalHtml(sg) {
     const high = sg.severity === "high";
-    const chip = `<span class="sev ${high ? "sev-high" : "sev-el"}">${high ? "Висок приоритет" : "Повишено"}</span>`;
+    const chip = sg.unverified
+      ? `<span class="sev sev-unv" title="Появява се само когато се добавят отговорите без код, които не могат да бъдат проверени">Непотвърдено – отговори без код</span>`
+      : `<span class="sev ${high ? "sev-high" : "sev-el"}">${high ? "Висок приоритет" : "Повишено"}</span>`;
     if (sg.kind === "contrast") {
       return `<div class="signal ${high ? "high" : ""}"><div class="sig-head">${chip}<h3>Децата са по-зле, когато има училище</h3></div>
         <p>Главоболието и болките в корема, трудното заспиване и лошото настроение са с <b>${fmt(sg.delta)} точки</b> по-чести, когато има училище,
@@ -252,7 +254,15 @@
       <div class="kpi"><span>Родители</span><b>${n.parent || 0}</b>${part.parent != null ? `<em>участие ${pct(part.parent)}</em>` : ""}</div>
       <div class="kpi"><span>Ученици</span><b>${n.student || 0}</b>${part.student != null ? `<em>участие ${pct(part.student)}</em>` : ""}</div>
       ${u.representativeness === "low" ? `<div class="kpi"><span>Внимание</span><b style="font-size:1rem">Ниско участие</b><em>под 30% – недоволните отговарят по-често</em></div>` : ""}
+      ${u.open_share ? `<div class="kpi"><span>Без код</span><b>${pct(u.open_share)}</b><em>отчитат се с половин тежест</em></div>` : ""}
     </div>`;
+    if (level === "school") {
+      const link = SF.schoolLink(u.unit_id);
+      h += `<div class="share-card"><div class="qr" aria-hidden="true">${SF.qrSvg(link)}</div><div>
+        <h3>Анкета за това училище</h3>
+        <p class="small ink2">Сканирайте кода или споделете връзката с родители и ученици. Без код от училището отговорите се отчитат с половин тежест.</p>
+        <div class="row"><input type="text" readonly value="${esc(link)}" aria-label="Връзка към анкетата"><button class="btn small secondary" type="button" data-copy="${esc(link)}">Копирай</button></div></div></div>`;
+    }
     if (level === "teacher") h += `<div class="note" style="margin-top:18px"><div class="priv">${ICON.lock}<span>Поверително. Този резултат виждат само учителят, директорът и инспекторатът. Не се публикува.</span></div></div>`;
     h += signalsBlock(u);
     h += wellbeingBlock(level, u);
@@ -390,7 +400,7 @@
           <div class="row"><div><span class="chip">${LV[u.level] || u.level}</span> <a class="nm" href="#/${u.level}/${encodeURIComponent(u.unit_id)}">${esc(u.name)}</a>
             <div class="small muted">${[...new Set([u.parent_name, u.region_name].filter(Boolean))].map(esc).join(" · ")} · ${respondents(u.summary?.n_respondents)} отговора</div></div>
             <span class="spacer"></span>${high ? `<span class="sev sev-high">${high} висок приоритет</span>` : ""}</div>
-          <div class="sig-tags">${u.signals.map((g) => `<span class="sev ${g.severity === "high" ? "sev-high" : "sev-el"}">${esc(title(g))}${g.kind === "rate" ? ` · ${pct(g.rate)}` : ""}</span>`).join("")}</div>
+          <div class="sig-tags">${u.signals.map((g) => `<span class="sev ${g.unverified ? "sev-unv" : g.severity === "high" ? "sev-high" : "sev-el"}">${esc(title(g))}${g.kind === "rate" ? ` · ${pct(g.rate)}` : ""}</span>`).join("")}</div>
           <details class="sig-more"><summary>Доказателства (${u.signals.length})</summary><div class="signals">${u.signals.map(signalHtml).join("")}</div></details></article>`;
       }).join("") : `<div class="card"><h3>Няма сигнали</h3><p class="ink2" style="margin:0">В тази вълна нито едно училище, клас или учител с вашия достъп не е ясно над средното за страната по някой от показателите.</p></div>`;
     } catch (e) {
@@ -466,6 +476,11 @@
     route();
   }
 
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-copy]");
+    if (!b) return;
+    try { await navigator.clipboard.writeText(b.dataset.copy); toast("Връзката е копирана."); } catch { toast("Копирайте връзката ръчно."); }
+  });
   window.addEventListener("hashchange", route);
   // the printed report carries every piece of evidence: open the collapsed blocks while printing
   window.addEventListener("beforeprint", () => { for (const d of document.querySelectorAll("details.sig-more:not([open])")) { d.open = true; d.dataset.printOpened = "1"; } });
@@ -474,6 +489,8 @@
   $("sig-wave").addEventListener("change", () => { st.wave = $("sig-wave").value; $("wave").value = st.wave; loadSignals(); });
   $("q").addEventListener("input", () => { st.q = $("q").value; renderUnits(); });
   $("back").addEventListener("click", () => go(`#/${st.level}`));
+  $("sig-back").addEventListener("click", () => go("#/school"));
+  $("sig-print").addEventListener("click", () => window.print());
   $("login-btn").addEventListener("click", () => openLogin(""));
   $("login-form").addEventListener("submit", async (e) => {
     if (e.submitter?.value !== "ok") return;

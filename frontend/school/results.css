@@ -169,3 +169,14 @@ h3.grp:first-of-type { margin-top: 6px; }
 #v-list > .page-head .field > span { color: #c8d3e1; }
 #v-list > .page-head select { min-width: 200px; }
 @media print { #v-list > .page-head { color: #000; background: none; padding: 0; } #v-list > .page-head::before, #v-list > .page-head::after { display: none; } #v-list > .page-head h1 { color: #000; } }
+
+.sev.sev-unv { background: var(--neutral-soft); color: var(--muted); border: 1px dashed var(--line-2); }
+
+.share-card { display: grid; grid-template-columns: 132px 1fr; gap: 20px; align-items: center; background: var(--card); border: 1px solid var(--line);
+  border-left: 4px solid var(--accent); border-radius: var(--radius-sm); padding: 16px 18px; margin-top: 18px; }
+.share-card .qr svg { width: 132px; height: 132px; display: block; background: #fff; border-radius: 4px; }
+.share-card h3 { margin: 0 0 4px; }
+.share-card p { margin: 0 0 10px; }
+.share-card .row input { flex: 1 1 220px; min-height: 38px; padding: 6px 10px; font-size: .88rem; }
+@media (max-width: 520px) { .share-card { grid-template-columns: 1fr; } .share-card .qr svg { width: 160px; height: 160px; } }
+@media print { .share-card .row { display: none; } }
