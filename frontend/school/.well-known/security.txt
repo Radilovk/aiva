@@ -1,0 +1,5 @@
+Contact: mailto:info@schoolrating.eu
+Expires: 2027-10-27T00:00:00.000Z
+Preferred-Languages: bg, en
+Canonical: https://schoolrating.eu/.well-known/security.txt
+Policy: https://schoolrating.eu/privacy
