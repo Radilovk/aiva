@@ -83,7 +83,7 @@ items += [
     item("PR02A", "PR", None, T("Каква оценка получава обикновено детето?"), roles=["parent"], grades=[1, 1],
          options=["Отличен (звезда)", "Много добър (сърце)", "Добър (усмивка)", "Задоволителен", "Незадоволителен", "Не знам"],
          hint="derived:grade_band=[5,4,3,2,1,null]"),
-    item("PR02B_BEL", "PR", None, T("Как се справя детето в училище според оценките на учителя?"), roles=["parent"], grades=[2, 3],
+    item("PR02B_BEL", "PR", None, T("Как се справя детето в училище според оценките?"), roles=["parent"], grades=[2, 3],
          options=["Отличен", "Много добър", "Добър", "Задоволителен", "Незадоволителен", "Не знам"],
          hint="derived:grade_band=[5,4,3,2,1,null]"),
     item("PR02C_BEL", "PR", None, T("Какъв е общият успех на детето?", "Какъв е общият ти успех?"),
@@ -175,7 +175,7 @@ items += [
 items += [
     item("TQ01", "TQ", "TQ", T("Детето разбира повечето уроци в час и не се налага да ги учим отново вкъщи.",
                                 "Повечето учители обясняват така, че разбирам."),
-         scale="agree5", score=LIKERT_POS, young={"text": "Разбираш ли какво обяснява учителката?", "scale": "kid3_agree", "score": LIKERT_POS}),
+         scale="agree5", score=LIKERT_POS, young={"text": "Разбираш ли какво обясняват учителите в час?", "scale": "kid3_agree", "score": LIKERT_POS}),
     item("TQ02", "TX", "TQ", T("Детето разказва с интерес за часовете.", "Часовете са интересни и участвам активно."),
          scale="agree5", score=LIKERT_POS, young={"text": "Интересно ли ти е в час?", "scale": "kid3_agree", "score": LIKERT_POS}),
     item("TQ03", "TX", "TQ", T("Получавам ясна информация какво детето знае и какво да подобри.", "Когато сгреша, учителите ми показват как да се поправя."),
@@ -205,7 +205,8 @@ items += [
     item("TC08", "TC", "TC", T("Класният ръководител отговаря бързо и ясно на въпросите ми."), roles=["parent"],
          scale="agree5", score=LIKERT_POS, aspect="parent_communication", repeat=TC_REPEAT),
 ]
-# Parent-version TC01 applies from grade 1 (rated teacher = класен ръководител / начален учител)
+# Parent-version TC01 applies from grade 1 (rated teacher = класен ръководител). In grades 1-4 a class may also have
+# subject teachers (English, music, PE…): students then rate them as in the upper grades.
 for it in items:
     if it["id"] == "TC01":
         it["grades_by_role"] = {"parent": [1, 12], "student": [4, 12]}
@@ -283,7 +284,7 @@ items += [
          roles=["student"], grades=[4, 9], scale="freq5", score=LIKERT_NEG,
          young={"text": "Наказват ли децата, когато просто играят и се гонят?", "scale": "kid3_freq", "score": LIKERT_NEG}),
     item("CD11", "CD", "CD", T("", "Мога да кажа мнението си на учител, без да се страхувам."), roles=["student"], scale="agree5", score=LIKERT_POS,
-         young={"text": "Можеш ли да кажеш на учителката, когато не си съгласен/съгласна?", "scale": "kid3_agree", "score": LIKERT_POS}),
+         young={"text": "Можеш ли да кажеш на учител, когато не си съгласен/съгласна?", "scale": "kid3_agree", "score": LIKERT_POS}),
 ]
 
 # ---------------------------------------------------------------- SF: безопасност
