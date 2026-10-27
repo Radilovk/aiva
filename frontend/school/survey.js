@@ -20,7 +20,7 @@
 
   const NONE = /^нищо от изброените/i;   // exclusive answer in checklists
 
-  const st = { pick: { role: null, grade: null }, code: "", s: null, qs: [], answers: {}, idx: 0, started: 0, triggers: new Set(), dir: 1, busy: false };
+  const st = { school: null, pick: { role: null, grade: null }, code: "", s: null, qs: [], answers: {}, idx: 0, started: 0, triggers: new Set(), dir: 1, busy: false };
 
   // ------------------------------------------------------------------ wording
   /** Students see grammatical gender that matches their answer to PR01 ("напрегнат/а" -> "напрегната"). */
@@ -81,7 +81,7 @@
       b.innerHTML = ICON.back;
       b.addEventListener("click", () => show(b.dataset.back));
     }
-    $("nocode-btn").addEventListener("click", () => show("s-who"));
+    $("nocode-btn").addEventListener("click", () => { SF.pow().catch(() => {}); show("s-who"); });
     for (const b of $("who-pick").querySelectorAll("[data-role]")) {
       b.addEventListener("click", () => {
         st.pick.role = b.dataset.role;
@@ -92,6 +92,7 @@
     }
     let timer = null;
     $("school-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchSchools, 250); });
+    $("propose-form").addEventListener("submit", propose);
     $("demo-btn").addEventListener("click", async () => {
       const btn = $("demo-btn");
       btn.disabled = true;
@@ -124,6 +125,9 @@
       b.addEventListener("click", () => {
         st.pick.grade = g;
         mark(box, b);
+        $("grade-err").hidden = true;
+        // the school's own link or QR code already says which school: go straight in
+        if (st.school) return openSession(st.school, b, "grade-err");
         setTimeout(() => { show("s-school"); $("school-q").focus({ preventScroll: true }); }, 180);
       });
       box.appendChild(b);
@@ -151,12 +155,35 @@
     } catch (e) { showErr("school-err", e.message); }
   }
 
-  async function openSession(sc, b) {
-    mark($("school-list"), b);
+  async function openSession(sc, b, errId = "school-err") {
+    if (b.closest("#school-list")) mark($("school-list"), b);
+    const label = b.innerHTML;
+    b.disabled = true;
     try {
-      const r = await api("/open-session", { method: "POST", body: { school_id: sc.school_id, role: st.pick.role, grade: st.pick.grade } });
-      await start(r.code, "school-err");
-    } catch (e) { showErr("school-err", e.message); }
+      const pow = await SF.pow();
+      SF.powUsed();
+      const r = await api("/open-session", { method: "POST", body: { school_id: sc.school_id, role: st.pick.role, grade: st.pick.grade, pow } });
+      await start(r.code, errId);
+    } catch (e) { showErr(errId, e.message); }
+    b.disabled = false;
+    b.innerHTML = label;
+  }
+
+  async function propose(e) {
+    e.preventDefault();
+    const name = $("p-name").value.trim(), town = $("p-town").value.trim();
+    const msg = $("p-msg");
+    if (name.length < 4 || town.length < 2) { msg.className = "err"; msg.textContent = "Напишете името на училището и населеното място."; return; }
+    $("p-btn").disabled = true;
+    msg.className = "small muted"; msg.textContent = "Изпращаме…";
+    try {
+      const pow = await SF.pow();
+      SF.powUsed();
+      await api("/school-requests", { method: "POST", body: { name, town, role: $("p-role").value, pow } });
+      msg.className = "note small"; msg.textContent = "Благодарим! Ще добавим училището след проверка. Можете да споделите платформата с други родители от класа.";
+      $("propose-form").reset();
+    } catch (err) { msg.className = "err"; msg.textContent = err.message; }
+    $("p-btn").disabled = false;
   }
 
   function showErr(id, msg) { const el = $(id); el.textContent = msg; el.hidden = false; }
@@ -223,6 +250,10 @@
     // Children under 14: a parent unlocks the code with consent (Personal Data Protection Act).
     $("consent-box").hidden = !(s.role === "student" && s.grade <= 7);
     $("start-icon").innerHTML = ICON.next;
+    $("intro-legal").innerHTML = (s.role === "student"
+      ? "Участието е доброволно – можеш да спреш по всяко време. Отговорите ти се обработват анонимно и само обобщено."
+      : "Участието е доброволно. С попълването се съгласявате отговорите да бъдат обработени анонимно за обобщени резултати, включително въпросите за здравето.") +
+      ' <a href="privacy.html" target="_blank" rel="noopener">Как пазим данните</a>';
   }
 
   // ------------------------------------------------------------------ question flow
@@ -632,6 +663,18 @@
 
   setupCodeScreen();
   const params = new URLSearchParams(location.search);
+  const sid = params.get("s");
+  if (sid) {
+    // the school's own address (from its QR code or link): no school search needed
+    api(`/schools/${encodeURIComponent(sid)}`).then((sc) => {
+      st.school = sc;
+      $("school-banner-name").textContent = sc.name;
+      $("school-banner").hidden = false;
+      $("nocode-btn").textContent = "Започни без код";
+      $("nocode-btn").classList.remove("secondary");
+      document.title = `Анкета · ${sc.name}`;
+    }).catch(() => {});
+  }
   const pre = params.get("code");
   if (pre) {
     // keep the code out of the address bar and history once read
@@ -640,5 +683,9 @@
     start(pre);
   } else if (params.get("demo") !== null) {
     show("s-who");
+  } else if (params.get("propose") !== null) {
+    show("s-school");
+    $("propose").open = true;
+    $("p-name").focus();
   }
 })();

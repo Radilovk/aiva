@@ -3,21 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#12151a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0f2440">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
-<title>Анкета · Глас за училището</title>
+<title>Анкета · SchoolRating.eu</title>
 <link rel="stylesheet" href="sf.css">
 <link rel="stylesheet" href="survey.css">
 </head>
 <body class="sv">
+<div class="gov-strip"><div class="wrap"><span class="long">Независима платформа за анонимна обратна връзка от родители и ученици</span><span class="sp"></span><span>Телефон за деца: <a href="tel:116111">116 111</a></span></div></div>
 <div class="demo-flag" id="demo-flag" hidden>Пробен режим – отговорите не се записват и не влизат в резултатите.</div>
 <main>
   <!-- 1. code -->
   <section class="sv-screen" id="s-code">
+    <div class="code-layout">
+    <figure class="sv-art" aria-hidden="true"><img src="img/survey.webp" alt="" width="1000" height="750"></figure>
     <div class="narrow">
-      <a class="brand" href="./" style="margin-bottom:28px"><span class="brand-mark" id="brand-mark"></span><span>Глас за училището</span></a>
+      <a class="brand" href="./" style="margin-bottom:28px"><span class="brand-mark" id="brand-mark"></span><span class="brand-name">SchoolRating.eu<small>Обратна връзка за училищната среда</small></span></a>
+      <div class="school-banner" id="school-banner" hidden><span data-icon="building"></span><span>Анкета за <b id="school-banner-name"></b></span></div>
       <h1>Как е в училище?</h1>
       <p class="ink2">Ако училището ви е дало листче с код, въведете го. Анкетата е анонимна и отнема около 6 минути.</p>
       <form id="code-form" class="code-box" autocomplete="off" novalidate>
@@ -31,6 +34,8 @@
       <div class="trust" id="trust"></div>
 
       <button class="btn secondary wide" type="button" id="nocode-btn">Нямам код</button>
+      <p class="legal-links"><a href="privacy.html">Поверителност</a><a href="terms.html">Условия</a><a href="about.html">Кои сме</a><a href="child-safety.html">Ако дете е в опасност</a></p>
+    </div>
     </div>
   </section>
 
@@ -52,6 +57,7 @@
       <h1 id="grade-title">В кой клас е детето?</h1>
       <p class="ink2 small" id="grade-hint">Ако имате повече деца – попълнете поотделно за всяко.</p>
       <div class="pick grades" id="grade-pick"></div>
+      <div id="grade-err" class="err" role="alert" hidden></div>
     </div>
   </section>
 
@@ -64,6 +70,17 @@
       <div class="pick" id="school-list" role="list"></div>
       <p class="small muted" id="school-msg">Без код отговорите се броят наполовина, защото не можем да проверим класа.</p>
       <div id="school-err" class="err" role="alert" hidden></div>
+      <details class="explain" id="propose">
+        <summary>Не намирате училището? Предложете го</summary>
+        <form id="propose-form" class="propose" novalidate>
+          <label class="field"><span>Име на училището</span><input type="text" id="p-name" maxlength="160" placeholder="напр. 51 СУ „Елисавета Багряна“" required></label>
+          <label class="field"><span>Населено място</span><input type="text" id="p-town" maxlength="80" placeholder="напр. София" required></label>
+          <label class="field"><span>Аз съм</span><select id="p-role"><option value="parent">родител</option><option value="student">ученик</option><option value="teacher">учител</option><option value="director">директор</option></select></label>
+          <button class="btn secondary" id="p-btn">Изпрати предложението</button>
+          <p class="small muted" style="margin:0">Проверяваме, че училището съществува, и го добавяме обикновено до 2 работни дни. Не искаме данни за вас.</p>
+          <div id="p-msg" role="status"></div>
+        </form>
+      </details>
       <button class="link-btn" type="button" id="demo-btn" style="margin-top:22px">Само да разгледам – пробна анкета, нищо не се записва</button>
     </div>
   </section>
@@ -78,6 +95,7 @@
         <label class="check"><input type="checkbox" id="consent">
           <span>Аз съм родител на детето и разрешавам да попълни анкетата. Няма да виждам отговорите му.</span></label>
       </div>
+      <p class="small muted" id="intro-legal">Участието е доброволно. С попълването се съгласявате отговорите да бъдат обработени анонимно за обобщени резултати, включително въпросите за здравето. <a href="privacy.html" target="_blank" rel="noopener">Как пазим данните</a></p>
       <div class="q-actions"><button class="btn" id="start-btn">Започни <span id="start-icon"></span></button></div>
       <div id="intro-err" class="err" role="alert" hidden></div>
     </div>
@@ -126,6 +144,7 @@
     </div>
   </section>
 </main>
+<script src="org.js"></script>
 <script src="sf.js"></script>
 <script src="survey.js"></script>
 </body>

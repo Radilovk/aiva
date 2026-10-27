@@ -3,25 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#12151a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0f2440">
 <meta name="referrer" content="no-referrer">
-<title>Резултати · Глас за училището</title>
+<title>Резултати · SchoolRating.eu</title>
 <meta name="description" content="Анонимна обратна връзка от родители и ученици: индекс на училищата и регионите с интервали на несигурност.">
 <link rel="stylesheet" href="sf.css">
 <link rel="stylesheet" href="results.css">
 </head>
 <body>
+<!-- chrome:head active="results.html" -->
+<a class="skip" href="#main">Към съдържанието</a>
+<div class="gov-strip"><div class="wrap"><span class="long">Независима платформа за анонимна обратна връзка от родители и ученици</span><span class="sp"></span><span>Телефон за деца: <a href="tel:116111">116 111</a></span></div></div>
 <header class="site-head">
   <div class="wrap">
-    <a class="brand" href="./"><span class="brand-mark" data-icon="mark"></span><span class="brand-name">Глас за училището</span></a>
-    <nav class="site-nav"><a href="survey.html">Анкета</a><a href="results.html" aria-current="page">Резултати</a></nav>
+    <a class="brand" href="./"><span class="brand-mark" data-icon="mark"></span><span class="brand-name">SchoolRating.eu<small>Обратна връзка за училищната среда</small></span></a>
+    <nav class="site-nav" aria-label="Основно меню"><a href="./" class="opt-link">Начало</a><a href="survey.html">Анкета</a><a href="results.html" aria-current="page">Резултати</a><a href="methodology.html" class="opt-link">Методология</a><a href="about.html" class="opt-link">За нас</a></nav>
+<!-- /chrome:head -->
     <button class="btn small secondary" id="login-btn" type="button"><span data-icon="lock"></span><span id="login-label">Вход</span></button>
   </div>
 </header>
 <div class="banner" id="demo-banner" hidden><div class="wrap"><strong>Демо данни.</strong><span>Резултатите са симулирани, за да се види как работи порталът. Не са за истински училища.</span></div></div>
 
-<main>
+<main id="main">
   <div class="wrap">
     <!-- list -->
     <section id="v-list">
@@ -57,7 +60,7 @@
 
     <!-- signals: inspectorate, school, teacher -->
     <section id="v-signals" hidden>
-      <button class="btn quiet small back-link no-print" type="button" onclick="location.hash='#/school'"><span data-icon="back"></span>Всички резултати</button>
+      <button class="btn quiet small back-link no-print" type="button" id="sig-back"><span data-icon="back"></span>Всички резултати</button>
       <div class="page-head">
         <div>
           <h1>Сигнали за проверка</h1>
@@ -65,7 +68,7 @@
         </div>
         <div class="row no-print" style="align-items:flex-end">
           <label class="field wave-pick"><span>Вълна</span><select id="sig-wave"></select></label>
-          <button class="btn secondary" type="button" onclick="window.print()">Печат / PDF доклад</button>
+          <button class="btn secondary" type="button" id="sig-print">Печат / PDF доклад</button>
         </div>
       </div>
       <p class="small muted" style="max-width:760px">Сигнал се появява, когато вредна практика или неблагополучие на децата се среща значително по-често,
@@ -82,7 +85,19 @@
   </div>
 </main>
 
-<footer class="site-foot"><div class="wrap" id="foot">Отговорите са анонимни. Показват се само обобщени резултати при достатъчно отговори.</div></footer>
+<!-- chrome:foot -->
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div><h4>SchoolRating.eu</h4><p style="margin:0">Независима платформа за анонимна обратна връзка от родители и ученици за училищната среда. Не е част от Министерството на образованието и науката или от регионалните управления на образованието.</p></div>
+      <div><h4>Платформата</h4><ul><li><a href="survey.html">Анкета</a></li><li><a href="results.html">Резултати</a></li><li><a href="methodology.html">Методология</a></li><li><a href="schools.html">За училища и РУО</a></li><li><a href="results.html#/login">Вход с ключ</a></li></ul></div>
+      <div><h4>Организацията</h4><ul><li><a href="about.html">За нас</a></li><li><a href="faq.html">Въпроси и отговори</a></li><li><a href="contact.html">Контакт</a></li><li><a href="child-safety.html">Ако дете е в опасност</a></li></ul></div>
+      <div><h4>Правна информация</h4><ul><li><a href="privacy.html">Поверителност и лични данни</a></li><li><a href="terms.html">Условия за ползване</a></li><li><a href="accessibility.html">Достъпност</a></li></ul></div>
+    </div>
+    <div class="base"><span>© 2026 <span data-org="legal_name" data-fallback="brand"></span></span><span data-org-line="eik">ЕИК <span data-org="eik"></span></span><span class="sp"></span><a data-org-href="source_code">Изходен код</a><span>Снимки: Unsplash</span></div>
+  </div>
+</footer>
+<!-- /chrome:foot -->
 
 <dialog id="login-dlg">
   <form class="dlg" method="dialog" id="login-form">
@@ -99,7 +114,9 @@
   </form>
 </dialog>
 
+<script src="org.js"></script>
 <script src="sf.js"></script>
+<script src="lib/qrcode.js"></script>
 <script src="results.js"></script>
 </body>
 </html>
