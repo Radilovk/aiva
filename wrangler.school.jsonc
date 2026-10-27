@@ -1,20 +1,21 @@
 {
   // SchoolRating.eu – the school feedback platform as a separate Worker (same D1 database as "aiva").
   // Deploy: npx wrangler deploy -c wrangler.school.jsonc
-  // Custom domain: once schoolrating.eu is a zone in this Cloudflare account, uncomment "routes".
+  // Custom domains: schoolrating.eu is a zone in this account (nameservers keyla/matias.ns.cloudflare.com).
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "schoolrating",
   "main": "workers/src/school/standalone.ts",
   "compatibility_date": "2026-06-02",
   "observability": { "enabled": true },
+  "workers_dev": true,
   "assets": {
     "directory": "frontend/school",
     "run_worker_first": ["/api/*"]
   },
-  // "routes": [
-  //   { "pattern": "schoolrating.eu", "custom_domain": true },
-  //   { "pattern": "www.schoolrating.eu", "custom_domain": true }
-  // ],
+  "routes": [
+    { "pattern": "schoolrating.eu", "custom_domain": true },
+    { "pattern": "www.schoolrating.eu", "custom_domain": true }
+  ],
   "d1_databases": [
     { "binding": "DB", "database_name": "aiva-db", "database_id": "3e660ebf-11b1-47c3-b2c8-752d039dd7dc" }
   ],
