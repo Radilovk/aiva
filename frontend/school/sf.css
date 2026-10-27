@@ -41,18 +41,7 @@
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
   --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f141b; --bg-2: #151b24; --card: #19202a; --ink: #e8ebef; --ink-2: #c0c7d1; --muted: #8f99a7;
-    --line: #29313d; --line-2: #37404d; --primary: #8fb4e0; --primary-ink: #0d1a2b; --primary-soft: #1a2a3e;
-    --primary-line: #34507a; --navy-deep: #0a1626; --accent: #d6aa4f; --accent-ink: #d6aa4f; --focus: #f0b429; --good: #6cc98f; --good-soft: #17301f;
-    --ok: #e2c15e; --ok-soft: #2f2a15; --warn: #f0a36b; --warn-soft: #33231a; --bad: #f08585; --bad-soft: #351c1c; --neutral-soft: #222a35;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .25);
-    --ci-band: color-mix(in srgb, var(--primary) 42%, transparent);
-    color-scheme: dark;
-  }
+  color-scheme: only light;   /* always light: no dark variant, and browsers must not auto-darken */
 }
 
 * { box-sizing: border-box; }
