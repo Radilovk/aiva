@@ -289,8 +289,8 @@ export function gradeBand(q: Questionnaire, role: string, grade: number, answers
   const bands: number[] = [];
   for (const qid of ['PR02A', 'PR02B_BEL', 'PR02B_MAT', 'PR02C_BEL', 'PR02C_MAT']) {
     const a = answers[qid];
-    const it = q._by_id[qid];
-    if (!isNum(a) || !applies(q, it, role, grade)) continue;
+    const it = q._by_id[qid];   // older banks asked per subject; the current one asks the overall success
+    if (!isNum(a) || !it || !applies(q, it, role, grade)) continue;
     const mapping = isYoung(q, role, grade) ? [5, 4, 3, 2, null] : [5, 4, 3, 2, 1, null];
     if (a < mapping.length && mapping[a] !== null) bands.push(mapping[a] as number);
   }
@@ -347,10 +347,9 @@ export function scoreRespondent(q: Questionnaire, resp: Response): Scored {
     if (!notApplicable) push(v.dimension, [s, v.weight]);
   }
   for (const d of q.derived as Dict[]) {
-    if (d.kind === 'sleep_hours') {
-      const b = answers.SL01, w = answers.SL02;
-      if (!isNum(b) || !isNum(w)) { push(d.dimension, [null, d.weight]); continue; }
-      const hours = 24 - d.bed_hours[b] + d.wake_hours[w];
+    if (d.kind === 'sleep_from_hours') {
+      const hours = sleepHours(answers, q);
+      if (hours === null) { push(d.dimension, [null, d.weight]); continue; }
       const s = normScore(q, 'sleep', hours, grade);
       items[d.id] = s;
       push(d.dimension, [s, d.weight]);
@@ -419,12 +418,13 @@ function indicators(a: Answers, role: string, grade: number, q: Questionnaire): 
     bullying_repeated: !has('SF01') ? null : +(n('SF01') >= 2),
     // weekly or more often in school weeks (SC01); the short grade-4 form asks WB01 instead
     psychosomatic_often: isNum(a.SC01_S) ? +((a.SC01_S as number) >= 2) : !has('WB01') ? null : +(n('WB01') >= (young ? 2 : 3)),
-    shouting_weekly: atLeast(a, 'HP01', 2),
-    class_punishment: atLeast(a, 'HP02', 1),
-    threats_weekly: atLeast(a, 'HP03', 2),
-    sent_out: atLeast(a, 'HP04', 1),
-    physical_force: !has('HP05') || n('HP05') === 3 ? null : +in_('HP05', [1, 2]),
-    grade_as_punishment: !has('HP06') || n('HP06') === 2 ? null : +(n('HP06') === 1),
+    // HP00 is a checklist; the "how often" follow-up (HP01, HP03) decides "every week"
+    shouting_weekly: weekly(a, 0, 'HP01'),
+    threats_weekly: weekly(a, 1, 'HP03'),
+    class_punishment: ticked(a, 2),
+    sent_out: ticked(a, 3),
+    grade_as_punishment: ticked(a, 4),
+    physical_force: ticked(a, 5),
     ...wellbeing(a, q),
     school_worse: schoolWorse(a, q),
     sleep_short: sleepShort(a, q, grade),
@@ -432,7 +432,12 @@ function indicators(a: Answers, role: string, grade: number, q: Questionnaire): 
   };
 }
 
-const atLeast = (a: Answers, id: string, k: number) => (isNum(a[id]) ? +((a[id] as number) >= k) : null);
+const ticked = (a: Answers, opt: number) => (Array.isArray(a.HP00) ? +(a.HP00 as number[]).includes(opt) : null);
+function weekly(a: Answers, opt: number, followUp: string): number | null {
+  const t = ticked(a, opt);
+  if (t !== 1) return t;
+  return isNum(a[followUp]) ? +((a[followUp] as number) >= 1) : null;   // month3: 1 = almost every week
+}
 
 /** WHO-5 raw score 0..100 = 4 x sum of (5 - answer index); only when all five items are answered. */
 function wellbeing(a: Answers, q: Questionnaire): Dict<number | null> {
@@ -450,11 +455,16 @@ function schoolWorse(a: Answers, q: Questionnaire): number | null {
   return +(pairs.filter(([x, y]) => x - y >= c.worse_steps).length >= c.worse_min_symptoms);
 }
 
+/** Hours slept on school nights, from the school-weeks row of SC06. */
+function sleepHours(a: Answers, q: Questionnaire): number | null {
+  const d = (q.derived as Dict[]).find((x) => x.kind === 'sleep_from_hours');
+  const v = d ? a[d.from] : undefined;
+  return d && isNum(v) && v < d.hours.length ? d.hours[v] : null;
+}
+
 function sleepShort(a: Answers, q: Questionnaire, grade: number): number | null {
-  const d = (q.derived as Dict[]).find((x) => x.kind === 'sleep_hours');
-  const b = a.SL01, w = a.SL02;
-  if (!d || !isNum(b) || !isNum(w)) return null;
-  const hours = 24 - d.bed_hours[b] + d.wake_hours[w];
+  const hours = sleepHours(a, q);
+  if (hours === null) return null;
   return +(hours < q.params.norms.sleep.min_hours_by_grade[grade <= 6 ? '1-6' : '7-12']);
 }
 
@@ -1117,9 +1127,14 @@ function simGrid(ans: Answers, v: Variant, rng: Rng, latent: number, grade: numb
 
 /** Harmful practices are rare events, more frequent where the school climate is poor. */
 function simRare(ans: Answers, v: Variant, rng: Rng, latent: number) {
-  if (v.id === 'HP05') ans[v.id] = rng.random() < 0.01 + (latent < -1.5 ? 0.08 : 0) ? 1 : 0;
-  else if (v.id === 'HP06') ans[v.id] = rng.random() < 0.04 + (latent < -1 ? 0.12 : 0) ? 1 : 0;
-  else ans[v.id] = Math.min(3, Math.max(0, Math.round(-0.8 - 0.9 * latent + rng.gauss(0, 0.8))));
+  if (v.id === 'HP00') {
+    // base rate of each practice, rising where the climate is poor
+    const base = [0.08, 0.07, 0.12, 0.12, 0.05, 0.01];
+    const t = base.map((b, k) => (rng.random() < b + Math.max(0, -latent) * b * 1.5 ? k : -1)).filter((k) => k >= 0);
+    ans[v.id] = t.length ? t : [6];
+  } else {
+    ans[v.id] = Math.min(2, Math.max(0, Math.round(-0.6 - 0.7 * latent + rng.gauss(0, 0.7))));
+  }
 }
 
 function simAnswers(q: Questionnaire, rng: Rng, role: string, grade: number, latent: number, gender: number, token: string): Answers {
@@ -1134,9 +1149,9 @@ function simAnswers(q: Questionnaire, rng: Rng, role: string, grade: number, lat
       else if (v.id === 'PR04') ans[v.id] = latent < -0.8 && rng.random() < 0.7 ? 2 : rng.choice([0, 0, 0, 1]);
       else if (v.id === 'PR05') ans[v.id] = latent < 0 ? [0] : [4];
       else if (v.id === 'QC01') ans[v.id] = rng.random() > 0.05 ? 1 : 3;
+      else if (v.module === 'HP') simRare(ans, v, rng, latent);
       else if (v.type === 'multi') ans[v.id] = [rng.randrange(n)];
       else if (v.type === 'grid') simGrid(ans, v, rng, latent, grade);
-      else if (v.module === 'HP') simRare(ans, v, rng, latent);
       else if (v.score) ans[v.id] = pick(q, v, 62 + 14 * latent + rng.gauss(0, 12), grade);
       else if (v.options) {
         if (v.id === 'SL01') ans[v.id] = clamp(2 + (grade - 4) / 3 - latent * 0.8 + rng.gauss(0, 0.8), 0, 7);

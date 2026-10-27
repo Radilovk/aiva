@@ -42,6 +42,7 @@ type C = Context<{ Bindings: SfEnv }>;
 const Q = loadQuestionnaire();
 const LEVELS = ['system', 'region', 'school', 'class', 'teacher'] as const;
 const MAX_FAILED_CODES_PER_DAY = 30;
+const MAX_OPEN_SESSIONS_PER_DAY = 20;   // per network address; open answers count half anyway
 
 /** Question ids that other questions' show_if depends on: the client re-asks /flow only after answering these. */
 const TRIGGERS = (() => {
@@ -84,6 +85,7 @@ const MIGRATIONS = [
   'ALTER TABLE sf_units ADD COLUMN n_signals INTEGER NOT NULL DEFAULT 0',
   "ALTER TABLE sf_units ADD COLUMN signals TEXT NOT NULL DEFAULT '[]'",
   'ALTER TABLE sf_keys ADD COLUMN region_id TEXT',
+  "ALTER TABLE sf_codes ADD COLUMN mode TEXT NOT NULL DEFAULT 'closed'",
 ];
 let schemaReady: Promise<unknown> | null = null;
 function ensureSchema(db: D1Database) {
@@ -231,7 +233,8 @@ async function body(c: C, limit = 256 * 1024): Promise<Dict> {
 
 // ------------------------------------------------------------------ respondent: code -> session -> flow -> submit
 interface CodeCtx { hash: string; wave_id: string; class_id: string; role: string; grade: number; school_id: string;
-  region_id: string; class_size: number | null; roster: Teacher[]; teachers: Teacher[] | null; demo: boolean; open: boolean }
+  region_id: string; class_size: number | null; roster: Teacher[]; teachers: Teacher[] | null; demo: boolean; open: boolean;
+  mode: 'closed' | 'open' }
 
 /** Demo codes ("DEMO-<P|S><grade, 2 digits>-<nonce>") run the real questionnaire but nothing is stored. */
 function demoCtx(code: string): CodeCtx | null {
@@ -247,19 +250,19 @@ function demoCtx(code: string): CodeCtx | null {
     { teacher_id: 'demo-t4', name: 'г-жа Георгиева', subject: 'Английски език' },
   ];
   return { hash: 'demo-' + m[3], wave_id: 'demo', class_id: 'demo', role, grade, school_id: 'demo', region_id: 'demo',
-    class_size: null, roster, teachers: null, demo: true, open: true };
+    class_size: null, roster, teachers: null, demo: true, open: true, mode: 'closed' };
 }
 
 async function codeCtx(c: C, code: unknown): Promise<CodeCtx> {
   const demo = demoCtx(String(code ?? ''));
   if (demo) return demo;
   if (normCode(code).length < 8) throw new HttpError(404, 'unknown code');
-  const ipHash = await sha256('sf-ip|' + (c.req.header('cf-connecting-ip') || 'unknown') + '|' + new Date().toISOString().slice(0, 10));
+  const ipHash = await ipKey(c);
   const att = await c.env.DB.prepare('SELECT n FROM sf_attempts WHERE key = ?').bind(ipHash).first<{ n: number }>();
   if ((att?.n || 0) >= MAX_FAILED_CODES_PER_DAY) throw new HttpError(429, 'Твърде много грешни опити. Опитайте утре.');
   const hash = await codeHash(String(code));
   const row = await c.env.DB.prepare(
-    `SELECT k.hash, k.wave_id, k.class_id, k.role, k.used, k.teachers, c.grade, c.school_id, c.region_id, c.class_size, c.roster,
+    `SELECT k.hash, k.wave_id, k.class_id, k.role, k.used, k.teachers, k.mode, c.grade, c.school_id, c.region_id, c.class_size, c.roster,
             w.open FROM sf_codes k JOIN sf_classes c ON c.wave_id = k.wave_id AND c.class_id = k.class_id
             JOIN sf_waves w ON w.id = k.wave_id WHERE k.hash = ?`).bind(hash).first<Dict>();
   if (!row) {
@@ -273,8 +276,10 @@ async function codeCtx(c: C, code: unknown): Promise<CodeCtx> {
   if (row.used) throw new HttpError(409, 'code already used');
   return { hash, wave_id: row.wave_id, class_id: row.class_id, role: row.role, grade: row.grade, school_id: row.school_id,
     region_id: row.region_id, class_size: row.class_size, roster: JSON.parse(row.roster || '[]'),
-    teachers: row.teachers ? JSON.parse(row.teachers) : null, demo: false, open: !!row.open };
+    teachers: row.teachers ? JSON.parse(row.teachers) : null, demo: false, open: !!row.open, mode: row.mode === 'open' ? 'open' : 'closed' };
 }
+
+const ipKey = (c: C) => sha256('sf-ip|' + (c.req.header('cf-connecting-ip') || 'unknown') + '|' + new Date().toISOString().slice(0, 10));
 
 /** Teachers are assigned once per code (least-rated first) and stored, so the form is stable across visits. */
 async function teachersFor(c: C, x: CodeCtx): Promise<Teacher[]> {
@@ -315,6 +320,53 @@ sf.post('/demo-session', async (c) => {
   return c.json({ code: `DEMO-${role}${String(grade).padStart(2, '0')}-${nonce}` });
 });
 
+// ------------------------------------------------------------------ open mode: no code, the respondent picks the school
+// Answers without a code cannot be tied to a class list, so the engine counts them at half weight ("unverified").
+// They go to one class per grade of the school; there are no teacher ratings without a code.
+
+/** Schools taking part in an open (non-demo) wave, for the "I have no code" search. */
+sf.get('/schools', async (c) => {
+  const q = String(c.req.query('q') || '').trim().toLowerCase().replace(/[%_]/g, '').slice(0, 60);
+  if (q.length < 2) return c.json({ schools: [] });
+  // SQLite LIKE ignores case only for Latin letters: try "софия", "София" and "СОФИЯ"
+  const pats = [...new Set([q, q[0].toUpperCase() + q.slice(1), q.toUpperCase()])].map((v) => `%${v}%`);
+  const like = (col: string) => pats.map(() => `${col} LIKE ?`).join(' OR ');
+  const rows = await c.env.DB.prepare(
+    `SELECT DISTINCT c.school_id, n.name AS name, r.name AS region FROM sf_classes c JOIN sf_waves w ON w.id = c.wave_id
+       JOIN sf_names n ON n.level = 'school' AND n.unit_id = c.school_id
+       LEFT JOIN sf_names r ON r.level = 'region' AND r.unit_id = c.region_id
+     WHERE w.open = 1 AND w.demo = 0 AND (${like('n.name')} OR ${like('r.name')}) ORDER BY n.name LIMIT 20`)
+    .bind(...pats, ...pats).all<Dict>();
+  return c.json({ schools: rows.results });
+});
+
+sf.post('/open-session', async (c) => {
+  const b = await body(c);
+  const schoolId = id(b.school_id, 'училище');
+  const role = b.role === 'student' ? 'student' : 'parent';
+  const grade = Number(b.grade);
+  if (!(grade >= 1 && grade <= 12)) throw new HttpError(400, 'Изберете клас от 1 до 12.');
+  if (role === 'student' && grade < Q.params.student_min_grade) throw new HttpError(400, 'Учениците от I–III клас не попълват анкета; попълва родителят.');
+  const home = await c.env.DB.prepare(
+    `SELECT c.wave_id, c.region_id FROM sf_classes c JOIN sf_waves w ON w.id = c.wave_id
+     WHERE c.school_id = ? AND w.open = 1 AND w.demo = 0 ORDER BY w.created_at DESC LIMIT 1`).bind(schoolId).first<Dict>();
+  if (!home) throw new HttpError(404, 'Това училище в момента не събира отговори.');
+  const key = 'open|' + (await ipKey(c));
+  const att = await c.env.DB.prepare('SELECT n FROM sf_attempts WHERE key = ?').bind(key).first<{ n: number }>();
+  if ((att?.n || 0) >= MAX_OPEN_SESSIONS_PER_DAY) throw new HttpError(429, 'От тази връзка днес са попълнени много анкети. Опитайте утре.');
+  const classId = `${schoolId}-g${grade}`, code = newCode(), day = new Date().toISOString().slice(0, 10);
+  await c.env.DB.batch([
+    c.env.DB.prepare(`INSERT OR IGNORE INTO sf_classes (wave_id, class_id, school_id, region_id, grade, class_size, roster)
+      VALUES (?, ?, ?, ?, ?, NULL, '[]')`).bind(home.wave_id, classId, schoolId, home.region_id, grade),
+    c.env.DB.prepare('INSERT OR IGNORE INTO sf_names (level, unit_id, name) VALUES (?, ?, ?)').bind('class', classId, `${grade} клас`),
+    c.env.DB.prepare("INSERT INTO sf_codes (hash, wave_id, class_id, role, mode) VALUES (?, ?, ?, ?, 'open')")
+      .bind(await codeHash(code), home.wave_id, classId, role),
+    c.env.DB.prepare('INSERT INTO sf_attempts (key, n, day) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET n = n + 1').bind(key, day),
+    c.env.DB.prepare('DELETE FROM sf_attempts WHERE day < ?').bind(day),
+  ]);
+  return c.json({ code });
+});
+
 sf.post('/session', async (c) => {
   const b = await body(c);
   const x = await codeCtx(c, b.code);
@@ -348,7 +400,7 @@ sf.post('/responses', async (c) => {
   const tt = textThemes(all);
   const answers = Object.fromEntries(Object.entries(all).filter(([, v]) => typeof v !== 'string')) as Answers;
   const duration = Number.isFinite(Number(b.duration_s)) ? Math.max(0, Math.round(Number(b.duration_s))) : null;
-  const resp: SfResponse = { id: crypto.randomUUID(), token_hash: x.hash, mode: 'closed', role: x.role, grade: x.grade,
+  const resp: SfResponse = { id: crypto.randomUUID(), token_hash: x.hash, mode: x.mode, role: x.role, grade: x.grade,
     region_id: x.region_id, school_id: x.school_id, class_id: x.class_id, duration_s: duration, answers,
     teachers: tans.map((t) => ({ ...t, answers: sanitizeAnswers(t.answers) })) };
   try { scoreRespondent(Q, resp); } catch { throw new HttpError(400, 'Невалидни отговори.'); }
