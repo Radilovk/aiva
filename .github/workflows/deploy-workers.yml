@@ -1,0 +1,40 @@
+name: Deploy Workers
+
+# Every push to main that touches the site or the workers publishes them to Cloudflare:
+# "aiva" (wrangler.jsonc) and "schoolrating" / schoolrating.eu (wrangler.school.jsonc).
+# Needs repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'workers/**'
+      - 'school-feedback/questionnaire.json'
+      - 'wrangler.jsonc'
+      - 'wrangler.school.jsonc'
+      - '.github/workflows/deploy-workers.yml'
+
+concurrency:
+  group: deploy-workers
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [wrangler.jsonc, wrangler.school.jsonc]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix workers
+      - name: Deploy ${{ matrix.config }}
+        run: npx --yes wrangler@4 deploy -c ${{ matrix.config }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
